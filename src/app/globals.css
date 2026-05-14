@@ -1,0 +1,69 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f7f4ec;
+  --foreground: #13212f;
+  --surface: #fffdf8;
+  --muted: #5e7182;
+  --brand: #ff6b2c;
+  --brand-deep: #d94c13;
+  --teal: #0f7b78;
+  --gold: #f0b429;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-space-grotesk);
+  --font-display: var(--font-playfair-display);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-space-grotesk), sans-serif;
+}
+
+h1,
+h2,
+h3,
+.font-display {
+  font-family: var(--font-playfair-display), serif;
+}
+
+.soft-grid {
+  background-image:
+    linear-gradient(to right, rgb(19 33 47 / 8%) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(19 33 47 / 8%) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+.hero-glow {
+  background:
+    radial-gradient(circle at 10% 20%, rgb(255 107 44 / 22%), transparent 40%),
+    radial-gradient(circle at 90% 10%, rgb(15 123 120 / 18%), transparent 36%),
+    radial-gradient(circle at 50% 90%, rgb(240 180 41 / 18%), transparent 45%);
+}
+
+.section-card {
+  background: var(--surface);
+  border: 1px solid rgb(19 33 47 / 14%);
+  border-radius: 1.25rem;
+  box-shadow: 0 12px 40px rgb(19 33 47 / 8%);
+}
+
+.rise-in {
+  animation: rise-in 700ms ease-out both;
+}
+
+@keyframes rise-in {
+  0% {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
