@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import {
   events,
@@ -201,21 +202,21 @@ export default function Home() {
           </div>
 
           <nav className="hidden gap-5 text-sm text-[#13212f]/80 lg:flex">
-            <a href="#programs" className="hover:text-[#13212f]">
+            <Link href="/programs" className="hover:text-[#13212f]">
               Programs
-            </a>
-            <a href="#events" className="hover:text-[#13212f]">
+            </Link>
+            <Link href="/events" className="hover:text-[#13212f]">
               Events
-            </a>
-            <a href="#stories" className="hover:text-[#13212f]">
+            </Link>
+            <Link href="/blog" className="hover:text-[#13212f]">
               Stories
-            </a>
-            <a href="#team" className="hover:text-[#13212f]">
+            </Link>
+            <Link href="/team" className="hover:text-[#13212f]">
               Team
-            </a>
-            <a href="#contact" className="hover:text-[#13212f]">
+            </Link>
+            <Link href="/contact" className="hover:text-[#13212f]">
               Contact
-            </a>
+            </Link>
           </nav>
 
           <div className="flex items-center gap-2 rounded-full border border-[#13212f]/20 bg-white/80 p-1">
@@ -256,18 +257,18 @@ export default function Home() {
               <p className="max-w-2xl text-lg text-[#4f6273]">{t.heroBody}</p>
 
               <div className="flex flex-wrap gap-3">
-                <a
-                  href="#events"
+                <Link
+                  href="/events"
                   className="rounded-full bg-[#ff6b2c] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#d94c13]"
                 >
                   {t.ctaPrimary}
-                </a>
-                <a
-                  href="#programs"
+                </Link>
+                <Link
+                  href="/programs"
                   className="rounded-full border border-[#13212f]/25 px-6 py-3 text-sm font-semibold text-[#13212f] transition hover:bg-[#13212f]/8"
                 >
                   {t.ctaSecondary}
-                </a>
+                </Link>
               </div>
             </div>
 
@@ -296,9 +297,9 @@ export default function Home() {
         <section id="programs" className="space-y-5">
           <div className="flex items-end justify-between">
             <h2 className="text-3xl">{t.sectionPrograms}</h2>
-            <a href="#contact" className="text-sm font-semibold text-[#0f7b78]">
+            <Link href="/partners" className="text-sm font-semibold text-[#0f7b78]">
               Partner with us
-            </a>
+            </Link>
           </div>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {programs.map((program) => (
@@ -316,12 +317,12 @@ export default function Home() {
         <section id="events" className="space-y-5">
           <div className="flex items-end justify-between">
             <h2 className="text-3xl">{t.sectionEvents}</h2>
-            <a
-              href="#"
+            <Link
+              href="/events"
               className="rounded-full bg-[#13212f] px-4 py-2 text-sm font-semibold text-white"
             >
               {t.ctaPrimary}
-            </a>
+            </Link>
           </div>
           <div className="grid gap-4 lg:grid-cols-3">
             {events.map((event) => (
@@ -416,24 +417,24 @@ export default function Home() {
         <section className="section-card p-6 sm:p-8" id="contact">
           <h2 className="text-3xl">{t.sectionInvolved}</h2>
           <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <a
-              href="#events"
+            <Link
+              href="/events"
               className="rounded-xl bg-[#ff6b2c] p-4 text-sm font-semibold text-white"
             >
               Join our events
-            </a>
-            <a
-              href="#"
+            </Link>
+            <Link
+              href="/join"
               className="rounded-xl border border-[#13212f]/20 p-4 text-sm font-semibold text-[#13212f]"
             >
               Volunteer with Spark SG
-            </a>
-            <a
-              href="#"
+            </Link>
+            <Link
+              href="/partners"
               className="rounded-xl border border-[#13212f]/20 p-4 text-sm font-semibold text-[#13212f]"
             >
               Partner opportunities
-            </a>
+            </Link>
             <button
               type="button"
               disabled
