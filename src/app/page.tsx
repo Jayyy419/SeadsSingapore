@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { SiteHeader } from "@/components/site-header";
+import { MediaMasonry } from "@/components/media-masonry";
 import {
   events,
   impactMetrics,
@@ -40,8 +41,8 @@ const copy: Record<
     heroTitle: "By Youth. For Community. Across Singapore.",
     heroBody:
       "Spark SG mobilizes students, families, and partners to co-create impact through events, programs, and stories that matter.",
-    ctaPrimary: "Join Our Events",
-    ctaSecondary: "Explore Programs",
+    ctaPrimary: "Explore Programs",
+    ctaSecondary: "View Media",
     sectionPrograms: "Signature Programs",
     sectionEvents: "Upcoming Events",
     sectionStories: "Latest Stories",
@@ -59,8 +60,8 @@ const copy: Record<
     heroTitle: "By Youth. For Community. Across Singapore.",
     heroBody:
       "Spark SG mobilizes students, families, and partners to co-create impact through events, programs, and stories that matter.",
-    ctaPrimary: "Join Our Events",
-    ctaSecondary: "Explore Programs",
+    ctaPrimary: "Explore Programs",
+    ctaSecondary: "View Media",
     sectionPrograms: "Signature Programs",
     sectionEvents: "Upcoming Events",
     sectionStories: "Latest Stories",
@@ -78,8 +79,8 @@ const copy: Record<
     heroTitle: "By Youth. For Community. Across Singapore.",
     heroBody:
       "Spark SG mobilizes students, families, and partners to co-create impact through events, programs, and stories that matter.",
-    ctaPrimary: "Join Our Events",
-    ctaSecondary: "Explore Programs",
+    ctaPrimary: "Explore Programs",
+    ctaSecondary: "View Media",
     sectionPrograms: "Signature Programs",
     sectionEvents: "Upcoming Events",
     sectionStories: "Latest Stories",
@@ -97,8 +98,8 @@ const copy: Record<
     heroTitle: "By Youth. For Community. Across Singapore.",
     heroBody:
       "Spark SG mobilizes students, families, and partners to co-create impact through events, programs, and stories that matter.",
-    ctaPrimary: "Join Our Events",
-    ctaSecondary: "Explore Programs",
+    ctaPrimary: "Explore Programs",
+    ctaSecondary: "View Media",
     sectionPrograms: "Signature Programs",
     sectionEvents: "Upcoming Events",
     sectionStories: "Latest Stories",
@@ -113,24 +114,6 @@ const copy: Record<
   },
 };
 
-const photoShowcase = [
-  {
-    title: "Youth leadership workshop",
-    description: "Drop your own photo at public/photos/photo-1.svg",
-    src: "/photos/photo-1.svg",
-  },
-  {
-    title: "Community volunteering day",
-    description: "Drop your own photo at public/photos/photo-2.svg",
-    src: "/photos/photo-2.svg",
-  },
-  {
-    title: "Partners and team planning",
-    description: "Drop your own photo at public/photos/photo-3.svg",
-    src: "/photos/photo-3.svg",
-  },
-];
-
 const localeLabels: Record<Locale, string> = {
   en: "EN",
   zh: "ZH",
@@ -141,7 +124,27 @@ const localeLabels: Record<Locale, string> = {
 export default function Home() {
   const [locale, setLocale] = useState<Locale>("en");
   const [query, setQuery] = useState("");
+  const [parallax, setParallax] = useState({ x: 0, y: 0, scroll: 0 });
   const [submitStatus, setSubmitStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
+
+  useEffect(() => {
+    const onMove = (event: MouseEvent) => {
+      const x = (event.clientX / window.innerWidth - 0.5) * 2;
+      const y = (event.clientY / window.innerHeight - 0.5) * 2;
+      setParallax((current) => ({ ...current, x, y }));
+    };
+
+    const onScroll = () => {
+      setParallax((current) => ({ ...current, scroll: window.scrollY }));
+    };
+
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("scroll", onScroll);
+    };
+  }, []);
 
   const t = copy[locale];
   const filteredStories = useMemo(
@@ -195,33 +198,25 @@ export default function Home() {
 
   return (
     <div className="min-h-screen soft-grid">
-      <SiteHeader
-        rightSlot={
-          <div className="flex items-center gap-2 rounded-full border border-[color:var(--foreground-soft)] bg-white/80 p-1">
-            {Object.keys(localeLabels).map((key) => {
-              const value = key as Locale;
-              const active = locale === value;
-              return (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setLocale(value)}
-                  className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
-                    active
-                      ? "bg-[color:var(--foreground)] text-white"
-                      : "text-[color:var(--muted)] hover:bg-[color:var(--surface-2)]"
-                  }`}
-                >
-                  {localeLabels[value]}
-                </button>
-              );
-            })}
-          </div>
-        }
-      />
+      <SiteHeader />
 
       <main className="mx-auto flex w-full max-w-6xl flex-col gap-12 px-4 pb-16 pt-8 sm:px-6 lg:px-8">
-        <section className="hero-glow section-card rise-in overflow-hidden p-8 sm:p-12">
+        <section className="hero-glow section-card relative overflow-hidden p-8 sm:p-12" data-reveal>
+          <span
+            className="cinematic-layer h-56 w-56 bg-[color:var(--brand)]/25"
+            style={{
+              left: `${6 + parallax.x * 1.5}%`,
+              top: `${8 + parallax.y * 2 + parallax.scroll * 0.008}%`,
+            }}
+          />
+          <span
+            className="cinematic-layer h-72 w-72 bg-[color:var(--brand-soft)]/65"
+            style={{
+              right: `${8 - parallax.x * 1.2}%`,
+              top: `${16 - parallax.y * 1.4 + parallax.scroll * 0.006}%`,
+            }}
+          />
+
           <div className="grid gap-8 lg:grid-cols-[1.35fr_1fr] lg:items-center">
             <div className="space-y-6">
               <p className="inline-flex items-center gap-2 rounded-full border border-[color:var(--foreground-soft)] bg-[color:var(--surface)] px-4 py-1 text-sm text-[color:var(--muted)]">
@@ -229,21 +224,23 @@ export default function Home() {
                 {t.tagline}
               </p>
 
-              <h1 className="max-w-2xl text-4xl leading-tight sm:text-5xl">
+              <h1 className="font-display max-w-2xl text-4xl leading-tight sm:text-6xl">
                 {t.heroTitle}
               </h1>
               <p className="max-w-2xl text-lg text-[color:var(--muted)]">{t.heroBody}</p>
 
               <div className="flex flex-wrap gap-3">
                 <Link
-                  href="/events"
-                  className="rounded-full bg-[color:var(--brand)] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[color:var(--brand-deep)]"
+                  href="/programs"
+                  className="magnetic rounded-full bg-[color:var(--brand)] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[color:var(--brand-deep)]"
+                  data-magnetic="true"
                 >
                   {t.ctaPrimary}
                 </Link>
                 <Link
-                  href="/programs"
-                  className="rounded-full border border-[color:var(--foreground-soft)] px-6 py-3 text-sm font-semibold text-[color:var(--foreground)] transition hover:bg-[color:var(--surface-2)]"
+                  href="/media"
+                  className="magnetic rounded-full border border-[color:var(--foreground-soft)] px-6 py-3 text-sm font-semibold text-[color:var(--foreground)] transition hover:bg-[color:var(--surface-2)]"
+                  data-magnetic="true"
                 >
                   {t.ctaSecondary}
                 </Link>
@@ -251,6 +248,28 @@ export default function Home() {
             </div>
 
             <div className="section-card bg-white/80 p-6">
+              <div className="mb-3 flex justify-end">
+                <div className="rounded-full border border-[color:var(--foreground-soft)] bg-[color:var(--surface)] p-1">
+                  {Object.keys(localeLabels).map((key) => {
+                    const value = key as Locale;
+                    const active = locale === value;
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setLocale(value)}
+                        className={`rounded-full px-2 py-1 text-[10px] font-semibold transition ${
+                          active
+                            ? "bg-[color:var(--foreground)] text-white"
+                            : "text-[color:var(--muted)] hover:bg-[color:var(--surface-2)]"
+                        }`}
+                      >
+                        {localeLabels[value]}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
               <p className="text-sm font-semibold text-[color:var(--brand)]">Live priorities</p>
               <ul className="mt-4 space-y-3 text-sm text-[color:var(--foreground)]">
                 <li>Event registrations and attendance conversion</li>
@@ -262,7 +281,7 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" id="impact">
+        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" id="impact" data-reveal>
           {impactMetrics.map((metric) => (
             <article key={metric.label} className="section-card rise-in p-5">
               <p className="text-3xl font-bold text-[color:var(--foreground)]">{metric.value}</p>
@@ -272,9 +291,9 @@ export default function Home() {
           ))}
         </section>
 
-        <section id="programs" className="space-y-5">
+        <section id="programs" className="space-y-5 rounded-3xl bg-[color:var(--surface-2)]/70 p-5 sm:p-7" data-reveal>
           <div className="flex items-end justify-between">
-            <h2 className="text-3xl">{t.sectionPrograms}</h2>
+            <h2 className="font-display text-3xl">{t.sectionPrograms}</h2>
             <Link href="/partners" className="text-sm font-semibold text-[color:var(--brand)]">
               Partner with us
             </Link>
@@ -292,14 +311,15 @@ export default function Home() {
           </div>
         </section>
 
-        <section id="events" className="space-y-5">
+        <section id="events" className="space-y-5" data-reveal>
           <div className="flex items-end justify-between">
-            <h2 className="text-3xl">{t.sectionEvents}</h2>
+            <h2 className="font-display text-3xl">{t.sectionEvents}</h2>
             <Link
               href="/events"
-              className="rounded-full bg-[color:var(--foreground)] px-4 py-2 text-sm font-semibold text-white"
+              className="magnetic rounded-full bg-[color:var(--foreground)] px-4 py-2 text-sm font-semibold text-white"
+              data-magnetic="true"
             >
-              {t.ctaPrimary}
+              View all
             </Link>
           </div>
           <div className="grid gap-4 lg:grid-cols-3">
@@ -322,9 +342,9 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="grid gap-6 lg:grid-cols-2" id="stories">
+        <section className="grid gap-6 lg:grid-cols-2" id="stories" data-reveal>
           <article className="section-card p-6">
-            <h2 className="text-3xl">{t.sectionStories}</h2>
+            <h2 className="font-display text-3xl">{t.sectionStories}</h2>
             <input
               className="mt-4 w-full rounded-xl border border-[color:var(--foreground-soft)] bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-[color:var(--brand)]"
               placeholder={t.searchPlaceholder}
@@ -348,23 +368,18 @@ export default function Home() {
           </article>
 
           <article className="section-card p-6">
-            <h2 className="text-3xl">{t.sectionGallery}</h2>
-            <div className="mt-4 grid gap-3">
-              {photoShowcase.map((item) => (
-                <article key={item.title} className="overflow-hidden rounded-xl border border-[color:var(--foreground-soft)] bg-[color:var(--surface)]">
-                  <img src={item.src} alt={item.title} className="h-40 w-full object-cover" />
-                  <div className="p-4">
-                    <p className="text-sm font-semibold text-[color:var(--foreground)]">{item.title}</p>
-                    <p className="mt-1 text-xs text-[color:var(--muted)]">{item.description}</p>
-                  </div>
-                </article>
-              ))}
+            <div className="mb-3 flex items-end justify-between">
+              <h2 className="font-display text-3xl">{t.sectionGallery}</h2>
+              <Link href="/media" className="text-sm font-semibold text-[color:var(--brand)]">
+                Open full gallery
+              </Link>
             </div>
+            <MediaMasonry limit={6} showFilter={false} />
           </article>
         </section>
 
-        <section id="team" className="space-y-5">
-          <h2 className="text-3xl">{t.sectionTeam}</h2>
+        <section id="team" className="space-y-5 rounded-3xl bg-[color:var(--brand-soft)]/55 p-5 sm:p-7" data-reveal>
+          <h2 className="font-display text-3xl">{t.sectionTeam}</h2>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {teamMembers.map((member) => (
               <article key={member.name} className="section-card p-5">
@@ -376,8 +391,8 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="space-y-5">
-          <h2 className="text-3xl">{t.sectionTestimonials}</h2>
+        <section className="space-y-5" data-reveal>
+          <h2 className="font-display text-3xl">{t.sectionTestimonials}</h2>
           <div className="grid gap-4 lg:grid-cols-3">
             {testimonials.map((item) => (
               <blockquote key={item.author} className="section-card p-6">
@@ -390,20 +405,21 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="section-card p-6 sm:p-8" id="contact">
-          <h2 className="text-3xl">{t.sectionInvolved}</h2>
+        <section className="section-card bg-[color:var(--surface-2)]/75 p-6 sm:p-8" id="contact" data-reveal>
+          <h2 className="font-display text-3xl">{t.sectionInvolved}</h2>
           <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <Link
-              href="/events"
-              className="rounded-xl bg-[color:var(--brand)] p-4 text-sm font-semibold text-white"
-            >
-              Join our events
-            </Link>
-            <Link
               href="/programs"
-              className="rounded-xl border border-[color:var(--foreground-soft)] p-4 text-sm font-semibold text-[color:var(--foreground)]"
+              className="magnetic rounded-xl bg-[color:var(--brand)] p-4 text-sm font-semibold text-white"
+              data-magnetic="true"
             >
               Explore our programs
+            </Link>
+            <Link
+              href="/events"
+              className="rounded-xl border border-[color:var(--foreground-soft)] p-4 text-sm font-semibold text-[color:var(--foreground)]"
+            >
+              Upcoming events
             </Link>
             <Link
               href="/partners"
@@ -454,7 +470,8 @@ export default function Home() {
             <button
               type="submit"
               disabled={submitStatus === "loading"}
-              className="w-fit rounded-full bg-[color:var(--brand)] px-5 py-2.5 text-sm font-semibold text-white"
+              className="magnetic w-fit rounded-full bg-[color:var(--brand)] px-5 py-2.5 text-sm font-semibold text-white"
+              data-magnetic="true"
             >
               {submitStatus === "loading" ? "Submitting..." : "Submit interest"}
             </button>
@@ -462,7 +479,7 @@ export default function Home() {
         </section>
       </main>
 
-      <footer className="border-t border-[color:var(--foreground-soft)] bg-[color:var(--foreground)] py-8 text-[color:var(--surface)]">
+      <footer className="border-t border-[color:var(--foreground-soft)] bg-[color:var(--foreground)] py-8 text-[color:var(--surface)]" data-reveal>
         <div className="mx-auto flex w-full max-w-6xl flex-col justify-between gap-5 px-4 sm:px-6 lg:flex-row lg:px-8">
           <div>
             <p className="text-xl font-bold">Spark SG</p>

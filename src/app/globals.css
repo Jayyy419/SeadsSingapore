@@ -17,46 +17,79 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-space-grotesk);
-  --font-display: var(--font-playfair-display);
+  --font-sans: var(--font-manrope);
+  --font-display: var(--font-source-serif);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-space-grotesk), sans-serif;
+  font-family: var(--font-manrope), sans-serif;
+  line-height: 1.55;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+  opacity: 0.25;
+  background-image: radial-gradient(rgb(31 41 55 / 16%) 0.5px, transparent 0.5px);
+  background-size: 3px 3px;
 }
 
 h1,
 h2,
 h3,
 .font-display {
-  font-family: var(--font-playfair-display), serif;
+  font-family: var(--font-source-serif), serif;
+  letter-spacing: -0.01em;
 }
 
 .soft-grid {
   background-image:
-    linear-gradient(to right, rgb(47 111 94 / 8%) 1px, transparent 1px),
-    linear-gradient(to bottom, rgb(47 111 94 / 8%) 1px, transparent 1px);
+    linear-gradient(to right, rgb(47 111 94 / 7%) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(47 111 94 / 7%) 1px, transparent 1px);
   background-size: 40px 40px;
 }
 
 .hero-glow {
   background:
-    radial-gradient(circle at 12% 18%, rgb(47 111 94 / 22%), transparent 38%),
-    radial-gradient(circle at 90% 10%, rgb(107 142 122 / 18%), transparent 35%),
-    radial-gradient(circle at 48% 90%, rgb(220 234 223 / 42%), transparent 45%);
+    radial-gradient(circle at 12% 18%, rgb(47 111 94 / 28%), transparent 38%),
+    radial-gradient(circle at 90% 10%, rgb(107 142 122 / 24%), transparent 35%),
+    radial-gradient(circle at 48% 90%, rgb(220 234 223 / 50%), transparent 45%);
 }
 
 .section-card {
   background: var(--surface);
   border: 1px solid var(--foreground-soft);
-  border-radius: 1.25rem;
+  border-radius: 1.5rem;
   box-shadow: 0 12px 40px rgb(31 41 55 / 8%);
 }
 
-.rise-in {
-  animation: rise-in 700ms ease-out both;
+[data-reveal] {
+  opacity: 0;
+  transform: translate3d(0, 24px, 0) scale(0.985);
+  transition:
+    opacity 700ms ease,
+    transform 700ms ease;
+}
+
+[data-reveal].is-visible {
+  opacity: 1;
+  transform: translate3d(0, 0, 0) scale(1);
+}
+
+.magnetic {
+  transition: transform 180ms ease;
+}
+
+.cinematic-layer {
+  position: absolute;
+  border-radius: 999px;
+  pointer-events: none;
+  filter: blur(6px);
 }
 
 @keyframes rise-in {

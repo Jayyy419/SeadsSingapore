@@ -11,6 +11,7 @@ Defined under `src/app`:
 - `/donate` -> `src/app/donate/page.tsx`
 - `/events` -> `src/app/events/page.tsx`
 - `/join` -> `src/app/join/page.tsx`
+- `/media` -> `src/app/media/page.tsx`
 - `/partners` -> `src/app/partners/page.tsx`
 - `/programs` -> `src/app/programs/page.tsx`
 - `/team` -> `src/app/team/page.tsx`

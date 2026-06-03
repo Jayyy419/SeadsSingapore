@@ -32,7 +32,7 @@ export function SiteShell({ children, title, subtitle }: SiteShellProps) {
           </div>
           <div className="text-sm text-[color:var(--surface-soft)]">
             <p>Next.js + Sanity-ready + Vercel deployment.</p>
-            <p className="mt-1">Primary CTA: Join our events.</p>
+            <p className="mt-1">Primary CTA: Explore our programs.</p>
           </div>
         </div>
       </footer>

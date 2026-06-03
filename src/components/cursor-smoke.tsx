@@ -5,9 +5,13 @@ import { useEffect, useRef } from "react";
 type Particle = {
   x: number;
   y: number;
+  vx: number;
+  vy: number;
   r: number;
   life: number;
   hue: number;
+  sat: number;
+  light: number;
 };
 
 export function CursorSmoke() {
@@ -20,8 +24,9 @@ export function CursorSmoke() {
 
     const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const coarsePointer = window.matchMedia("(pointer: coarse)").matches;
+    const motionDisabled = document.documentElement.dataset.motion === "off";
 
-    if (prefersReducedMotion || coarsePointer) {
+    if (prefersReducedMotion || coarsePointer || motionDisabled) {
       return;
     }
 
@@ -44,15 +49,20 @@ export function CursorSmoke() {
     };
 
     const addParticle = (x: number, y: number) => {
+      const warm = Math.random() > 0.58;
       particles.push({
         x,
         y,
-        r: 28 + Math.random() * 20,
+        vx: (Math.random() - 0.5) * 0.7,
+        vy: -0.35 - Math.random() * 0.55,
+        r: 14 + Math.random() * 14,
         life: 1,
-        hue: 140 + Math.random() * 30,
+        hue: warm ? 34 + Math.random() * 12 : 145 + Math.random() * 20,
+        sat: warm ? 72 : 54,
+        light: warm ? 58 : 50,
       });
 
-      if (particles.length > 70) {
+      if (particles.length > 90) {
         particles.shift();
       }
     };
@@ -66,18 +76,20 @@ export function CursorSmoke() {
 
       for (let i = particles.length - 1; i >= 0; i -= 1) {
         const p = particles[i];
-        p.life -= 0.018;
-        p.r += 0.25;
+        p.life -= 0.02;
+        p.r += 0.18;
+        p.x += p.vx;
+        p.y += p.vy;
 
         if (p.life <= 0) {
           particles.splice(i, 1);
           continue;
         }
 
-        const alpha = p.life * 0.12;
+        const alpha = p.life * 0.16;
         const gradient = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r);
-        gradient.addColorStop(0, `hsla(${p.hue}, 45%, 52%, ${alpha})`);
-        gradient.addColorStop(1, `hsla(${p.hue}, 45%, 52%, 0)`);
+        gradient.addColorStop(0, `hsla(${p.hue}, ${p.sat}%, ${p.light}%, ${alpha})`);
+        gradient.addColorStop(1, `hsla(${p.hue}, ${p.sat}%, ${p.light}%, 0)`);
 
         ctx.fillStyle = gradient;
         ctx.beginPath();

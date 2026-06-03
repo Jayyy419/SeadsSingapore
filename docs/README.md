@@ -9,6 +9,7 @@ This folder contains project documentation for development, deployment, and main
 - [Environment Variables](./ENVIRONMENT.md)
 - [Routes and Pages](./ROUTES.md)
 - [Deployment Runbook](./DEPLOYMENT.md)
+- [Design System](./DESIGN_SYSTEM.md)
 - [Changelog](./CHANGELOG.md)
 
 ## Quick Start
