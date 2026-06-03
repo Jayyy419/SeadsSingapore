@@ -10,13 +10,13 @@ export default function EventsPage() {
       <section className="grid gap-4 lg:grid-cols-3">
         {events.map((event) => (
           <article key={event.title} className="section-card p-6">
-            <p className="text-xs font-bold uppercase tracking-wide text-[#ff6b2c]">{event.type}</p>
+            <p className="text-xs font-bold uppercase tracking-wide text-[color:var(--brand)]">{event.type}</p>
             <h2 className="mt-2 text-xl">{event.title}</h2>
             <p className="mt-3 text-sm text-[#4f6273]">{event.date}</p>
             <p className="text-sm text-[#4f6273]">{event.location}</p>
             <button
               type="button"
-              className="mt-4 rounded-full bg-[#13212f] px-4 py-2 text-sm font-semibold text-white"
+              className="mt-4 rounded-full bg-[color:var(--foreground)] px-4 py-2 text-sm font-semibold text-white"
             >
               Join Our Events
             </button>

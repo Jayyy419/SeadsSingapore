@@ -1,14 +1,17 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f7f4ec;
-  --foreground: #13212f;
-  --surface: #fffdf8;
-  --muted: #5e7182;
-  --brand: #ff6b2c;
-  --brand-deep: #d94c13;
-  --teal: #0f7b78;
-  --gold: #f0b429;
+  --background: #f6f8f5;
+  --background-overlay: rgb(246 248 245 / 94%);
+  --foreground: #1f2937;
+  --foreground-soft: rgb(31 41 55 / 16%);
+  --surface: #ffffff;
+  --surface-2: #eef3ee;
+  --surface-soft: rgb(255 255 255 / 72%);
+  --muted: #4b5563;
+  --brand: #2f6f5e;
+  --brand-deep: #25594c;
+  --brand-soft: #dceadf;
 }
 
 @theme inline {
@@ -33,23 +36,23 @@ h3,
 
 .soft-grid {
   background-image:
-    linear-gradient(to right, rgb(19 33 47 / 8%) 1px, transparent 1px),
-    linear-gradient(to bottom, rgb(19 33 47 / 8%) 1px, transparent 1px);
+    linear-gradient(to right, rgb(47 111 94 / 8%) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(47 111 94 / 8%) 1px, transparent 1px);
   background-size: 40px 40px;
 }
 
 .hero-glow {
   background:
-    radial-gradient(circle at 10% 20%, rgb(255 107 44 / 22%), transparent 40%),
-    radial-gradient(circle at 90% 10%, rgb(15 123 120 / 18%), transparent 36%),
-    radial-gradient(circle at 50% 90%, rgb(240 180 41 / 18%), transparent 45%);
+    radial-gradient(circle at 12% 18%, rgb(47 111 94 / 22%), transparent 38%),
+    radial-gradient(circle at 90% 10%, rgb(107 142 122 / 18%), transparent 35%),
+    radial-gradient(circle at 48% 90%, rgb(220 234 223 / 42%), transparent 45%);
 }
 
 .section-card {
   background: var(--surface);
-  border: 1px solid rgb(19 33 47 / 14%);
+  border: 1px solid var(--foreground-soft);
   border-radius: 1.25rem;
-  box-shadow: 0 12px 40px rgb(19 33 47 / 8%);
+  box-shadow: 0 12px 40px rgb(31 41 55 / 8%);
 }
 
 .rise-in {

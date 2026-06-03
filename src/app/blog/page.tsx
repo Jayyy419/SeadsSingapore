@@ -10,7 +10,7 @@ export default function BlogPage() {
       <section className="grid gap-4">
         {stories.map((story) => (
           <article key={story.title} className="section-card p-6">
-            <p className="text-xs font-semibold uppercase tracking-wide text-[#0f7b78]">{story.category}</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-[color:var(--brand)]">{story.category}</p>
             <h2 className="mt-2 text-2xl">{story.title}</h2>
             <p className="mt-3 text-sm text-[#4f6273]">{story.excerpt}</p>
           </article>

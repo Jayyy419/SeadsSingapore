@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Space_Grotesk, Playfair_Display } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
+import { CursorSmoke } from "@/components/cursor-smoke";
 import "./globals.css";
 
 const spaceGrotesk = Space_Grotesk({
@@ -30,6 +31,7 @@ export default function RootLayout({
       className={`${spaceGrotesk.variable} ${playfairDisplay.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
+        <CursorSmoke />
         {children}
         <Analytics />
       </body>

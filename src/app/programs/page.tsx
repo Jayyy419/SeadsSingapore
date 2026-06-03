@@ -10,7 +10,7 @@ export default function ProgramsPage() {
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {programs.map((program) => (
           <article key={program.name} className="section-card p-6">
-            <p className="text-xs font-bold uppercase tracking-wide text-[#0f7b78]">{program.tag}</p>
+            <p className="text-xs font-bold uppercase tracking-wide text-[color:var(--brand)]">{program.tag}</p>
             <h2 className="mt-2 text-xl">{program.name}</h2>
             <p className="mt-3 text-sm text-[#4f6273]">{program.description}</p>
           </article>

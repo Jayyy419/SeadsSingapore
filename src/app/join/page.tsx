@@ -24,9 +24,9 @@ export default function JoinPage() {
               </li>
             ))}
           </ol>
-          <Link
-            href="/events"
-            className="mt-6 inline-flex rounded-full bg-[#ff6b2c] px-5 py-2.5 text-sm font-semibold text-white"
+            <Link
+              href="/events"
+              className="mt-6 inline-flex rounded-full bg-[color:var(--brand)] px-5 py-2.5 text-sm font-semibold text-white"
           >
             Join Our Events
           </Link>
