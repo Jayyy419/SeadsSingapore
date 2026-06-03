@@ -113,7 +113,6 @@ const copy: Record<
   },
 };
 
-const gallery = [
 const photoShowcase = [
   {
     title: "Youth leadership workshop",
