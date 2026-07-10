@@ -94,7 +94,7 @@ export function MediaMasonry({ limit, showFilter = true }: MediaMasonryProps) {
           onClick={() => setOpenIndex(null)}
         >
           <div
-            className="max-h-[92vh] w-full max-w-5xl overflow-hidden rounded-3xl border border-white/20 bg-[color:var(--foreground)]"
+            className="max-h-[92vh] w-full max-w-5xl overflow-hidden rounded-3xl border border-white/20 bg-[color:var(--inverse-bg)]"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b border-white/15 px-4 py-3 text-white">

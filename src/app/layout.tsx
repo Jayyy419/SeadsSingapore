@@ -18,9 +18,9 @@ const sourceSerif = Source_Serif_4({
 });
 
 export const metadata: Metadata = {
-  title: "Spark SG",
+  title: "Seads Singapore",
   description:
-    "Spark SG is a youth-powered platform for events, programs, stories, and community impact.",
+    "Seads is a youth-led non-profit cultivating sustainability, mental health awareness, and personal growth across Southeast Asia.",
 };
 
 export default function RootLayout({

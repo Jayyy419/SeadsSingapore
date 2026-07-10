@@ -1,17 +1,45 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f6f8f5;
-  --background-overlay: rgb(246 248 245 / 94%);
+  --background: #faf9f5;
+  --background-overlay: rgb(250 249 245 / 92%);
   --foreground: #1f2937;
   --foreground-soft: rgb(31 41 55 / 16%);
+  --foreground-strong: rgb(31 41 55 / 22%);
   --surface: #ffffff;
   --surface-2: #eef3ee;
   --surface-soft: rgb(255 255 255 / 72%);
-  --muted: #4b5563;
+  --muted: #6b7280;
   --brand: #2f6f5e;
   --brand-deep: #25594c;
   --brand-soft: #dceadf;
+  --accent: #c8763f;
+  --footer-bg: #161f1a;
+  --footer-fg: #e7ebe8;
+  --footer-muted: #9aa79d;
+  --inverse-bg: #1f2937;
+  --inverse-fg: #ffffff;
+}
+
+:root[data-theme="dark"] {
+  --background: #15211c;
+  --background-overlay: rgb(21 33 28 / 92%);
+  --foreground: #eef1ec;
+  --foreground-soft: rgb(255 255 255 / 14%);
+  --foreground-strong: rgb(255 255 255 / 24%);
+  --surface: #1c2925;
+  --surface-2: #213028;
+  --surface-soft: rgb(28 41 37 / 72%);
+  --muted: #9fb0a5;
+  --brand: #6fc0a4;
+  --brand-deep: #8ad4b9;
+  --brand-soft: #213c31;
+  --accent: #e2965f;
+  --footer-bg: #0a100d;
+  --footer-fg: #e7ebe8;
+  --footer-muted: #7c8d81;
+  --inverse-bg: #0d1512;
+  --inverse-fg: #eef1ec;
 }
 
 @theme inline {
@@ -26,6 +54,7 @@ body {
   color: var(--foreground);
   font-family: var(--font-manrope), sans-serif;
   line-height: 1.55;
+  transition: background 200ms ease, color 200ms ease;
 }
 
 body::before {
@@ -102,4 +131,41 @@ h3,
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+.stripe-ph {
+  background-image: repeating-linear-gradient(
+    135deg,
+    rgb(47 111 94 / 14%),
+    rgb(47 111 94 / 14%) 8px,
+    rgb(47 111 94 / 6%) 8px,
+    rgb(47 111 94 / 6%) 16px
+  );
+}
+
+/* Seads nav: vine + flower-bloom hover dropdown */
+@keyframes seads-petal-grow {
+  0% { transform: scale(0.2); opacity: 0; }
+  55% { transform: scale(1.05); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes seads-petal-shrink {
+  0% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(0.15); opacity: 0; }
+}
+@keyframes seads-seed-pop {
+  0% { transform: scale(0.35); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes seads-seed-shrink {
+  0% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(0.35); opacity: 0; }
+}
+@keyframes seads-label-rise {
+  0% { opacity: 0; transform: translate(-50%, -42%) scale(0.9); }
+  100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+@keyframes seads-label-fall {
+  0% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -42%) scale(0.9); }
 }

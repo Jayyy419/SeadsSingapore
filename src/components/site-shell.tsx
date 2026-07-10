@@ -22,17 +22,19 @@ export function SiteShell({ children, title, subtitle }: SiteShellProps) {
         {children}
       </main>
 
-      <footer className="border-t border-[color:var(--foreground-soft)] bg-[color:var(--foreground)] py-8 text-[color:var(--surface)]">
+      <footer className="border-t border-[color:var(--foreground-soft)] bg-[color:var(--footer-bg)] py-8 text-[color:var(--footer-fg)]">
         <div className="mx-auto flex w-full max-w-6xl flex-col justify-between gap-5 px-4 sm:px-6 lg:flex-row lg:px-8">
           <div>
-            <p className="text-xl font-bold">Spark SG</p>
-            <p className="mt-1 text-sm text-[color:var(--surface-soft)]">
-              Youth-led programs, events, and partnerships for sustainable community impact.
+            <p className="font-display text-xl font-bold">
+              Seads <span className="font-display text-[13px] italic text-[color:var(--footer-muted)]">/si:dz/</span>
+            </p>
+            <p className="mt-1 max-w-xs text-sm text-[color:var(--footer-muted)]">
+              A youth-led movement seeding sustainability, mental health awareness, and growth across Southeast Asia.
             </p>
           </div>
-          <div className="text-sm text-[color:var(--surface-soft)]">
-            <p>Next.js + Sanity-ready + Vercel deployment.</p>
-            <p className="mt-1">Primary CTA: Explore our programs.</p>
+          <div className="text-sm text-[color:var(--footer-muted)]">
+            <p>Singapore · est. across SEA</p>
+            <p className="mt-1">hello@seads.sg</p>
           </div>
         </div>
       </footer>

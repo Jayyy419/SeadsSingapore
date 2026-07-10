@@ -35,70 +35,70 @@ export type TeamMember = {
 
 export const impactMetrics: ImpactMetric[] = [
   {
-    value: "25K+",
-    label: "Community members reached",
-    note: "Across school, neighborhood, and youth networks",
+    value: "40K+",
+    label: "Youths reached",
+    note: "Across schools and community networks in SEA",
   },
   {
-    value: "120+",
-    label: "Events delivered",
+    value: "150+",
+    label: "Programs delivered",
     note: "Leadership camps, service projects, and forums",
   },
   {
-    value: "380+",
+    value: "500+",
     label: "Active volunteers",
-    note: "Students and young professionals across Singapore",
+    note: "Students and young professionals region-wide",
   },
   {
-    value: "18",
+    value: "24",
     label: "Partner organizations",
-    note: "Schools, NGOs, and private sector collaborators",
+    note: "Schools, NGOs, and grassroots collectives",
   },
 ];
 
 export const programs: Program[] = [
   {
-    tag: "Leadership",
-    name: "Spark Future Leaders",
-    description:
-      "A pathway for students to develop civic leadership, project management, and communication skills through cohort-based learning.",
-  },
-  {
     tag: "Sustainability",
-    name: "Green Neighborhood Labs",
+    name: "Green Roots Lab",
     description:
-      "Hands-on community initiatives focused on waste reduction, climate literacy, and local sustainability action.",
+      "Hands-on community initiatives on waste reduction, climate literacy, and local sustainability action.",
   },
   {
-    tag: "Well-being",
-    name: "Community Care Circles",
+    tag: "Mental Health",
+    name: "Root & Rise Circles",
     description:
-      "Peer-led support spaces and practical workshops that promote mental health, empathy, and stronger intergenerational ties.",
+      "Peer-led support spaces and workshops promoting mental wellbeing and stronger youth connections.",
+  },
+  {
+    tag: "Leadership",
+    name: "Sprout Leaders Studio",
+    description:
+      "A cohort-based pathway building civic leadership, project management, and communication skills.",
   },
   {
     tag: "Innovation",
-    name: "Youth Solutions Studio",
+    name: "Youth Solutions Sprint",
     description:
-      "Challenge-based program where youth teams prototype solutions to social issues with mentorship from partners and experts.",
+      "Challenge-based teams prototyping solutions to social issues with mentorship from partners.",
   },
   {
     tag: "Media",
-    name: "Spark Stories Collective",
+    name: "Seads Stories Collective",
     description:
-      "A youth editorial initiative that documents grassroots impact stories through writing, photo essays, and short videos.",
+      "A youth editorial initiative documenting grassroots impact through writing, photo, and film.",
   },
   {
     tag: "Service",
-    name: "Volunteer Impact Sprint",
+    name: "Community Harvest Days",
     description:
-      "Monthly service days that match volunteers with trusted local organizations for direct, measurable community outcomes.",
+      "Monthly service days connecting volunteers with trusted local organizations for direct impact.",
   },
 ];
 
 export const events: EventItem[] = [
   {
     type: "Forum",
-    title: "Spark Youth Dialogue 2026",
+    title: "Seads Youth Dialogue 2026",
     date: "18 Jul 2026",
     location: "Singapore Management University",
   },
@@ -146,7 +146,7 @@ export const stories: Story[] = [
 export const testimonials: Testimonial[] = [
   {
     quote:
-      "Spark SG made volunteering feel meaningful and structured. I could see real outcomes from every hour I gave.",
+      "Seads made volunteering feel meaningful and structured. I could see real outcomes from every hour I gave.",
     author: "Nadira, Student Volunteer",
   },
   {

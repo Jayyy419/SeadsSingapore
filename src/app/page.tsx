@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import { SiteHeader } from "@/components/site-header";
 import { MediaMasonry } from "@/components/media-masonry";
+import { translations, type Locale } from "@/content/i18n";
 import {
   events,
   impactMetrics,
@@ -13,155 +14,10 @@ import {
   testimonials,
 } from "@/content/siteContent";
 
-type Locale = "en" | "zh" | "ms" | "ta";
-
-const copy: Record<
-  Locale,
-  {
-    tagline: string;
-    heroTitle: string;
-    heroBody: string;
-    ctaPrimary: string;
-    ctaSecondary: string;
-    sectionPrograms: string;
-    sectionEvents: string;
-    sectionStories: string;
-    sectionImpact: string;
-    sectionGallery: string;
-    sectionTeam: string;
-    sectionTestimonials: string;
-    sectionInvolved: string;
-    donateLabel: string;
-    donateComingSoon: string;
-    searchPlaceholder: string;
-  }
-> = {
-  en: {
-    tagline: "Tagline placeholder: Spark youth, shape communities.",
-    heroTitle: "By Youth. For Community. Across Singapore.",
-    heroBody:
-      "Spark SG mobilizes students, families, and partners to co-create impact through events, programs, and stories that matter.",
-    ctaPrimary: "Explore Programs",
-    ctaSecondary: "View Media",
-    sectionPrograms: "Signature Programs",
-    sectionEvents: "Upcoming Events",
-    sectionStories: "Latest Stories",
-    sectionImpact: "Our Impact",
-    sectionGallery: "Photo Wall",
-    sectionTeam: "Meet The Team",
-    sectionTestimonials: "Voices From The Community",
-    sectionInvolved: "Get Involved",
-    donateLabel: "Donate",
-    donateComingSoon: "Coming Soon",
-    searchPlaceholder: "Search stories by title or category",
-  },
-  zh: {
-    tagline: "Tagline placeholder: Spark youth, shape communities.",
-    heroTitle: "By Youth. For Community. Across Singapore.",
-    heroBody:
-      "Spark SG mobilizes students, families, and partners to co-create impact through events, programs, and stories that matter.",
-    ctaPrimary: "Explore Programs",
-    ctaSecondary: "View Media",
-    sectionPrograms: "Signature Programs",
-    sectionEvents: "Upcoming Events",
-    sectionStories: "Latest Stories",
-    sectionImpact: "Our Impact",
-    sectionGallery: "Photo Wall",
-    sectionTeam: "Meet The Team",
-    sectionTestimonials: "Voices From The Community",
-    sectionInvolved: "Get Involved",
-    donateLabel: "Donate",
-    donateComingSoon: "Coming Soon",
-    searchPlaceholder: "Search stories by title or category",
-  },
-  ms: {
-    tagline: "Tagline placeholder: Spark youth, shape communities.",
-    heroTitle: "By Youth. For Community. Across Singapore.",
-    heroBody:
-      "Spark SG mobilizes students, families, and partners to co-create impact through events, programs, and stories that matter.",
-    ctaPrimary: "Explore Programs",
-    ctaSecondary: "View Media",
-    sectionPrograms: "Signature Programs",
-    sectionEvents: "Upcoming Events",
-    sectionStories: "Latest Stories",
-    sectionImpact: "Our Impact",
-    sectionGallery: "Photo Wall",
-    sectionTeam: "Meet The Team",
-    sectionTestimonials: "Voices From The Community",
-    sectionInvolved: "Get Involved",
-    donateLabel: "Donate",
-    donateComingSoon: "Coming Soon",
-    searchPlaceholder: "Search stories by title or category",
-  },
-  ta: {
-    tagline: "Tagline placeholder: Spark youth, shape communities.",
-    heroTitle: "By Youth. For Community. Across Singapore.",
-    heroBody:
-      "Spark SG mobilizes students, families, and partners to co-create impact through events, programs, and stories that matter.",
-    ctaPrimary: "Explore Programs",
-    ctaSecondary: "View Media",
-    sectionPrograms: "Signature Programs",
-    sectionEvents: "Upcoming Events",
-    sectionStories: "Latest Stories",
-    sectionImpact: "Our Impact",
-    sectionGallery: "Photo Wall",
-    sectionTeam: "Meet The Team",
-    sectionTestimonials: "Voices From The Community",
-    sectionInvolved: "Get Involved",
-    donateLabel: "Donate",
-    donateComingSoon: "Coming Soon",
-    searchPlaceholder: "Search stories by title or category",
-  },
-};
-
-const localeLabels: Record<Locale, string> = {
-  en: "EN",
-  zh: "ZH",
-  ms: "MS",
-  ta: "TA",
-};
-
 export default function Home() {
   const [locale, setLocale] = useState<Locale>("en");
-  const [query, setQuery] = useState("");
-  const [parallax, setParallax] = useState({ x: 0, y: 0, scroll: 0 });
   const [submitStatus, setSubmitStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
-
-  useEffect(() => {
-    const onMove = (event: MouseEvent) => {
-      const x = (event.clientX / window.innerWidth - 0.5) * 2;
-      const y = (event.clientY / window.innerHeight - 0.5) * 2;
-      setParallax((current) => ({ ...current, x, y }));
-    };
-
-    const onScroll = () => {
-      setParallax((current) => ({ ...current, scroll: window.scrollY }));
-    };
-
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => {
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("scroll", onScroll);
-    };
-  }, []);
-
-  const t = copy[locale];
-  const filteredStories = useMemo(
-    () =>
-      stories.filter((story) => {
-        const search = query.trim().toLowerCase();
-        if (!search) {
-          return true;
-        }
-
-        return (
-          story.title.toLowerCase().includes(search) ||
-          story.category.toLowerCase().includes(search)
-        );
-      }),
-    [query],
-  );
+  const t = translations[locale];
 
   async function onInterestSubmit(formData: FormData) {
     const endpoint = process.env.NEXT_PUBLIC_GOOGLE_SHEETS_ENDPOINT;
@@ -180,9 +36,7 @@ export default function Home() {
 
       const response = await fetch(endpoint, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
@@ -197,300 +51,289 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen soft-grid">
-      <SiteHeader />
+    <div className="min-h-screen">
+      <SiteHeader onLocaleChange={setLocale} />
 
-      <main className="mx-auto flex w-full max-w-6xl flex-col gap-12 px-4 pb-16 pt-8 sm:px-6 lg:px-8">
-        <section className="hero-glow section-card relative overflow-hidden p-8 sm:p-12" data-reveal>
-          <span
-            className="cinematic-layer h-56 w-56 bg-[color:var(--brand)]/25"
-            style={{
-              left: `${6 + parallax.x * 1.5}%`,
-              top: `${8 + parallax.y * 2 + parallax.scroll * 0.008}%`,
-            }}
-          />
-          <span
-            className="cinematic-layer h-72 w-72 bg-[color:var(--brand-soft)]/65"
-            style={{
-              right: `${8 - parallax.x * 1.2}%`,
-              top: `${16 - parallax.y * 1.4 + parallax.scroll * 0.006}%`,
-            }}
-          />
-
-          <div className="grid gap-8 lg:grid-cols-[1.35fr_1fr] lg:items-center">
-            <div className="space-y-6">
-              <p className="inline-flex items-center gap-2 rounded-full border border-[color:var(--foreground-soft)] bg-[color:var(--surface)] px-4 py-1 text-sm text-[color:var(--muted)]">
-                <span className="h-2 w-2 rounded-full bg-[color:var(--brand)]" />
-                {t.tagline}
-              </p>
-
-              <h1 className="font-display max-w-2xl text-4xl leading-tight sm:text-6xl">
-                {t.heroTitle}
-              </h1>
-              <p className="max-w-2xl text-lg text-[color:var(--muted)]">{t.heroBody}</p>
-
-              <div className="flex flex-wrap gap-3">
-                <Link
-                  href="/programs"
-                  className="magnetic rounded-full bg-[color:var(--brand)] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[color:var(--brand-deep)]"
-                  data-magnetic="true"
-                >
-                  {t.ctaPrimary}
-                </Link>
-                <Link
-                  href="/media"
-                  className="magnetic rounded-full border border-[color:var(--foreground-soft)] px-6 py-3 text-sm font-semibold text-[color:var(--foreground)] transition hover:bg-[color:var(--surface-2)]"
-                  data-magnetic="true"
-                >
-                  {t.ctaSecondary}
-                </Link>
-              </div>
-            </div>
-
-            <div className="section-card bg-white/80 p-6">
-              <div className="mb-3 flex justify-end">
-                <div className="rounded-full border border-[color:var(--foreground-soft)] bg-[color:var(--surface)] p-1">
-                  {Object.keys(localeLabels).map((key) => {
-                    const value = key as Locale;
-                    const active = locale === value;
-                    return (
-                      <button
-                        key={value}
-                        type="button"
-                        onClick={() => setLocale(value)}
-                        className={`rounded-full px-2 py-1 text-[10px] font-semibold transition ${
-                          active
-                            ? "bg-[color:var(--foreground)] text-white"
-                            : "text-[color:var(--muted)] hover:bg-[color:var(--surface-2)]"
-                        }`}
-                      >
-                        {localeLabels[value]}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-              <p className="text-sm font-semibold text-[color:var(--brand)]">Live priorities</p>
-              <ul className="mt-4 space-y-3 text-sm text-[color:var(--foreground)]">
-                <li>Event registrations and attendance conversion</li>
-                <li>Volunteer onboarding and partner collaboration</li>
-                <li>Fresh storytelling to grow engagement</li>
-                <li>Multilingual access for wider outreach</li>
-              </ul>
-            </div>
+      {/* HERO */}
+      <section className="relative overflow-hidden px-4 pb-[90px] pt-24 sm:px-6 lg:px-8">
+        <div className="relative z-10 mx-auto max-w-[840px] text-center">
+          <p className="mb-5 text-xs font-semibold uppercase tracking-[0.14em] text-[#7a8f7f]">{t.heroEyebrow}</p>
+          <div className="flex flex-wrap items-baseline justify-center gap-4">
+            <h1 className="font-display text-[clamp(56px,9vw,104px)] font-semibold leading-none text-[color:var(--foreground)]">
+              Seads
+            </h1>
+            <span className="font-display text-2xl italic text-[#5c6b60]">/si:dz/</span>
           </div>
-        </section>
+          <p className="my-4 font-medium italic text-[color:var(--brand)]">{t.heroPos}</p>
 
-        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" id="impact" data-reveal>
+          <ol className="mx-auto flex max-w-[640px] flex-col gap-5 text-left" style={{ listStyle: "none", padding: 0 }}>
+            <li className="flex gap-4">
+              <span className="font-display text-xl font-semibold text-[color:var(--brand)]">1.</span>
+              <span className="font-display text-xl leading-snug text-[color:var(--foreground)]">{t.heroDef1}</span>
+            </li>
+            <li className="flex gap-4">
+              <span className="font-display text-xl font-semibold text-[color:var(--brand)]">2.</span>
+              <span className="font-display text-xl leading-snug text-[color:var(--foreground)]">{t.heroDef2}</span>
+            </li>
+          </ol>
+
+          <div className="mt-9 flex flex-wrap justify-center gap-3">
+            <span className="inline-flex items-center gap-2 rounded-full border border-[color:var(--foreground-strong)] px-4 py-2 text-[13px] font-semibold text-[color:var(--muted)]">
+              {t.tagSea}
+            </span>
+            <span className="inline-flex items-center rounded-full bg-[color:var(--brand-soft)] px-4 py-2 text-[13px] font-semibold text-[color:var(--brand-deep)]">
+              {t.tagEst}
+            </span>
+          </div>
+
+          <div className="mt-10 flex flex-wrap justify-center gap-3.5">
+            <a href="#programs" className="rounded-full bg-[color:var(--brand)] px-6.5 py-3.5 text-sm font-semibold text-white">
+              {t.ctaPrimary}
+            </a>
+            <Link
+              href="/about"
+              className="rounded-full border border-[color:var(--foreground-strong)] px-6.5 py-3.5 text-sm font-semibold text-[color:var(--foreground)]"
+            >
+              {t.ctaSecondary}
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      <main className="mx-auto flex w-full max-w-6xl flex-col gap-0 px-4 sm:px-6 lg:px-8">
+        {/* IMPACT */}
+        <section className="grid gap-4.5 pb-16 sm:grid-cols-2 lg:grid-cols-4">
           {impactMetrics.map((metric) => (
-            <article key={metric.label} className="section-card rise-in p-5">
-              <p className="text-3xl font-bold text-[color:var(--foreground)]">{metric.value}</p>
-              <p className="mt-2 text-sm font-semibold text-[color:var(--foreground)]">{metric.label}</p>
-              <p className="mt-1 text-sm text-[color:var(--muted)]">{metric.note}</p>
+            <article
+              key={metric.label}
+              className="rounded-[20px] border border-[color:var(--foreground-soft)] bg-[color:var(--surface)] p-6 shadow-[0_10px_30px_rgba(31,41,55,.05)]"
+            >
+              <p className="font-display text-4xl font-bold text-[color:var(--foreground)]">{metric.value}</p>
+              <p className="mt-2.5 text-sm font-bold text-[color:var(--foreground)]">{metric.label}</p>
+              <p className="mt-1 text-[13px] text-[color:var(--muted)]">{metric.note}</p>
             </article>
           ))}
         </section>
+      </main>
 
-        <section id="programs" className="space-y-5 rounded-3xl bg-[color:var(--surface-2)]/70 p-5 sm:p-7" data-reveal>
-          <div className="flex items-end justify-between">
-            <h2 className="font-display text-3xl">{t.sectionPrograms}</h2>
-            <Link href="/partners" className="text-sm font-semibold text-[color:var(--brand)]">
-              Partner with us
-            </Link>
+      {/* ABOUT / ETYMOLOGY STRIP */}
+      <section id="about" className="bg-[color:var(--inverse-bg)] px-4 py-20 text-[color:var(--inverse-fg)] sm:px-6 lg:px-8">
+        <div className="mx-auto grid max-w-[1100px] items-center gap-11 lg:grid-cols-2">
+          <div>
+            <p className="mb-3.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#9db3a3]">{t.aboutEyebrow}</p>
+            <div className="mb-4.5 flex flex-wrap items-center gap-2.5">
+              <span className="rounded-[10px] bg-[color:var(--brand)] px-3.5 py-2 text-[15px] font-bold text-[color:var(--brand-soft)]">SEA</span>
+              <span className="text-lg font-semibold text-[#c9d2cd]">+</span>
+              <span className="rounded-[10px] bg-[color:var(--accent)] px-3.5 py-2 text-[15px] font-bold text-[#fff0e2]">seeds</span>
+            </div>
+            <p className="font-display text-[26px] leading-snug text-[#f2f1ec]">{t.aboutBody1}</p>
           </div>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {programs.map((program) => (
-              <article key={program.name} className="section-card p-6">
-                <p className="text-xs font-bold uppercase tracking-wide text-[color:var(--brand)]">
-                  {program.tag}
-                </p>
-                <h3 className="mt-2 text-xl">{program.name}</h3>
-                <p className="mt-2 text-sm text-[color:var(--muted)]">{program.description}</p>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <section id="events" className="space-y-5" data-reveal>
-          <div className="flex items-end justify-between">
-            <h2 className="font-display text-3xl">{t.sectionEvents}</h2>
+          <div>
+            <p className="text-lg leading-[1.7] text-[#c9d2cd]">{t.aboutBody2}</p>
             <Link
-              href="/events"
-              className="magnetic rounded-full bg-[color:var(--foreground)] px-4 py-2 text-sm font-semibold text-white"
-              data-magnetic="true"
+              href="/team"
+              className="mt-5.5 inline-block rounded-full border border-white/25 px-6 py-3 text-sm font-semibold text-white"
             >
-              View all
+              {t.aboutCta}
             </Link>
           </div>
-          <div className="grid gap-4 lg:grid-cols-3">
-            {events.map((event) => (
-              <article key={event.title} className="section-card p-6">
-                <p className="text-xs font-bold uppercase tracking-wide text-[color:var(--brand)]">
-                  {event.type}
-                </p>
-                <h3 className="mt-2 text-xl">{event.title}</h3>
-                <p className="mt-2 text-sm text-[color:var(--muted)]">{event.date}</p>
-                <p className="text-sm text-[color:var(--muted)]">{event.location}</p>
-                <button
-                  type="button"
-                  className="mt-4 rounded-full border border-[color:var(--foreground-soft)] px-4 py-2 text-sm font-semibold transition hover:bg-[color:var(--foreground)] hover:text-white"
-                >
-                  Register
-                </button>
-              </article>
+        </div>
+      </section>
+
+      <div className="mx-auto flex w-full max-w-6xl flex-col px-4 sm:px-6 lg:px-8">
+        {/* PROGRAMS */}
+        <section id="programs" className="py-20">
+          <div className="mb-8 flex flex-wrap items-end justify-between gap-5">
+            <div>
+              <p className="mb-2.5 text-xs font-semibold uppercase tracking-[0.14em] text-[color:var(--accent)]">{t.programsEyebrow}</p>
+              <h2 className="font-display text-[38px]">{t.programsTitle}</h2>
+            </div>
+            <Link href="/partners" className="text-sm font-semibold text-[color:var(--foreground)]">
+              {t.programsLink} &rarr;
+            </Link>
+          </div>
+          <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+            {programs.map((program, i) => (
+              <Link
+                key={program.name}
+                href="/programs"
+                className="block rounded-[20px] border border-[color:var(--foreground-soft)] bg-[color:var(--surface)] p-7 text-inherit"
+              >
+                <div className="mb-3.5 flex items-center justify-between">
+                  <span className="text-xs font-bold uppercase tracking-wide text-[color:var(--brand)]">{program.tag}</span>
+                  <span className="font-display text-sm text-[color:var(--foreground-soft)]">{String(i + 1).padStart(2, "0")}</span>
+                </div>
+                <h3 className="font-display mb-2.5 text-xl text-[color:var(--foreground)]">{program.name}</h3>
+                <p className="text-[14.5px] text-[color:var(--muted)]">{program.description}</p>
+              </Link>
             ))}
           </div>
         </section>
+      </div>
 
-        <section className="grid gap-6 lg:grid-cols-2" id="stories" data-reveal>
-          <article className="section-card p-6">
-            <h2 className="font-display text-3xl">{t.sectionStories}</h2>
-            <input
-              className="mt-4 w-full rounded-xl border border-[color:var(--foreground-soft)] bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-[color:var(--brand)]"
-              placeholder={t.searchPlaceholder}
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-            />
-            <div className="mt-4 space-y-3">
-              {filteredStories.slice(0, 3).map((story) => (
-                <div
-                  key={story.title}
-                  className="rounded-xl border border-[color:var(--foreground-soft)] bg-[color:var(--surface)] p-4"
+      {/* EVENTS */}
+      <section id="events" className="bg-[color:var(--surface-2)] px-4 py-20 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-6xl">
+          <div className="mb-8 flex flex-wrap items-end justify-between gap-5">
+            <h2 className="font-display text-[38px]">{t.eventsTitle}</h2>
+            <Link href="/events" className="rounded-full bg-[color:var(--inverse-bg)] px-5 py-2.5 text-sm font-semibold text-[color:var(--inverse-fg)]">
+              {t.viewAll}
+            </Link>
+          </div>
+          <div className="grid gap-5 lg:grid-cols-3">
+            {events.map((event) => (
+              <article key={event.title} className="rounded-[20px] border border-[color:var(--foreground-soft)] bg-[color:var(--surface)] p-6.5">
+                <p className="mb-2.5 text-xs font-bold uppercase tracking-wide text-[color:var(--brand)]">{event.type}</p>
+                <h3 className="font-display mb-3 text-xl text-[color:var(--foreground)]">{event.title}</h3>
+                <p className="text-sm text-[color:var(--muted)]">{event.date}</p>
+                <p className="mb-4.5 mt-0.5 text-sm text-[color:var(--muted)]">{event.location}</p>
+                <Link
+                  href="/events"
+                  className="inline-block rounded-full border border-[color:var(--foreground-soft)] px-5 py-2 text-[13px] font-semibold text-[color:var(--foreground)]"
                 >
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[color:var(--brand)]">
-                    {story.category}
-                  </p>
-                  <h3 className="mt-1 font-semibold">{story.title}</h3>
-                  <p className="mt-1 text-sm text-[color:var(--muted)]">{story.excerpt}</p>
-                </div>
+                  View details
+                </Link>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* STORIES + GALLERY */}
+      <section id="stories" className="mx-auto max-w-6xl px-4 py-20 sm:px-6 lg:px-8">
+        <div className="grid items-start gap-6 lg:grid-cols-[1.05fr_1fr]">
+          <div>
+            <div className="mb-5 flex items-center justify-between">
+              <h2 className="font-display text-[32px]">{t.storiesTitle}</h2>
+              <Link href="/blog" className="text-sm font-semibold text-[color:var(--foreground)]">
+                {t.viewAll} &rarr;
+              </Link>
+            </div>
+            <div className="flex flex-col gap-3.5">
+              {stories.map((story) => (
+                <Link
+                  key={story.title}
+                  href="/blog"
+                  className="block rounded-2xl border border-[color:var(--foreground-soft)] bg-[color:var(--surface)] p-5 text-inherit"
+                >
+                  <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-[color:var(--accent)]">{story.category}</p>
+                  <h3 className="font-display mb-1.5 text-lg text-[color:var(--foreground)]">{story.title}</h3>
+                  <p className="text-sm text-[color:var(--muted)]">{story.excerpt}</p>
+                </Link>
               ))}
             </div>
-          </article>
-
-          <article className="section-card p-6">
-            <div className="mb-3 flex items-end justify-between">
-              <h2 className="font-display text-3xl">{t.sectionGallery}</h2>
-              <Link href="/media" className="text-sm font-semibold text-[color:var(--brand)]">
-                Open full gallery
+          </div>
+          <div>
+            <div className="mb-5 flex items-center justify-between">
+              <h2 className="font-display text-[32px]">{t.galleryTitle}</h2>
+              <Link href="/media" className="text-sm font-semibold text-[color:var(--foreground)]">
+                {t.galleryLink} &rarr;
               </Link>
             </div>
             <MediaMasonry limit={6} showFilter={false} />
-          </article>
-        </section>
+          </div>
+        </div>
+      </section>
 
-        <section id="team" className="space-y-5 rounded-3xl bg-[color:var(--brand-soft)]/55 p-5 sm:p-7" data-reveal>
-          <h2 className="font-display text-3xl">{t.sectionTeam}</h2>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* TEAM */}
+      <section id="team" className="bg-[color:var(--brand-soft)] px-4 py-20 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-6xl">
+          <h2 className="font-display mb-8 text-[38px]">{t.teamTitle}</h2>
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
             {teamMembers.map((member) => (
-              <article key={member.name} className="section-card p-5">
-                <div className="h-24 rounded-xl bg-[color:var(--surface-2)]" />
-                <h3 className="mt-3 text-lg">{member.name}</h3>
-                <p className="text-sm text-[color:var(--brand)]">{member.role}</p>
-              </article>
+              <Link key={member.name} href="/team" className="block rounded-[20px] bg-[color:var(--surface)] p-5 text-inherit">
+                <div className="stripe-ph flex h-[140px] items-center justify-center rounded-2xl">
+                  <span className="text-[11px] text-[color:var(--brand-deep)]" style={{ fontFamily: "ui-monospace,monospace" }}>
+                    portrait photo
+                  </span>
+                </div>
+                <h3 className="font-display mb-0.5 mt-4 text-lg text-[color:var(--foreground)]">{member.name}</h3>
+                <p className="text-sm font-semibold text-[color:var(--brand)]">{member.role}</p>
+              </Link>
             ))}
           </div>
-        </section>
+        </div>
+      </section>
 
-        <section className="space-y-5" data-reveal>
-          <h2 className="font-display text-3xl">{t.sectionTestimonials}</h2>
-          <div className="grid gap-4 lg:grid-cols-3">
-            {testimonials.map((item) => (
-              <blockquote key={item.author} className="section-card p-6">
-                <p className="text-sm text-[color:var(--foreground)]">&ldquo;{item.quote}&rdquo;</p>
-                <footer className="mt-3 text-sm font-semibold text-[color:var(--foreground)]">
-                  {item.author}
-                </footer>
-              </blockquote>
-            ))}
-          </div>
-        </section>
+      {/* TESTIMONIALS */}
+      <section className="mx-auto max-w-6xl px-4 py-20 sm:px-6 lg:px-8">
+        <h2 className="font-display mb-8 text-[38px]">{t.testimonialsTitle}</h2>
+        <div className="grid gap-5 lg:grid-cols-3">
+          {testimonials.map((item) => (
+            <blockquote key={item.author} className="rounded-[20px] border border-[color:var(--foreground-soft)] bg-[color:var(--surface)] p-6.5">
+              <p className="font-display text-[17px] leading-relaxed text-[color:var(--foreground)]">&ldquo;{item.quote}&rdquo;</p>
+              <footer className="mt-4 text-sm font-semibold text-[color:var(--brand)]">{item.author}</footer>
+            </blockquote>
+          ))}
+        </div>
+      </section>
 
-        <section className="section-card bg-[color:var(--surface-2)]/75 p-6 sm:p-8" id="contact" data-reveal>
-          <h2 className="font-display text-3xl">{t.sectionInvolved}</h2>
-          <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <Link
-              href="/programs"
-              className="magnetic rounded-xl bg-[color:var(--brand)] p-4 text-sm font-semibold text-white"
-              data-magnetic="true"
-            >
-              Explore our programs
-            </Link>
-            <Link
-              href="/events"
-              className="rounded-xl border border-[color:var(--foreground-soft)] p-4 text-sm font-semibold text-[color:var(--foreground)]"
-            >
-              Upcoming events
-            </Link>
-            <Link
-              href="/partners"
-              className="rounded-xl border border-[color:var(--foreground-soft)] p-4 text-sm font-semibold text-[color:var(--foreground)]"
-            >
-              Partner opportunities
-            </Link>
-            <Link
-              href="/contact"
-              className="rounded-xl border border-dashed border-[color:var(--foreground-soft)] p-4 text-sm font-semibold text-[color:var(--muted)]"
-            >
-              Contact us
-            </Link>
-          </div>
-
-          <form className="mt-6 grid gap-3 md:grid-cols-2" action={onInterestSubmit}>
+      {/* GET INVOLVED */}
+      <section id="contact" className="bg-[color:var(--inverse-bg)] px-4 py-20 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-[900px] text-center">
+          <p className="mb-3.5 text-xs font-semibold uppercase tracking-[0.14em] text-[#9db3a3]">{t.contactEyebrow}</p>
+          <h2 className="font-display mb-4 text-4xl text-white">{t.contactTitle}</h2>
+          <p className="mx-auto mb-9 max-w-[560px] text-base text-[#c9d2cd]">{t.contactBody}</p>
+          <form className="mx-auto grid gap-3 text-left md:grid-cols-2" action={onInterestSubmit}>
             <input
               type="text"
               name="name"
-              placeholder="Full name"
-              className="rounded-xl border border-[color:var(--foreground-soft)] bg-white px-4 py-3 text-sm"
+              placeholder={t.namePh}
+              className="rounded-xl border border-white/20 bg-white/[.06] px-4 py-3.5 text-sm text-white placeholder:text-white/50"
             />
             <input
               type="email"
               name="email"
-              placeholder="Email"
-              className="rounded-xl border border-[color:var(--foreground-soft)] bg-white px-4 py-3 text-sm"
+              placeholder={t.emailPh}
+              className="rounded-xl border border-white/20 bg-white/[.06] px-4 py-3.5 text-sm text-white placeholder:text-white/50"
             />
             <input
               type="text"
               name="interest"
-              placeholder="What are you interested in?"
-              className="rounded-xl border border-[color:var(--foreground-soft)] bg-white px-4 py-3 text-sm md:col-span-2"
+              placeholder={t.interestPh}
+              className="rounded-xl border border-white/20 bg-white/[.06] px-4 py-3.5 text-sm text-white placeholder:text-white/50 md:col-span-2"
             />
-            <p className="text-xs text-[color:var(--muted)] md:col-span-2">
-              Google Sheets integration is ready for your account setup.
-            </p>
             {submitStatus === "done" && (
-              <p className="text-xs font-semibold text-[color:var(--brand)] md:col-span-2">
-                Submission captured. Once your endpoint is added, entries will flow to Google Sheets.
+              <p className="text-xs font-semibold text-[color:var(--brand-soft)] md:col-span-2">
+                Submission captured. Thanks for reaching out — we&rsquo;ll follow up soon.
               </p>
             )}
             {submitStatus === "error" && (
-              <p className="text-xs font-semibold text-[color:var(--brand-deep)] md:col-span-2">
-                Could not submit right now. Please try again.
-              </p>
+              <p className="text-xs font-semibold text-[#e2965f] md:col-span-2">Could not submit right now. Please try again.</p>
             )}
             <button
               type="submit"
               disabled={submitStatus === "loading"}
-              className="magnetic w-fit rounded-full bg-[color:var(--brand)] px-5 py-2.5 text-sm font-semibold text-white"
-              data-magnetic="true"
+              className="mt-2 w-fit justify-self-center rounded-full bg-[color:var(--accent)] px-8 py-3.5 text-sm font-semibold text-white md:col-span-2"
             >
-              {submitStatus === "loading" ? "Submitting..." : "Submit interest"}
+              {submitStatus === "loading" ? "Submitting..." : t.submit}
             </button>
           </form>
-        </section>
-      </main>
+        </div>
+      </section>
 
-      <footer className="border-t border-[color:var(--foreground-soft)] bg-[color:var(--foreground)] py-8 text-[color:var(--surface)]" data-reveal>
-        <div className="mx-auto flex w-full max-w-6xl flex-col justify-between gap-5 px-4 sm:px-6 lg:flex-row lg:px-8">
+      {/* FOOTER */}
+      <footer className="bg-[color:var(--footer-bg)] px-4 py-11 text-[color:var(--footer-fg)] sm:px-6 lg:px-8">
+        <div className="mx-auto flex max-w-6xl flex-wrap justify-between gap-5">
           <div>
-            <p className="text-xl font-bold">Spark SG</p>
-            <p className="mt-1 text-sm text-[color:var(--surface-soft)]">
-              Youth-led programs, events, and partnerships for sustainable community impact.
+            <p className="font-display text-xl font-bold">
+              Seads <span className="font-display text-[13px] italic text-[#8fa295]">/si:dz/</span>
             </p>
+            <p className="mt-1.5 max-w-[320px] text-[13px] text-[color:var(--footer-muted)]">{t.footerTagline}</p>
           </div>
-          <div className="text-sm text-[color:var(--surface-soft)]">
-            <p>Built with Next.js, Tailwind, and Sanity-ready content architecture.</p>
-            <p className="mt-1">Vercel deployment ready.</p>
+          <div className="text-[13px] text-[color:var(--footer-muted)]">
+            <p>Singapore &middot; est. across SEA</p>
+            <p className="mt-1">hello@seads.sg</p>
           </div>
+        </div>
+        <div className="mx-auto mt-6 flex max-w-6xl flex-wrap gap-4.5 border-t border-white/10 pt-5 text-[13px]">
+          <Link href="/about" className="text-[color:var(--footer-muted)]">About</Link>
+          <Link href="/team" className="text-[color:var(--footer-muted)]">Team</Link>
+          <Link href="/programs" className="text-[color:var(--footer-muted)]">Programs</Link>
+          <Link href="/media" className="text-[color:var(--footer-muted)]">Media</Link>
+          <Link href="/partners" className="text-[color:var(--footer-muted)]">Partners</Link>
+          <Link href="/donate" className="text-[color:var(--footer-muted)]">Donate</Link>
+          <Link href="/contact" className="text-[color:var(--footer-muted)]">Contact</Link>
         </div>
       </footer>
     </div>

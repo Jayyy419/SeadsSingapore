@@ -5,7 +5,7 @@ export default function EventsPage() {
   return (
     <SiteShell
       title="Events"
-      subtitle="Join upcoming Spark SG forums, workshops, and volunteer activations."
+      subtitle="Join upcoming Seads forums, workshops, and volunteer activations."
     >
       <section className="grid gap-4 lg:grid-cols-3">
         {events.map((event) => (
@@ -16,7 +16,7 @@ export default function EventsPage() {
             <p className="text-sm text-[#4f6273]">{event.location}</p>
             <button
               type="button"
-              className="mt-4 rounded-full bg-[color:var(--foreground)] px-4 py-2 text-sm font-semibold text-white"
+              className="mt-4 rounded-full bg-[color:var(--inverse-bg)] px-4 py-2 text-sm font-semibold text-[color:var(--inverse-fg)]"
             >
               Join Our Events
             </button>
