@@ -1,10 +1,7 @@
 import type { Metadata } from "next";
 import { Manrope, Source_Serif_4 } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
-import { CursorSmoke } from "@/components/cursor-smoke";
-import { MotionChoreography } from "@/components/motion-choreography";
 import { ScrollProgress } from "@/components/scroll-progress";
-import { MagneticEffects } from "@/components/magnetic-effects";
 import "./globals.css";
 
 const manrope = Manrope({
@@ -35,9 +32,6 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <ScrollProgress />
-        <CursorSmoke />
-        <MotionChoreography />
-        <MagneticEffects />
         {children}
         <Analytics />
       </body>

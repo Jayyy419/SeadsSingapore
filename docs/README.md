@@ -1,4 +1,4 @@
-# SparkSG Docs
+# Seads Docs
 
 This folder contains project documentation for development, deployment, and maintenance.
 

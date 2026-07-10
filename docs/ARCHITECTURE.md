@@ -2,7 +2,7 @@
 
 ## High-Level Overview
 
-SparkSG is a Next.js App Router web application with:
+Seads is a Next.js App Router web application with:
 
 - A rich homepage experience (`src/app/page.tsx`)
 - Supporting informational routes (about, programs, events, team, partners, blog, contact, join, donate)
@@ -54,10 +54,24 @@ File: `src/app/page.tsx`
 
 Responsibilities:
 
-- Renders hero, impact, programs, events, stories, team, testimonials, and get-involved sections
-- Supports locale toggle state (`en`, `zh`, `ms`, `ta`)
-- Supports local story filtering via search query
+- Renders the dictionary-entry hero (Seads /si:dz/), impact, about/etymology, programs, events,
+  stories + gallery, team, testimonials, and get-involved sections
+- Receives locale changes from `SiteHeader` (`en`, `zh`, `ms`, `hi`) via an `onLocaleChange` callback
+  and translates its own body copy from `src/content/i18n.ts`
 - Supports optional form submission to `NEXT_PUBLIC_GOOGLE_SHEETS_ENDPOINT`
+
+### Site Header
+
+File: `src/components/site-header.tsx`
+
+Responsibilities:
+
+- Shared sticky nav across every route (rendered directly by `page.tsx` and by `SiteShell`)
+- Owns locale state (persisted to `localStorage`, four languages) and light/dark theme state
+  (persisted to `localStorage`, toggles `data-theme` on `<html>`)
+- Renders the vine SVG + grouped nav that blooms into a flower of sub-links on hover
+  (geometry in `src/lib/vine.ts`)
+- Auto-detects the active nav group/child from the current route via `usePathname()`
 
 ### Site Shell
 
@@ -85,13 +99,13 @@ This allows migration from static content to CMS-backed content without rebuildi
 
 ## Styling Architecture
 
-- Global color tokens and theme variables live in `src/app/globals.css`
+- Global color tokens live in `src/app/globals.css`, with a `:root[data-theme="dark"]` override
+  block for dark mode (toggled by `SiteHeader`)
 - Utility-first styling via Tailwind classes in components
 - Additional custom classes include:
-  - `soft-grid`
-  - `hero-glow`
-  - `section-card`
-  - `rise-in`
+  - `section-card` — the shared card treatment (border, radius, subtle shadow)
+  - `stripe-ph` — diagonal-stripe placeholder fill for photo/portrait slots
+  - `seads-*` keyframes — the nav's vine/bloom hover animation
 
 ## Deployment Architecture
 

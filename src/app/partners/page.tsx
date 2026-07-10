@@ -19,13 +19,13 @@ export default function PartnersPage() {
   return (
     <SiteShell
       title="Partners"
-      subtitle="Spark SG collaborates with schools, NGOs, and private sector partners to multiply community outcomes."
+      subtitle="Seads collaborates with schools, NGOs, and private sector partners across Southeast Asia to multiply community outcomes."
     >
       <section className="grid gap-4 lg:grid-cols-3">
         {partnerTracks.map((track) => (
           <article key={track.title} className="section-card p-6">
-            <h2 className="text-xl">{track.title}</h2>
-            <p className="mt-3 text-sm text-[#4f6273]">{track.detail}</p>
+            <h2 className="font-display text-xl">{track.title}</h2>
+            <p className="mt-3 text-sm text-[color:var(--muted)]">{track.detail}</p>
           </article>
         ))}
       </section>

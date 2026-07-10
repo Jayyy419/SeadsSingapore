@@ -9,13 +9,14 @@ type SiteShellProps = {
 
 export function SiteShell({ children, title, subtitle }: SiteShellProps) {
   return (
-    <div className="min-h-screen soft-grid">
+    <div className="min-h-screen">
       <SiteHeader />
 
-      <main className="mx-auto w-full max-w-6xl px-4 pb-16 pt-8 sm:px-6 lg:px-8">
+      <main className="mx-auto w-full max-w-6xl px-4 pb-16 pt-14 sm:px-6 lg:px-8">
         {title && (
-          <section className="hero-glow section-card mb-8 overflow-hidden p-8 sm:p-10">
-            <h1 className="text-4xl leading-tight sm:text-5xl">{title}</h1>
+          <section className="mb-12">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.14em] text-[color:var(--accent)]">Seads</p>
+            <h1 className="font-display text-4xl leading-tight text-[color:var(--foreground)] sm:text-5xl">{title}</h1>
             {subtitle && <p className="mt-3 max-w-2xl text-[color:var(--muted)]">{subtitle}</p>}
           </section>
         )}

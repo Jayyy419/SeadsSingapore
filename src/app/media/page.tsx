@@ -7,7 +7,7 @@ export default function MediaPage() {
       title="Media"
       subtitle="Moments from our programs, events, and youth-led community action across Singapore."
     >
-      <section className="section-card bg-[color:var(--surface-2)]/70 p-5 sm:p-7" data-reveal>
+      <section className="section-card bg-[color:var(--surface-2)]/70 p-5 sm:p-7">
         <div className="mb-4">
           <h2 className="font-display text-3xl">Photo Gallery</h2>
           <p className="mt-2 text-sm text-[color:var(--muted)]">
