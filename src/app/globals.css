@@ -76,61 +76,11 @@ h3,
   letter-spacing: -0.01em;
 }
 
-.soft-grid {
-  background-image:
-    linear-gradient(to right, rgb(47 111 94 / 7%) 1px, transparent 1px),
-    linear-gradient(to bottom, rgb(47 111 94 / 7%) 1px, transparent 1px);
-  background-size: 40px 40px;
-}
-
-.hero-glow {
-  background:
-    radial-gradient(circle at 12% 18%, rgb(47 111 94 / 28%), transparent 38%),
-    radial-gradient(circle at 90% 10%, rgb(107 142 122 / 24%), transparent 35%),
-    radial-gradient(circle at 48% 90%, rgb(220 234 223 / 50%), transparent 45%);
-}
-
 .section-card {
   background: var(--surface);
   border: 1px solid var(--foreground-soft);
-  border-radius: 1.5rem;
-  box-shadow: 0 12px 40px rgb(31 41 55 / 8%);
-}
-
-[data-reveal] {
-  opacity: 0;
-  transform: translate3d(0, 24px, 0) scale(0.985);
-  transition:
-    opacity 700ms ease,
-    transform 700ms ease;
-}
-
-[data-reveal].is-visible {
-  opacity: 1;
-  transform: translate3d(0, 0, 0) scale(1);
-}
-
-.magnetic {
-  transition: transform 180ms ease;
-}
-
-.cinematic-layer {
-  position: absolute;
-  border-radius: 999px;
-  pointer-events: none;
-  filter: blur(6px);
-}
-
-@keyframes rise-in {
-  0% {
-    opacity: 0;
-    transform: translateY(14px);
-  }
-
-  100% {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  border-radius: 20px;
+  box-shadow: 0 10px 30px rgb(31 41 55 / 5%);
 }
 
 .stripe-ph {
