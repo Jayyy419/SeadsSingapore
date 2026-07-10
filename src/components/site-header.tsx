@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { translations, type Locale } from "@/content/i18n";
 import { buildBloom, buildVine, computeSprigs, type BloomChild, type FillerPetal, type Sprig } from "@/lib/vine";
 
@@ -49,20 +49,21 @@ export function SiteHeader({ onLocaleChange }: SiteHeaderProps) {
   const pathname = usePathname();
   const { group: activeGroupKey, child: activeChild } = activeGroupForPath(pathname ?? "/");
 
-  const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.innerWidth < MOBILE_BREAKPOINT);
+  // These three all start at the SSR-safe default (matching what the server rendered, since
+  // window/localStorage aren't available at build/render time) and get corrected — if needed —
+  // by a real post-mount setState in the effect below. Reading window/localStorage inside a
+  // useState lazy initializer instead would make the *first* client render disagree with the
+  // static HTML already in the DOM; React's hydration commit doesn't repaint mismatched
+  // attributes in that case (it trusts the server markup), so nothing further ever corrects it
+  // since no genuine re-render follows. A real effect-driven update is a normal post-hydration
+  // render, which React does apply to the DOM.
+  const [isMobile, setIsMobile] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [openGroup, setOpenGroup] = useState<GroupKey | null>(null);
   const [closingGroup, setClosingGroup] = useState<GroupKey | null>(null);
   const [hoveredLocale, setHoveredLocale] = useState<Locale | null>(null);
-  const [locale, setLocaleState] = useState<Locale>(() => {
-    if (typeof window === "undefined") return "en";
-    const stored = window.localStorage.getItem(LOCALE_KEY) as Locale | null;
-    return stored && translations[stored] ? stored : "en";
-  });
-  const [theme, setTheme] = useState<"light" | "dark">(() => {
-    if (typeof window === "undefined") return "light";
-    return window.localStorage.getItem(THEME_KEY) === "dark" ? "dark" : "light";
-  });
+  const [locale, setLocaleState] = useState<Locale>("en");
+  const [theme, setTheme] = useState<"light" | "dark">("light");
   const [vine, setVine] = useState<{ width: number; height: number; path: string; sprigs: Sprig[] }>({
     width: 0,
     height: 44,
@@ -80,12 +81,29 @@ export function SiteHeader({ onLocaleChange }: SiteHeaderProps) {
     isMobileRef.current = isMobile;
   }, [isMobile]);
 
-  // Sync the initial (possibly localStorage-restored) theme/locale to the DOM attribute and
-  // the parent page — DOM mutation and a callback to the caller, not this component's own
-  // setState, so this is a legitimate one-time effect rather than derived state.
-  useEffect(() => {
-    document.documentElement.setAttribute("data-theme", theme);
-    onLocaleChange?.(locale);
+  // Read the real client-only values once on mount and correct state/DOM as needed.
+  // useLayoutEffect (not useEffect) so this commits before the browser paints the first
+  // frame, avoiding a visible flash of the desktop nav on a mobile viewport.
+  //
+  // The setState calls below are deliberate, not the usual derived-state antipattern:
+  // window/localStorage aren't available during the static prerender, so these can only be
+  // read post-mount, and a real setState here (not a useState lazy initializer) is what makes
+  // React actually repaint the mismatched markup instead of silently keeping the server's
+  // stale attributes.
+  useLayoutEffect(() => {
+    const mobile = window.innerWidth < MOBILE_BREAKPOINT;
+    isMobileRef.current = mobile;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setIsMobile(mobile);
+
+    const storedLocale = window.localStorage.getItem(LOCALE_KEY) as Locale | null;
+    const resolvedLocale = storedLocale && translations[storedLocale] ? storedLocale : "en";
+    setLocaleState(resolvedLocale);
+    onLocaleChange?.(resolvedLocale);
+
+    const resolvedTheme = window.localStorage.getItem(THEME_KEY) === "dark" ? "dark" : "light";
+    setTheme(resolvedTheme);
+    document.documentElement.setAttribute("data-theme", resolvedTheme);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
