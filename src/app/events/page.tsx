@@ -1,6 +1,12 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { SiteShell } from "@/components/site-shell";
 import { events } from "@/content/siteContent";
+
+export const metadata: Metadata = {
+  title: "Events",
+  description: "Join upcoming Seads forums, workshops, and volunteer activations across Southeast Asia.",
+};
 
 export default function EventsPage() {
   return (

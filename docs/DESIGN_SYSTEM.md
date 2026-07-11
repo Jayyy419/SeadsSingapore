@@ -91,6 +91,8 @@ Current source list is in [src/content/media.ts](../src/content/media.ts).
 
 Future recommendation:
 
-1. Move media metadata + assets to Sanity CMS.
-2. Keep same UI components and swap data source.
-3. Non-technical team can manage images/captions/dates from browser UI.
+1. Move media metadata + assets to a real backend/CMS once one is chosen (media files to
+   object storage such as S3, metadata to a database or headless CMS).
+2. Keep the same UI components (`MediaMasonry`) and swap only the data source in
+   `src/content/media.ts` for a fetch/query call.
+3. Non-technical team can manage images/captions/dates from a browser UI instead of editing code.

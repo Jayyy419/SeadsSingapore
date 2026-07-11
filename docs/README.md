@@ -33,5 +33,5 @@ From `package.json`:
 ## Notes
 
 - This project uses Next.js App Router in `src/app`.
-- Data is currently sourced from `src/content/siteContent.ts`, with Sanity-ready query/client utilities in `src/lib`.
+- Data is sourced from `src/content/siteContent.ts` and `src/content/media.ts` (no CMS/backend is wired up yet — see `docs/ARCHITECTURE.md`).
 - Analytics is enabled via Vercel Analytics in `src/app/layout.tsx`.

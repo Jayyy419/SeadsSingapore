@@ -34,10 +34,18 @@ This provides:
 - Blog list currently maps local `stories` from `src/content/siteContent.ts`
 - Homepage also uses local content plus interactive filtering and form actions
 
+## SEO
+
+- Every subpage exports its own `metadata` (title/description); the homepage inherits the
+  root layout's default since it's a client component (`"use client"`)
+- Root layout sets a `title.template` (`"%s | Seads Singapore"`) so subpage titles stay
+  consistent without repeating the suffix everywhere
+- `src/app/sitemap.ts` and `src/app/robots.ts` generate `/sitemap.xml` and `/robots.txt`
+  from `NEXT_PUBLIC_SITE_URL` (see `docs/ENVIRONMENT.md`)
+
 ## Future Expansion Notes
 
 Potential next additions:
 
 - Dynamic route for individual stories (`/blog/[slug]`)
-- CMS-driven route generation (Sanity-backed)
-- SEO metadata per route via route segment metadata exports
+- Backend/CMS-driven route generation once a real data source is chosen

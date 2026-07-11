@@ -1,4 +1,10 @@
+import type { Metadata } from "next";
 import { SiteShell } from "@/components/site-shell";
+
+export const metadata: Metadata = {
+  title: "Contact",
+  description: "Reach out to Seads for events, collaborations, media, and partnership opportunities.",
+};
 
 export default function ContactPage() {
   return (

@@ -1,5 +1,11 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { SiteShell } from "@/components/site-shell";
+
+export const metadata: Metadata = {
+  title: "Join Seads",
+  description: "Start your journey with Seads as a participant, volunteer, contributor, or community partner.",
+};
 
 const steps = [
   "Browse upcoming Seads events",

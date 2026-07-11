@@ -15,7 +15,10 @@ const sourceSerif = Source_Serif_4({
 });
 
 export const metadata: Metadata = {
-  title: "Seads Singapore",
+  title: {
+    default: "Seads Singapore",
+    template: "%s | Seads Singapore",
+  },
   description:
     "Seads is a youth-led non-profit cultivating sustainability, mental health awareness, and personal growth across Southeast Asia.",
 };

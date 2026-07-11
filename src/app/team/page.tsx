@@ -1,5 +1,11 @@
+import type { Metadata } from "next";
 import { SiteShell } from "@/components/site-shell";
 import { teamMembers } from "@/content/siteContent";
+
+export const metadata: Metadata = {
+  title: "Meet The Team",
+  description: "Meet the people powering Seads across strategy, programs, and community partnerships.",
+};
 
 export default function TeamPage() {
   return (

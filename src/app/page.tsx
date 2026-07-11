@@ -16,13 +16,15 @@ import {
 
 export default function Home() {
   const [locale, setLocale] = useState<Locale>("en");
-  const [submitStatus, setSubmitStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
+  const [submitStatus, setSubmitStatus] = useState<"idle" | "loading" | "done" | "error" | "unconfigured">("idle");
   const t = translations[locale];
 
   async function onInterestSubmit(formData: FormData) {
     const endpoint = process.env.NEXT_PUBLIC_GOOGLE_SHEETS_ENDPOINT;
     if (!endpoint) {
-      setSubmitStatus("done");
+      // Don't claim success when nothing was actually captured — an unconfigured endpoint
+      // previously showed the same "Submission captured" message as a real success.
+      setSubmitStatus("unconfigured");
       return;
     }
 
@@ -307,6 +309,11 @@ export default function Home() {
             )}
             {submitStatus === "error" && (
               <p className="text-xs font-semibold text-[#e2965f] md:col-span-2">Could not submit right now. Please try again.</p>
+            )}
+            {submitStatus === "unconfigured" && (
+              <p className="text-xs font-semibold text-[#e2965f] md:col-span-2">
+                This form isn&rsquo;t connected yet — please email us directly at hello@seads.sg for now.
+              </p>
             )}
             <button
               type="submit"

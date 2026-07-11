@@ -1,5 +1,11 @@
+import type { Metadata } from "next";
 import { SiteShell } from "@/components/site-shell";
 import { programs } from "@/content/siteContent";
+
+export const metadata: Metadata = {
+  title: "Signature Programs",
+  description: "Explore Seads initiatives across sustainability, mental health, leadership, innovation, media, and service.",
+};
 
 export default function ProgramsPage() {
   return (

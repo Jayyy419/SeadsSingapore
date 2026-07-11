@@ -12,19 +12,19 @@
 - Tailwind CSS v4 (via `@import "tailwindcss"` in `src/app/globals.css`)
 - Custom CSS variables and utility classes in `src/app/globals.css`
 - Google Fonts loaded through `next/font/google`:
-  - Space Grotesk
-  - Playfair Display
+  - Manrope (sans, body)
+  - Source Serif 4 (display/headings, `.font-display`)
 
 ## Content and Data
 
 - Local typed content source:
-  - `src/content/siteContent.ts`
-- Sanity-ready integration:
-  - `next-sanity`
-  - `@sanity/client`
-  - `groq`
-  - Query definitions in `src/lib/queries.ts`
-  - Sanity client config in `src/lib/sanity.ts`
+  - `src/content/siteContent.ts` (programs, events, stories, team, testimonials, impact metrics)
+  - `src/content/media.ts` (gallery items)
+  - `src/content/i18n.ts` (EN/MN/BM/HI translations)
+- No CMS or backend API — a Sanity integration was scaffolded early on but never actually
+  used by any route, and was removed (it pulled in ~800 transitive packages and accounted
+  for nearly all of this project's `npm audit` findings). See `docs/ARCHITECTURE.md` for
+  where to wire in a real backend later.
 
 ## Analytics and Hosting
 

@@ -1,5 +1,11 @@
+import type { Metadata } from "next";
 import { SiteShell } from "@/components/site-shell";
 import { MediaMasonry } from "@/components/media-masonry";
+
+export const metadata: Metadata = {
+  title: "Media",
+  description: "Photos from Seads programs, events, and youth-led community action across Southeast Asia.",
+};
 
 export default function MediaPage() {
   return (

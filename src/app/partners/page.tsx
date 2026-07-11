@@ -1,4 +1,10 @@
+import type { Metadata } from "next";
 import { SiteShell } from "@/components/site-shell";
+
+export const metadata: Metadata = {
+  title: "Partners",
+  description: "Seads collaborates with schools, NGOs, and private sector partners across Southeast Asia to multiply community outcomes.",
+};
 
 const partnerTracks = [
   {

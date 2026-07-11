@@ -4,6 +4,46 @@ All notable changes to this project should be documented in this file.
 
 This format is inspired by Keep a Changelog and uses a date-based release style.
 
+## [2026-07-11]
+
+### Fixed
+
+- Mobile navigation permanently rendered the desktop layout (crammed nav overflowing
+  horizontally, hamburger hidden) on every route for every mobile visitor. Root cause: a
+  `useState` lazy initializer read `window.innerWidth`, which is unavailable during the
+  static prerender, so the server always baked in the desktop layout — and React's
+  hydration commit doesn't repaint markup it thinks already matches, so nothing ever
+  corrected it afterward. Fixed by initializing at the SSR-safe default and correcting via
+  `useLayoutEffect` post-mount (a genuine post-hydration render, which React does apply).
+- The homepage "Get Involved" form silently told every visitor their submission was
+  captured even when `NEXT_PUBLIC_GOOGLE_SHEETS_ENDPOINT` was unset (which it currently
+  is) — nothing was actually being saved anywhere. Now shows an honest "not connected yet,
+  email us directly" message instead.
+- `events/page.tsx`: the "Join Our Events" button had no `onClick` handler at all.
+- `contact/page.tsx`: the three email addresses were plain text, not clickable.
+
+### Added
+
+- Hover states across the site: cards, CTA buttons, nav/footer links, the locale switcher,
+  theme toggle, and MediaMasonry's filter pills/gallery images/lightbox — previously there
+  was no `hover:` styling anywhere despite `--brand-deep` being defined specifically for
+  this purpose.
+- Site-wide smooth scroll (respecting `prefers-reduced-motion`) and a consistent
+  `:focus-visible` ring for keyboard navigation.
+- `.env.example`, documenting the one environment variable this project actually uses
+  (`docs/ENVIRONMENT.md` referenced a `.env.example` that didn't exist).
+
+### Removed
+
+- The Sanity CMS integration (`next-sanity`, `@sanity/client`, `groq`,
+  `src/lib/sanity.ts`, `src/lib/queries.ts`). It was scaffolded early on but never
+  actually imported by any route, and its dependency tree (a full copy of the Sanity
+  Studio/CLI toolchain, including a bundled Vite dev server) accounted for 18 of this
+  project's 23 `npm audit` findings. Removing it dropped that to 5, and a follow-up
+  `npm audit fix` brought it to 3 — all three are inside Next.js's own bundled build-time
+  PostCSS, not fixable without downgrading Next.js itself, and not exploitable here since
+  no user input flows through it (see `docs/ARCHITECTURE.md`).
+
 ## [2026-07-10]
 
 ### Changed

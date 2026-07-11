@@ -8,7 +8,9 @@ Seads is a Next.js App Router web application with:
 - Supporting informational routes (about, programs, events, team, partners, blog, contact, join, donate)
 - Reusable shell layout for subpages (`src/components/site-shell.tsx`)
 - Local typed content source (`src/content/siteContent.ts`)
-- Optional integration hooks for Sanity and Google Sheets endpoint submission
+- Google Sheets endpoint submission for the "Get Involved" interest form (no CMS or
+  database is wired up yet — a prior Sanity integration was scaffolded but never used and
+  has been removed; see the Changelog)
 
 ## Runtime Flow
 
@@ -18,8 +20,8 @@ Seads is a Next.js App Router web application with:
    - Homepage uses local state and client-side interactions (`"use client"`).
    - Subpages render static sections and shared shell wrappers.
 4. Data sources:
-   - Primary current source: static TypeScript content module.
-   - Secondary/ready source: Sanity query and client utilities.
+   - Only current source: static TypeScript content modules (`src/content/*`). No backend
+     API or database is queried at request time.
 
 ## Main Directories
 
@@ -31,7 +33,7 @@ Seads is a Next.js App Router web application with:
 - `src/content`
   - Typed local data objects for metrics, programs, events, stories, team, and testimonials
 - `src/lib`
-  - Integration utilities (`sanity.ts`, `queries.ts`)
+  - Shared non-content utilities (currently just `vine.ts`, the nav's vine/bloom geometry)
 - `public`
   - Static assets
 
@@ -90,12 +92,16 @@ Responsibilities:
 - `src/content/siteContent.ts`
 - Strongly typed arrays and records used by route components
 
-### Sanity-Ready Path
+### Backend / CMS
 
-- `src/lib/sanity.ts`: Sanity client configuration from environment variables
-- `src/lib/queries.ts`: GROQ queries for homepage and stories
-
-This allows migration from static content to CMS-backed content without rebuilding app structure.
+None yet. All content is static TypeScript modules baked into the build at compile time
+(the site is fully statically prerendered — see Deployment Architecture below). A prior
+Sanity CMS integration was scaffolded (`src/lib/sanity.ts`, `src/lib/queries.ts`) but never
+actually used by any route, and pulled in ~800 transitive packages including most of this
+project's npm audit findings, so it was removed. If/when a real backend is added (a database,
+CMS, or custom API), this is the natural place to wire it in — swap the imports in each route
+from `@/content/siteContent` to a fetch/query call, without needing to restructure the routes
+themselves.
 
 ## Styling Architecture
 

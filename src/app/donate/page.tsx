@@ -1,5 +1,11 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { SiteShell } from "@/components/site-shell";
+
+export const metadata: Metadata = {
+  title: "Donate",
+  description: "Support Seads' youth-led programs and community initiatives across Southeast Asia.",
+};
 
 export default function DonatePage() {
   return (
