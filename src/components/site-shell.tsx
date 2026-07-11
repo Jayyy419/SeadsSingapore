@@ -1,5 +1,16 @@
 import { ReactNode } from "react";
+import Link from "next/link";
 import { SiteHeader } from "@/components/site-header";
+
+const FOOTER_LINKS = [
+  { label: "About", href: "/about" },
+  { label: "Team", href: "/team" },
+  { label: "Programs", href: "/programs" },
+  { label: "Media", href: "/media" },
+  { label: "Partners", href: "/partners" },
+  { label: "Donate", href: "/donate" },
+  { label: "Contact", href: "/contact" },
+];
 
 type SiteShellProps = {
   children: ReactNode;
@@ -35,8 +46,17 @@ export function SiteShell({ children, title, subtitle }: SiteShellProps) {
           </div>
           <div className="text-sm text-[color:var(--footer-muted)]">
             <p>Singapore · est. across SEA</p>
-            <p className="mt-1">hello@seads.sg</p>
+            <a href="mailto:hello@seads.sg" className="mt-1 block hover:text-[color:var(--footer-fg)]">
+              hello@seads.sg
+            </a>
           </div>
+        </div>
+        <div className="mx-auto mt-6 flex w-full max-w-6xl flex-wrap gap-4.5 border-t border-white/10 px-4 pt-5 text-[13px] sm:px-6 lg:px-8">
+          {FOOTER_LINKS.map((link) => (
+            <Link key={link.label} href={link.href} className="text-[color:var(--footer-muted)] hover:text-[color:var(--footer-fg)]">
+              {link.label}
+            </Link>
+          ))}
         </div>
       </footer>
     </div>

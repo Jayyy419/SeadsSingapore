@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { SiteShell } from "@/components/site-shell";
 import { events } from "@/content/siteContent";
 
@@ -14,12 +15,12 @@ export default function EventsPage() {
             <h2 className="font-display mt-2 text-xl">{event.title}</h2>
             <p className="mt-3 text-sm text-[color:var(--muted)]">{event.date}</p>
             <p className="text-sm text-[color:var(--muted)]">{event.location}</p>
-            <button
-              type="button"
-              className="mt-4 rounded-full bg-[color:var(--inverse-bg)] px-4 py-2 text-sm font-semibold text-[color:var(--inverse-fg)]"
+            <Link
+              href="/join"
+              className="mt-4 inline-block rounded-full bg-[color:var(--inverse-bg)] px-4 py-2 text-sm font-semibold text-[color:var(--inverse-fg)] hover:opacity-85"
             >
               Join Our Events
-            </button>
+            </Link>
           </article>
         ))}
       </section>

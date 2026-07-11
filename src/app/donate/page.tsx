@@ -14,12 +14,15 @@ export default function DonatePage() {
           We are finalizing secure contribution channels and impact transparency workflows. You can still support us by joining events or partnering today.
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
-          <Link href="/events" className="rounded-full bg-[color:var(--brand)] px-5 py-2.5 text-sm font-semibold text-white">
+          <Link
+            href="/events"
+            className="rounded-full bg-[color:var(--brand)] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[color:var(--brand-deep)]"
+          >
             Join Our Events
           </Link>
           <Link
             href="/partners"
-            className="rounded-full border border-[color:var(--foreground-soft)] px-5 py-2.5 text-sm font-semibold text-[color:var(--foreground)]"
+            className="rounded-full border border-[color:var(--foreground-soft)] px-5 py-2.5 text-sm font-semibold text-[color:var(--foreground)] hover:border-[color:var(--brand)] hover:text-[color:var(--brand)]"
           >
             Partner with Seads
           </Link>

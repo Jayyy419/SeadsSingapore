@@ -87,12 +87,15 @@ export default function Home() {
           </div>
 
           <div className="mt-10 flex flex-wrap justify-center gap-3.5">
-            <a href="#programs" className="rounded-full bg-[color:var(--brand)] px-6.5 py-3.5 text-sm font-semibold text-white">
+            <a
+              href="#programs"
+              className="rounded-full bg-[color:var(--brand)] px-6.5 py-3.5 text-sm font-semibold text-white hover:bg-[color:var(--brand-deep)]"
+            >
               {t.ctaPrimary}
             </a>
             <Link
               href="/about"
-              className="rounded-full border border-[color:var(--foreground-strong)] px-6.5 py-3.5 text-sm font-semibold text-[color:var(--foreground)]"
+              className="rounded-full border border-[color:var(--foreground-strong)] px-6.5 py-3.5 text-sm font-semibold text-[color:var(--foreground)] hover:border-[color:var(--brand)] hover:text-[color:var(--brand)]"
             >
               {t.ctaSecondary}
             </Link>
@@ -132,7 +135,7 @@ export default function Home() {
             <p className="text-lg leading-[1.7] text-[#c9d2cd]">{t.aboutBody2}</p>
             <Link
               href="/team"
-              className="mt-5.5 inline-block rounded-full border border-white/25 px-6 py-3 text-sm font-semibold text-white"
+              className="mt-5.5 inline-block rounded-full border border-white/25 px-6 py-3 text-sm font-semibold text-white hover:border-white/50 hover:bg-white/10"
             >
               {t.aboutCta}
             </Link>
@@ -148,7 +151,7 @@ export default function Home() {
               <p className="mb-2.5 text-xs font-semibold uppercase tracking-[0.14em] text-[color:var(--accent)]">{t.programsEyebrow}</p>
               <h2 className="font-display text-[38px]">{t.programsTitle}</h2>
             </div>
-            <Link href="/partners" className="text-sm font-semibold text-[color:var(--foreground)]">
+            <Link href="/partners" className="text-sm font-semibold text-[color:var(--foreground)] hover:text-[color:var(--brand)]">
               {t.programsLink} &rarr;
             </Link>
           </div>
@@ -157,7 +160,7 @@ export default function Home() {
               <Link
                 key={program.name}
                 href="/programs"
-                className="block rounded-[20px] border border-[color:var(--foreground-soft)] bg-[color:var(--surface)] p-7 text-inherit"
+                className="block rounded-[20px] border border-[color:var(--foreground-soft)] bg-[color:var(--surface)] p-7 text-inherit transition-[transform,box-shadow,border-color] hover:-translate-y-1 hover:border-[color:var(--brand)] hover:shadow-[0_14px_34px_rgba(31,41,55,.1)]"
               >
                 <div className="mb-3.5 flex items-center justify-between">
                   <span className="text-xs font-bold uppercase tracking-wide text-[color:var(--brand)]">{program.tag}</span>
@@ -176,7 +179,7 @@ export default function Home() {
         <div className="mx-auto max-w-6xl">
           <div className="mb-8 flex flex-wrap items-end justify-between gap-5">
             <h2 className="font-display text-[38px]">{t.eventsTitle}</h2>
-            <Link href="/events" className="rounded-full bg-[color:var(--inverse-bg)] px-5 py-2.5 text-sm font-semibold text-[color:var(--inverse-fg)]">
+            <Link href="/events" className="rounded-full bg-[color:var(--inverse-bg)] px-5 py-2.5 text-sm font-semibold text-[color:var(--inverse-fg)] hover:opacity-85">
               {t.viewAll}
             </Link>
           </div>
@@ -189,7 +192,7 @@ export default function Home() {
                 <p className="mb-4.5 mt-0.5 text-sm text-[color:var(--muted)]">{event.location}</p>
                 <Link
                   href="/events"
-                  className="inline-block rounded-full border border-[color:var(--foreground-soft)] px-5 py-2 text-[13px] font-semibold text-[color:var(--foreground)]"
+                  className="inline-block rounded-full border border-[color:var(--foreground-soft)] px-5 py-2 text-[13px] font-semibold text-[color:var(--foreground)] hover:border-[color:var(--brand)] hover:text-[color:var(--brand)]"
                 >
                   View details
                 </Link>
@@ -205,7 +208,7 @@ export default function Home() {
           <div>
             <div className="mb-5 flex items-center justify-between">
               <h2 className="font-display text-[32px]">{t.storiesTitle}</h2>
-              <Link href="/blog" className="text-sm font-semibold text-[color:var(--foreground)]">
+              <Link href="/blog" className="text-sm font-semibold text-[color:var(--foreground)] hover:text-[color:var(--brand)]">
                 {t.viewAll} &rarr;
               </Link>
             </div>
@@ -214,7 +217,7 @@ export default function Home() {
                 <Link
                   key={story.title}
                   href="/blog"
-                  className="block rounded-2xl border border-[color:var(--foreground-soft)] bg-[color:var(--surface)] p-5 text-inherit"
+                  className="block rounded-2xl border border-[color:var(--foreground-soft)] bg-[color:var(--surface)] p-5 text-inherit transition-[transform,box-shadow,border-color] hover:-translate-y-0.5 hover:border-[color:var(--brand)] hover:shadow-[0_10px_26px_rgba(31,41,55,.08)]"
                 >
                   <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-[color:var(--accent)]">{story.category}</p>
                   <h3 className="font-display mb-1.5 text-lg text-[color:var(--foreground)]">{story.title}</h3>
@@ -226,7 +229,7 @@ export default function Home() {
           <div>
             <div className="mb-5 flex items-center justify-between">
               <h2 className="font-display text-[32px]">{t.galleryTitle}</h2>
-              <Link href="/media" className="text-sm font-semibold text-[color:var(--foreground)]">
+              <Link href="/media" className="text-sm font-semibold text-[color:var(--foreground)] hover:text-[color:var(--brand)]">
                 {t.galleryLink} &rarr;
               </Link>
             </div>
@@ -241,7 +244,11 @@ export default function Home() {
           <h2 className="font-display mb-8 text-[38px]">{t.teamTitle}</h2>
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
             {teamMembers.map((member) => (
-              <Link key={member.name} href="/team" className="block rounded-[20px] bg-[color:var(--surface)] p-5 text-inherit">
+              <Link
+                key={member.name}
+                href="/team"
+                className="block rounded-[20px] bg-[color:var(--surface)] p-5 text-inherit transition-[transform,box-shadow] hover:-translate-y-1 hover:shadow-[0_14px_34px_rgba(31,41,55,.1)]"
+              >
                 <div className="stripe-ph flex h-[140px] items-center justify-center rounded-2xl">
                   <span className="text-[11px] text-[color:var(--brand-deep)]" style={{ fontFamily: "ui-monospace,monospace" }}>
                     portrait photo
@@ -304,7 +311,7 @@ export default function Home() {
             <button
               type="submit"
               disabled={submitStatus === "loading"}
-              className="mt-2 w-fit justify-self-center rounded-full bg-[color:var(--accent)] px-8 py-3.5 text-sm font-semibold text-white md:col-span-2"
+              className="mt-2 w-fit justify-self-center rounded-full bg-[color:var(--accent)] px-8 py-3.5 text-sm font-semibold text-white hover:opacity-85 disabled:opacity-60 md:col-span-2"
             >
               {submitStatus === "loading" ? "Submitting..." : t.submit}
             </button>
@@ -327,13 +334,13 @@ export default function Home() {
           </div>
         </div>
         <div className="mx-auto mt-6 flex max-w-6xl flex-wrap gap-4.5 border-t border-white/10 pt-5 text-[13px]">
-          <Link href="/about" className="text-[color:var(--footer-muted)]">About</Link>
-          <Link href="/team" className="text-[color:var(--footer-muted)]">Team</Link>
-          <Link href="/programs" className="text-[color:var(--footer-muted)]">Programs</Link>
-          <Link href="/media" className="text-[color:var(--footer-muted)]">Media</Link>
-          <Link href="/partners" className="text-[color:var(--footer-muted)]">Partners</Link>
-          <Link href="/donate" className="text-[color:var(--footer-muted)]">Donate</Link>
-          <Link href="/contact" className="text-[color:var(--footer-muted)]">Contact</Link>
+          <Link href="/about" className="text-[color:var(--footer-muted)] hover:text-[color:var(--footer-fg)]">About</Link>
+          <Link href="/team" className="text-[color:var(--footer-muted)] hover:text-[color:var(--footer-fg)]">Team</Link>
+          <Link href="/programs" className="text-[color:var(--footer-muted)] hover:text-[color:var(--footer-fg)]">Programs</Link>
+          <Link href="/media" className="text-[color:var(--footer-muted)] hover:text-[color:var(--footer-fg)]">Media</Link>
+          <Link href="/partners" className="text-[color:var(--footer-muted)] hover:text-[color:var(--footer-fg)]">Partners</Link>
+          <Link href="/donate" className="text-[color:var(--footer-muted)] hover:text-[color:var(--footer-fg)]">Donate</Link>
+          <Link href="/contact" className="text-[color:var(--footer-muted)] hover:text-[color:var(--footer-fg)]">Contact</Link>
         </div>
       </footer>
     </div>

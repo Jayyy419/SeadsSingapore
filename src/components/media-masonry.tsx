@@ -45,7 +45,7 @@ export function MediaMasonry({ limit, showFilter = true }: MediaMasonryProps) {
                 className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
                   active
                     ? "border-[color:var(--brand)] bg-[color:var(--brand)] text-white"
-                    : "border-[color:var(--foreground-soft)] bg-white text-[color:var(--muted)] hover:bg-[color:var(--surface-2)]"
+                    : "border-[color:var(--foreground-soft)] bg-[color:var(--surface)] text-[color:var(--muted)] hover:bg-[color:var(--surface-2)] hover:border-[color:var(--brand)]"
                 }`}
               >
                 {category}
@@ -59,12 +59,12 @@ export function MediaMasonry({ limit, showFilter = true }: MediaMasonryProps) {
         {filtered.map((item, index) => (
           <figure
             key={`${item.src}-${item.date}-${index}`}
-            className="mb-4 break-inside-avoid overflow-hidden rounded-3xl border border-[color:var(--foreground-soft)] bg-white shadow-sm"
+            className="group mb-4 break-inside-avoid overflow-hidden rounded-3xl border border-[color:var(--foreground-soft)] bg-[color:var(--surface)] shadow-sm transition-[box-shadow,border-color] hover:border-[color:var(--brand)] hover:shadow-md"
           >
             <button
               type="button"
               onClick={() => setOpenIndex(index)}
-              className="block w-full text-left"
+              className="block w-full overflow-hidden text-left"
             >
               <Image
                 src={item.src}
@@ -72,7 +72,7 @@ export function MediaMasonry({ limit, showFilter = true }: MediaMasonryProps) {
                 width={1200}
                 height={720}
                 sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
-                className="h-auto w-full object-cover"
+                className="h-auto w-full object-cover transition-transform duration-300 group-hover:scale-105"
               />
             </button>
             <figcaption className="space-y-1 p-4">
@@ -105,7 +105,7 @@ export function MediaMasonry({ limit, showFilter = true }: MediaMasonryProps) {
               <button
                 type="button"
                 onClick={() => setOpenIndex(null)}
-                className="rounded-full border border-white/25 px-3 py-1 text-xs font-semibold text-white/90"
+                className="rounded-full border border-white/25 px-3 py-1 text-xs font-semibold text-white/90 hover:border-white/50 hover:bg-white/10"
               >
                 Close
               </button>

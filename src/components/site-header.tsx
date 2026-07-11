@@ -250,7 +250,10 @@ export function SiteHeader({ onLocaleChange }: SiteHeaderProps) {
 
   const locales = LOCALE_META.map((l) => ({
     ...l,
-    bg: l.code === locale ? "var(--foreground)" : "transparent",
+    active: l.code === locale,
+    // Inactive buttons leave background undefined so the CSS hover class below can actually
+    // apply — an inline style value here (even "transparent") would always beat a :hover rule.
+    bg: l.code === locale ? "var(--foreground)" : undefined,
     color: l.code === locale ? "var(--background)" : "var(--muted)",
     showTip: hoveredLocale === l.code,
   }));
@@ -409,7 +412,7 @@ export function SiteHeader({ onLocaleChange }: SiteHeaderProps) {
                 <button
                   type="button"
                   onClick={() => setLocale(loc.code)}
-                  className="rounded-full px-2 py-1.5 text-[11px] font-bold"
+                  className={`rounded-full px-2 py-1.5 text-[11px] font-bold ${loc.active ? "" : "hover:bg-[color:var(--surface-2)]"}`}
                   style={{ background: loc.bg, color: loc.color }}
                 >
                   {loc.label}
@@ -425,11 +428,14 @@ export function SiteHeader({ onLocaleChange }: SiteHeaderProps) {
           <button
             type="button"
             onClick={toggleTheme}
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-[color:var(--foreground-soft)] bg-[color:var(--surface)] text-[15px] leading-none text-[color:var(--foreground)]"
+            className="flex h-9 w-9 items-center justify-center rounded-full border border-[color:var(--foreground-soft)] bg-[color:var(--surface)] text-[15px] leading-none text-[color:var(--foreground)] hover:border-[color:var(--brand)]"
           >
             {themeIcon}
           </button>
-          <Link href="/donate" className="rounded-full bg-[color:var(--brand)] px-4.5 py-2.5 text-[13.5px] font-semibold text-white">
+          <Link
+            href="/donate"
+            className="rounded-full bg-[color:var(--brand)] px-4.5 py-2.5 text-[13.5px] font-semibold text-white hover:bg-[color:var(--brand-deep)]"
+          >
             {donateLabel}
           </Link>
         </div>
@@ -437,7 +443,7 @@ export function SiteHeader({ onLocaleChange }: SiteHeaderProps) {
         <button
           type="button"
           onClick={() => setMenuOpen((prev) => !prev)}
-          className={`${isMobile ? "flex" : "hidden"} h-[38px] w-[38px] flex-col items-center justify-center gap-1 rounded-full border border-[color:var(--foreground-soft)] bg-[color:var(--surface)] justify-self-end`}
+          className={`${isMobile ? "flex" : "hidden"} h-[38px] w-[38px] flex-col items-center justify-center gap-1 rounded-full border border-[color:var(--foreground-soft)] bg-[color:var(--surface)] justify-self-end hover:border-[color:var(--brand)]`}
         >
           <span className="h-0.5 w-4 rounded-sm bg-[color:var(--foreground)]" />
           <span className="h-0.5 w-4 rounded-sm bg-[color:var(--foreground)]" />
@@ -451,7 +457,7 @@ export function SiteHeader({ onLocaleChange }: SiteHeaderProps) {
               <Link
                 href={group.href}
                 onClick={() => setMenuOpen(false)}
-                className="flex items-center gap-2 rounded-xl px-3.5 py-3 text-[15px] font-bold"
+                className="flex items-center gap-2 rounded-xl px-3.5 py-3 text-[15px] font-bold hover:bg-[color:var(--surface-2)] active:bg-[color:var(--surface-2)]"
                 style={{ color: group.color }}
               >
                 <svg width="10" height="15" viewBox="0 0 16 22" className="shrink-0">
@@ -466,7 +472,7 @@ export function SiteHeader({ onLocaleChange }: SiteHeaderProps) {
                       key={child.key}
                       href={child.href}
                       onClick={() => setMenuOpen(false)}
-                      className="block rounded-lg px-3.5 py-2.5 text-sm font-semibold"
+                      className="block rounded-lg px-3.5 py-2.5 text-sm font-semibold hover:bg-[color:var(--surface-2)] active:bg-[color:var(--surface-2)]"
                       style={{ color: child.mobileColor }}
                     >
                       {child.label}
@@ -483,7 +489,7 @@ export function SiteHeader({ onLocaleChange }: SiteHeaderProps) {
                   key={loc.code}
                   type="button"
                   onClick={() => setLocale(loc.code)}
-                  className="rounded-full px-2.5 py-1.5 text-[11px] font-bold"
+                  className={`rounded-full px-2.5 py-1.5 text-[11px] font-bold ${loc.active ? "" : "hover:bg-[color:var(--surface-2)]"}`}
                   style={{ background: loc.bg, color: loc.color }}
                 >
                   {loc.label}
@@ -493,14 +499,14 @@ export function SiteHeader({ onLocaleChange }: SiteHeaderProps) {
             <button
               type="button"
               onClick={toggleTheme}
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-[color:var(--foreground-soft)] bg-[color:var(--surface)] text-[color:var(--foreground)]"
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-[color:var(--foreground-soft)] bg-[color:var(--surface)] text-[color:var(--foreground)] hover:border-[color:var(--brand)]"
             >
               {themeIcon}
             </button>
             <Link
               href="/donate"
               onClick={() => setMenuOpen(false)}
-              className="rounded-full bg-[color:var(--brand)] px-4.5 py-2.5 text-sm font-semibold text-white"
+              className="rounded-full bg-[color:var(--brand)] px-4.5 py-2.5 text-sm font-semibold text-white hover:bg-[color:var(--brand-deep)]"
             >
               {donateLabel}
             </Link>

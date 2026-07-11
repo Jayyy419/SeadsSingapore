@@ -9,15 +9,21 @@ export default function ContactPage() {
       <section className="grid gap-4 lg:grid-cols-3">
         <article className="section-card p-6">
           <h2 className="font-display text-xl">General enquiries</h2>
-          <p className="mt-3 text-sm text-[color:var(--muted)]">hello@seads.sg</p>
+          <a href="mailto:hello@seads.sg" className="mt-3 block text-sm text-[color:var(--muted)] hover:text-[color:var(--brand)]">
+            hello@seads.sg
+          </a>
         </article>
         <article className="section-card p-6">
           <h2 className="font-display text-xl">Partnerships</h2>
-          <p className="mt-3 text-sm text-[color:var(--muted)]">partners@seads.sg</p>
+          <a href="mailto:partners@seads.sg" className="mt-3 block text-sm text-[color:var(--muted)] hover:text-[color:var(--brand)]">
+            partners@seads.sg
+          </a>
         </article>
         <article className="section-card p-6">
           <h2 className="font-display text-xl">Media</h2>
-          <p className="mt-3 text-sm text-[color:var(--muted)]">media@seads.sg</p>
+          <a href="mailto:media@seads.sg" className="mt-3 block text-sm text-[color:var(--muted)] hover:text-[color:var(--brand)]">
+            media@seads.sg
+          </a>
         </article>
       </section>
     </SiteShell>
