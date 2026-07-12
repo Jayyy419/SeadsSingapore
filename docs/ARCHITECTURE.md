@@ -7,10 +7,11 @@ Seads is a Next.js App Router web application with:
 - A rich homepage experience (`src/app/page.tsx`)
 - Supporting informational routes (about, programs, events, team, partners, blog, contact, join, donate)
 - Reusable shell layout for subpages (`src/components/site-shell.tsx`)
-- Local typed content source (`src/content/siteContent.ts`)
-- Google Sheets endpoint submission for the "Get Involved" interest form (no CMS or
-  database is wired up yet — a prior Sanity integration was scaffolded but never used and
-  has been removed; see the Changelog)
+- Local typed content source (`src/content/siteContent.ts`) — no CMS is wired up yet (a
+  prior Sanity integration was scaffolded but never used and has been removed; see the
+  Changelog)
+- A small AWS backend (API Gateway + Lambda + DynamoDB + SES) behind the "Get Involved"
+  interest form — see Backend Architecture below
 
 ## Runtime Flow
 
@@ -60,7 +61,8 @@ Responsibilities:
   stories + gallery, team, testimonials, and get-involved sections
 - Receives locale changes from `SiteHeader` (`en`, `zh`, `ms`, `hi`) via an `onLocaleChange` callback
   and translates its own body copy from `src/content/i18n.ts`
-- Supports optional form submission to `NEXT_PUBLIC_GOOGLE_SHEETS_ENDPOINT`
+- Submits the "Get Involved" form to `NEXT_PUBLIC_INTEREST_FORM_ENDPOINT` — see Backend
+  Architecture
 
 ### Site Header
 
@@ -92,16 +94,51 @@ Responsibilities:
 - `src/content/siteContent.ts`
 - Strongly typed arrays and records used by route components
 
-### Backend / CMS
+### CMS
 
-None yet. All content is static TypeScript modules baked into the build at compile time
-(the site is fully statically prerendered — see Deployment Architecture below). A prior
-Sanity CMS integration was scaffolded (`src/lib/sanity.ts`, `src/lib/queries.ts`) but never
-actually used by any route, and pulled in ~800 transitive packages including most of this
-project's npm audit findings, so it was removed. If/when a real backend is added (a database,
-CMS, or custom API), this is the natural place to wire it in — swap the imports in each route
-from `@/content/siteContent` to a fetch/query call, without needing to restructure the routes
-themselves.
+None yet. All site content (programs, events, team, stories, testimonials, media) is static
+TypeScript modules baked into the build at compile time (the site is fully statically
+prerendered — see Deployment Architecture below). A prior Sanity CMS integration was
+scaffolded (`src/lib/sanity.ts`, `src/lib/queries.ts`) but never actually used by any route,
+and pulled in ~800 transitive packages including most of this project's `npm audit` findings,
+so it was removed. If/when a real CMS is added, this is the natural place to wire it in — swap
+the imports in each route from `@/content/siteContent` to a fetch/query call, without needing
+to restructure the routes themselves.
+
+## Backend Architecture
+
+The only live backend is the "Get Involved" interest-form pipeline, on AWS (`us-east-1`,
+account `140023398409`):
+
+```
+Browser --POST--> API Gateway (HTTP API, seads-interest-form-api)
+                      |
+                      v
+                 Lambda (seads-interest-form-handler, Node.js 20.x)
+                      |
+                      +--> DynamoDB (seads-interest-submissions) — always
+                      +--> SES SendEmail to the configured notify address — best-effort,
+                           logged but non-fatal if it fails (submission is already saved)
+```
+
+- **API Gateway**: `seads-interest-form-api`, single route `POST /submit-interest`, CORS
+  restricted to the deployed frontend origin(s). Update the CORS allow-list (both here and
+  in the Lambda's `ALLOWED_ORIGINS` env var) when the custom domain goes live.
+- **Lambda**: validates `name`/`email`/`interest`, writes to DynamoDB with a generated UUID
+  + timestamp, then attempts an SES notification email. Source in the deploy package (not
+  currently checked into this repo — see the note below).
+- **DynamoDB**: `seads-interest-submissions`, on-demand billing, partition key `id` (string).
+- **SES**: starts in sandbox mode (verified addresses only, low send quota) — request
+  production access before relying on this for real traffic.
+- **IAM**: the Lambda's execution role (`seads-interest-form-lambda-role`) is scoped to
+  exactly `dynamodb:PutItem` on that one table, `ses:SendEmail`, and CloudWatch Logs — not
+  broader account access.
+
+**Known gap:** the Lambda source currently lives only in the deployed function, not in this
+repo. Before making further changes to it, add it under (for example) `backend/interest-form/`
+so it's version-controlled and reviewable like everything else, and set up a deploy step
+(manual `aws lambda update-function-code`, or wire it into CI) rather than editing it directly
+in the AWS console.
 
 ## Styling Architecture
 

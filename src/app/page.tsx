@@ -20,7 +20,7 @@ export default function Home() {
   const t = translations[locale];
 
   async function onInterestSubmit(formData: FormData) {
-    const endpoint = process.env.NEXT_PUBLIC_GOOGLE_SHEETS_ENDPOINT;
+    const endpoint = process.env.NEXT_PUBLIC_INTEREST_FORM_ENDPOINT;
     if (!endpoint) {
       // Don't claim success when nothing was actually captured — an unconfigured endpoint
       // previously showed the same "Submission captured" message as a real success.

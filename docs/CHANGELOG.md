@@ -4,6 +4,28 @@ All notable changes to this project should be documented in this file.
 
 This format is inspired by Keep a Changelog and uses a date-based release style.
 
+## [2026-07-12]
+
+### Added
+
+- Migrated hosting from Vercel to **AWS Amplify Hosting** (app `SeadsSingapore`,
+  `d1s8x62kxpmlx7`, `us-east-1`), connected to `main` on GitHub with auto-deploy on push.
+  Vercel is left running untouched as a fallback until a custom domain is confirmed working
+  on Amplify.
+- Built a real backend for the "Get Involved" form: API Gateway -> Lambda -> DynamoDB, with
+  a best-effort SES notification email. This replaces the Google Sheets integration, which
+  was never actually configured in production (see the 2026-07-11 entry — the form was
+  silently discarding every submission). Source now lives in `backend/interest-form/`.
+- Renamed `NEXT_PUBLIC_GOOGLE_SHEETS_ENDPOINT` to `NEXT_PUBLIC_INTEREST_FORM_ENDPOINT` to
+  match (it was never Google Sheets in practice).
+
+### Known Gaps
+
+- SES is still in sandbox mode — request production access before relying on the
+  notification email for real traffic.
+- No custom domain yet; Amplify is serving from its default `*.amplifyapp.com` URL.
+- No CI for the Lambda — deploys are manual (`backend/interest-form/README.md`).
+
 ## [2026-07-11]
 
 ### Fixed

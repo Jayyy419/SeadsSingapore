@@ -21,16 +21,23 @@
   - `src/content/siteContent.ts` (programs, events, stories, team, testimonials, impact metrics)
   - `src/content/media.ts` (gallery items)
   - `src/content/i18n.ts` (EN/MN/BM/HI translations)
-- No CMS or backend API — a Sanity integration was scaffolded early on but never actually
-  used by any route, and was removed (it pulled in ~800 transitive packages and accounted
-  for nearly all of this project's `npm audit` findings). See `docs/ARCHITECTURE.md` for
-  where to wire in a real backend later.
+- No CMS — a Sanity integration was scaffolded early on but never actually used by any
+  route, and was removed (it pulled in ~800 transitive packages and accounted for nearly
+  all of this project's `npm audit` findings).
+
+## Backend (AWS)
+
+- API Gateway (HTTP API) + Lambda (Node.js 20.x) + DynamoDB + SES behind the "Get Involved"
+  form — see `docs/ARCHITECTURE.md` (Backend Architecture) and `backend/interest-form/`
+- No auth, database beyond DynamoDB, or CMS yet — see Architecture doc's "Not doing yet" list
 
 ## Analytics and Hosting
 
-- Vercel Analytics (`@vercel/analytics`)
-- Vercel hosting (production alias currently includes `sparksg.vercel.app`)
-- Project-level Vercel framework override in `vercel.json`
+- Vercel Analytics (`@vercel/analytics`) — kept even after moving hosting off Vercel; it's
+  just a client-side script, doesn't require Vercel hosting
+- **AWS Amplify Hosting** (`us-east-1`) — see `docs/DEPLOYMENT.md`
+- Legacy: Vercel hosting (`sparksg.vercel.app` / `seadssg.vercel.app`) — being phased out,
+  see `docs/DEPLOYMENT.md`
 
 ## Quality and Tooling
 
@@ -41,5 +48,5 @@
 
 - `package.json`: scripts and dependencies
 - `tsconfig.json`: strict TypeScript + alias `@/* -> src/*`
-- `next.config.ts`: default Next.js config scaffold
-- `vercel.json`: framework set to Next.js
+- `next.config.ts`: security headers (see `docs/ARCHITECTURE.md`)
+- `vercel.json`: legacy, framework set to Next.js — no longer the deploy target

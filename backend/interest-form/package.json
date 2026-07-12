@@ -1,0 +1,10 @@
+{
+  "name": "seads-interest-form-handler",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.750.0",
+    "@aws-sdk/lib-dynamodb": "^3.750.0",
+    "@aws-sdk/client-ses": "^3.750.0"
+  }
+}
