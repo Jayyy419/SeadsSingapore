@@ -6,6 +6,16 @@ This format is inspired by Keep a Changelog and uses a date-based release style.
 
 ## [2026-07-12]
 
+### Added (backend hardening)
+
+- Set `NOTIFY_EMAIL` on the interest-form Lambda and verified it in SES (confirmed via a
+  real end-to-end test: submission landed in DynamoDB, no SES error in the logs).
+- Submitted SES production-access request (currently sandboxed).
+- CloudWatch log retention set to 90 days on the Lambda's log group (was unset/indefinite).
+- DynamoDB point-in-time recovery enabled on `seads-interest-submissions`.
+- API Gateway throttling (5 req/s, burst 10) on the interest-form endpoint.
+- $30/month AWS Budget with 80%/100% actual and 100% forecasted spend alerts.
+
 ### Added
 
 - Migrated hosting from Vercel to **AWS Amplify Hosting** (app `SeadsSingapore`,

@@ -122,23 +122,29 @@ Browser --POST--> API Gateway (HTTP API, seads-interest-form-api)
 ```
 
 - **API Gateway**: `seads-interest-form-api`, single route `POST /submit-interest`, CORS
-  restricted to the deployed frontend origin(s). Update the CORS allow-list (both here and
-  in the Lambda's `ALLOWED_ORIGINS` env var) when the custom domain goes live.
-- **Lambda**: validates `name`/`email`/`interest`, writes to DynamoDB with a generated UUID
-  + timestamp, then attempts an SES notification email. Source in the deploy package (not
-  currently checked into this repo — see the note below).
-- **DynamoDB**: `seads-interest-submissions`, on-demand billing, partition key `id` (string).
-- **SES**: starts in sandbox mode (verified addresses only, low send quota) — request
-  production access before relying on this for real traffic.
+  restricted to the deployed frontend origin(s), throttled to 5 req/s (burst 10) on the
+  `$default` stage to limit abuse of a public, unauthenticated endpoint. Update the CORS
+  allow-list (both here and in the Lambda's `ALLOWED_ORIGINS` env var) when the custom
+  domain goes live.
+- **Lambda**: `seads-interest-form-handler`, source in `backend/interest-form/`. Validates
+  `name`/`email`/`interest`, writes to DynamoDB with a generated UUID + timestamp, then
+  attempts an SES notification email to `NOTIFY_EMAIL`. CloudWatch log retention set to 90
+  days (default is "never expire," which just accumulates cost indefinitely).
+- **DynamoDB**: `seads-interest-submissions`, on-demand billing, partition key `id` (string),
+  point-in-time recovery enabled (35-day rolling restore window).
+- **SES**: production-access request submitted (AWS reviews these; sandbox limits — verified
+  addresses only, 200/day, 1/sec — apply until approved). `NOTIFY_EMAIL` must be a
+  SES-verified address; re-verify and update the Lambda env var if it changes.
 - **IAM**: the Lambda's execution role (`seads-interest-form-lambda-role`) is scoped to
   exactly `dynamodb:PutItem` on that one table, `ses:SendEmail`, and CloudWatch Logs — not
   broader account access.
+- **Billing**: a $30/month AWS Budget (`seads-monthly-budget`) alerts on 80%/100% actual
+  spend and 100% forecasted spend.
 
-**Known gap:** the Lambda source currently lives only in the deployed function, not in this
-repo. Before making further changes to it, add it under (for example) `backend/interest-form/`
-so it's version-controlled and reviewable like everything else, and set up a deploy step
-(manual `aws lambda update-function-code`, or wire it into CI) rather than editing it directly
-in the AWS console.
+**Known gap:** no CI for the Lambda yet — deploys are manual (`backend/interest-form/README.md`).
+Also no auth/rate-limiting beyond API Gateway's per-IP-agnostic throttle (5 req/s account-wide
+for this route, not per-visitor), so a determined abuser could still exhaust it for everyone;
+revisit if this ever becomes a real problem (e.g. add a CAPTCHA or WAF rule).
 
 ## Styling Architecture
 
