@@ -1,15 +1,29 @@
 # Interest form Lambda
 
-Handles `POST /submit-interest` behind API Gateway. Validates the "Get Involved" form
-payload, writes it to DynamoDB, and best-effort sends an SES notification email.
+Handles `POST /submit-interest` (and `GET /health`) behind API Gateway. Validates the "Get
+Involved" form payload, writes it to DynamoDB, and best-effort sends an SES notification
+email.
 
 ## Live resources (`ap-southeast-1`, account `140023398409`)
 
-- API Gateway: `seads-interest-form-api` (`jztkgrm3lh`) — endpoint in `NEXT_PUBLIC_INTEREST_FORM_ENDPOINT`
+- API Gateway: `seads-interest-form-api` (`jztkgrm3lh`) — `POST /submit-interest` endpoint in
+  `NEXT_PUBLIC_INTEREST_FORM_ENDPOINT`; `GET /health` returns `{"ok":true}` with no DB/SES
+  calls, used only by the Route 53 health check
 - Lambda: `seads-interest-form-handler`
 - DynamoDB table: `seads-interest-submissions`
 - IAM role: `seads-interest-form-lambda-role-sg` (`iam-policy.json` + `iam-trust-policy.json`
   in this directory — scoped to just this table + SES + logs + `seads/*` secrets)
+
+## Monitoring
+
+- CloudWatch alarms `seads-interest-form-lambda-errors` / `-throttles` (`ap-southeast-1`) on
+  the Lambda's own `Errors`/`Throttles` metrics.
+- Route 53 health checks `seads-api-health-check` (hits `GET /health`) and
+  `seads-frontend-health-check` (hits the Amplify site's `/`), each with a CloudWatch alarm.
+  Route 53 health-check metrics only publish to CloudWatch in `us-east-1` regardless of what
+  region the checked endpoint is in, so those two alarms — and the SNS topic they notify —
+  live in `us-east-1`, separate from the Lambda alarms' `ap-southeast-1` topic. Both topics
+  are named `seads-alerts`; don't assume "the SNS topic" without checking the region.
 
 Moved here from `us-east-1` on 2026-07-13 to sit closer to this project's Singapore/SEA
 audience — the old stack was deleted after this one was verified working end-to-end.

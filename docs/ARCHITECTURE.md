@@ -123,11 +123,12 @@ Browser --POST--> API Gateway (HTTP API, seads-interest-form-api)
                            logged but non-fatal if it fails (submission is already saved)
 ```
 
-- **API Gateway**: `seads-interest-form-api`, single route `POST /submit-interest`, CORS
-  restricted to the deployed frontend origin(s), throttled to 5 req/s (burst 10) on the
-  `$default` stage to limit abuse of a public, unauthenticated endpoint. Update the CORS
-  allow-list (both here and in the Lambda's `ALLOWED_ORIGINS` env var) when the custom
-  domain goes live.
+- **API Gateway**: `seads-interest-form-api`, two routes — `POST /submit-interest` (the real
+  endpoint, CORS restricted to the deployed frontend origin(s), throttled to 5 req/s burst 10
+  on the `$default` stage to limit abuse of a public, unauthenticated endpoint) and
+  `GET /health` (unauthenticated, no DB/SES calls, used only by the Route 53 health check
+  below). Update the CORS allow-list (both here and in the Lambda's `ALLOWED_ORIGINS` env var)
+  when the custom domain goes live.
 - **Lambda**: `seads-interest-form-handler`, source in `backend/interest-form/`. Validates
   `name`/`email`/`interest`, writes to DynamoDB with a generated UUID + timestamp, then
   attempts an SES notification email to `NOTIFY_EMAIL`. CloudWatch log retention set to 90
@@ -160,9 +161,23 @@ Browser --POST--> API Gateway (HTTP API, seads-interest-form-api)
   for. True billing separation would mean separate AWS accounts under an AWS Organization,
   overkill for a single project like this.
 
-**Known gap:** no auth/rate-limiting beyond API Gateway's per-IP-agnostic throttle (5 req/s
-account-wide for this route, not per-visitor), so a determined abuser could still exhaust it
-for everyone; revisit if this ever becomes a real problem (e.g. add a CAPTCHA or WAF rule).
+- **Monitoring**: two CloudWatch alarms on the Lambda itself (`seads-interest-form-lambda-errors`,
+  `seads-interest-form-lambda-throttles`, both in `ap-southeast-1`), and two Route 53 health
+  checks with matching alarms (`seads-api-health-check` against `GET /health`,
+  `seads-frontend-health-check` against the Amplify site's `/`) — Route 53 health-check
+  metrics only publish to CloudWatch in `us-east-1` regardless of where the checked endpoint
+  lives, so those two alarms (and their SNS topic) are in `us-east-1`, separate from the
+  Lambda alarms' `ap-southeast-1` SNS topic. Both topics are named `seads-alerts` and email
+  the same address — same name, different region, easy to mix up.
+- **WAF**: not used. AWS WAF doesn't support API Gateway *HTTP APIs* (only REST APIs, ALBs,
+  CloudFront, etc.) — fronting this with CloudFront just to attach WAF was judged not worth
+  the added infrastructure for a single contact-form endpoint. Abuse mitigation instead: the
+  account-wide throttle above, plus Cloudflare Turnstile (planned) on the frontend form.
+
+**Known gap:** no per-visitor rate-limiting (API Gateway's throttle above is account-wide, not
+per-IP) — a determined abuser could still exhaust it for everyone. Turnstile (planned) should
+close most of this in practice, since it stops scripted/bot submissions before they even hit
+the API.
 
 ## Styling Architecture
 

@@ -4,6 +4,28 @@ All notable changes to this project should be documented in this file.
 
 This format is inspired by Keep a Changelog and uses a date-based release style.
 
+## [2026-07-13] (3)
+
+### Added
+
+- CloudWatch alarms on the interest-form Lambda's `Errors` and `Throttles` metrics
+  (`seads-interest-form-lambda-errors`, `-throttles`), notifying an SNS topic
+  (`seads-alerts`, `ap-southeast-1`) that emails `opsfin.sg@aseanyouthadvocates.org`.
+- Uptime monitoring via two Route 53 health checks — `seads-api-health-check` against a new
+  `GET /health` route (added to both the Lambda and API Gateway; returns `{"ok":true}` with
+  no DB/SES calls) and `seads-frontend-health-check` against the Amplify site's `/` — each
+  with a CloudWatch alarm. Route 53 health-check metrics only publish to CloudWatch in
+  `us-east-1`, so those two alarms and a second `seads-alerts` SNS topic live there,
+  separate from the Lambda alarms' `ap-southeast-1` topic.
+
+### Investigated, not implemented
+
+- AWS WAF for the interest-form API Gateway: not possible without extra infrastructure —
+  WAF doesn't support API Gateway *HTTP APIs* (only REST APIs, ALBs, CloudFront, etc.), and
+  fronting this with a CloudFront distribution just to attach WAF wasn't judged worth it for
+  a single contact-form endpoint. Relying instead on the existing account-wide throttle plus
+  Cloudflare Turnstile (planned) on the frontend form.
+
 ## [2026-07-13] (2)
 
 ### Added

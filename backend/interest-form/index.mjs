@@ -28,8 +28,14 @@ export const handler = async (event) => {
   const origin = event.headers?.origin || event.headers?.Origin || "";
   const headers = { "Content-Type": "application/json", ...corsHeaders(origin) };
 
-  if (event.requestContext?.http?.method === "OPTIONS") {
+  const method = event.requestContext?.http?.method;
+
+  if (method === "OPTIONS") {
     return { statusCode: 204, headers, body: "" };
+  }
+
+  if (method === "GET" && event.rawPath === "/health") {
+    return { statusCode: 200, headers, body: JSON.stringify({ ok: true }) };
   }
 
   let payload;
