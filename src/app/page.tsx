@@ -376,6 +376,7 @@ export default function Home() {
           <Link href="/partners" className="text-[color:var(--footer-muted)] hover:text-[color:var(--footer-fg)]">Partners</Link>
           <Link href="/donate" className="text-[color:var(--footer-muted)] hover:text-[color:var(--footer-fg)]">Donate</Link>
           <Link href="/contact" className="text-[color:var(--footer-muted)] hover:text-[color:var(--footer-fg)]">Contact</Link>
+          <Link href="/privacy" className="text-[color:var(--footer-muted)] hover:text-[color:var(--footer-fg)]">Privacy</Link>
         </div>
       </footer>
     </div>

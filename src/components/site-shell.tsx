@@ -10,6 +10,7 @@ const FOOTER_LINKS = [
   { label: "Partners", href: "/partners" },
   { label: "Donate", href: "/donate" },
   { label: "Contact", href: "/contact" },
+  { label: "Privacy", href: "/privacy" },
 ];
 
 type SiteShellProps = {

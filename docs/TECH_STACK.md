@@ -31,10 +31,14 @@
   form — see `docs/ARCHITECTURE.md` (Backend Architecture) and `backend/interest-form/`
 - No auth, database beyond DynamoDB, or CMS yet — see Architecture doc's "Not doing yet" list
 
-## Analytics and Hosting
+## Analytics, Monitoring, and Hosting
 
 - Vercel Analytics (`@vercel/analytics`) — kept even after moving hosting off Vercel; it's
   just a client-side script, doesn't require Vercel hosting
+- Sentry (`@sentry/nextjs`) — client/server/edge error tracking, wired up but inactive until
+  `NEXT_PUBLIC_SENTRY_DSN`/`SENTRY_DSN` are set (`.env.example`, Amplify env vars); no-ops
+  entirely if unset. Config: `sentry.client.config.ts`, `sentry.server.config.ts`,
+  `sentry.edge.config.ts`, `instrumentation.ts`, `src/app/global-error.tsx`.
 - **AWS Amplify Hosting** (`ap-southeast-1`) — see `docs/DEPLOYMENT.md`
 - Legacy: Vercel hosting (`sparksg.vercel.app` / `seadssg.vercel.app`) — being phased out,
   see `docs/DEPLOYMENT.md`

@@ -1122,6 +1122,49 @@ it's the general audit shape: check total/per-chunk JS size, check `package.json
 anything unexpectedly heavy, and grep for dead assets before assuming a performance pass
 needs code changes at all. Sometimes the honest answer is "already fine, here's the evidence."
 
+### A CSP bug that "verified end-to-end" testing still missed
+
+Worth understanding in detail, because it's a genuinely easy mistake to repeat: Turnstile was
+added, its backend half was verified with a real request (a curl POST with a garbage token,
+confirmed rejected), and its frontend half was verified by inspecting the built static HTML
+(confirmed the widget `<div>` and script `<script src="https://challenges.cloudflare.com/...">`
+were both present with the right site key). Both checks passed. It still shipped broken:
+the site's Content-Security-Policy (`next.config.ts`) never had `challenges.cloudflare.com`
+in `script-src`, so **every real visitor's browser refused to execute that script** — the
+widget never rendered, no token was ever generated, and the Lambda's bot check (correctly)
+rejected every genuine submission that had no token.
+
+Why the testing missed it: curl doesn't parse or enforce HTML/CSP at all — it just sends
+bytes over HTTP, so a curl-based test can never catch a client-side enforcement mechanism
+like CSP. And checking the *static HTML* only confirms the markup a browser *would receive*,
+not what a browser actually *does* with it once CSP evaluates each resource. The only way to
+have caught this was rendering the page in a real browser and checking the console for CSP
+violations — which is exactly what happened one conversation turn later, once
+`withSentryConfig` gave a reason to touch `next.config.ts` again and prompted a second look
+at the CSP:
+
+```js
+page.on('console', msg => consoleMessages.push(msg.text()));
+await page.goto('http://localhost:4127/');
+// filter for messages mentioning "content security policy"
+```
+
+There's a second layer worth noting too: this sandbox's own network policy independently
+blocks requests to Cloudflare's domain, for an unrelated reason (it's not on this sandbox's
+outbound allowlist — the same restriction that blocked reaching the live Amplify URL directly
+throughout this whole project). That meant *even after* fixing the CSP, the Turnstile script
+still couldn't be observed actually loading successfully from here — but critically, the
+*type* of failure changed from a CSP violation (logged by the browser before any network
+request is even attempted) to a network-level failure (the browser tries, and only then
+fails) — and that distinction is the actual proof the CSP fix worked, since in the real
+Amplify environment (genuine internet access, no sandbox proxy) that second failure mode
+doesn't exist at all.
+
+General lesson: "I tested the backend" and "I confirmed the HTML is correct" are both real,
+valid checks — but neither one exercises a browser's own enforcement layer (CSP, CORS,
+mixed-content blocking, etc.). Any feature that depends on browser-enforced policy needs an
+actual browser in the loop to be genuinely verified, not just inspected.
+
 ---
 
 ## Glossary

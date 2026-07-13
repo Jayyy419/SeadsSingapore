@@ -4,6 +4,53 @@ All notable changes to this project should be documented in this file.
 
 This format is inspired by Keep a Changelog and uses a date-based release style.
 
+## [2026-07-13] (11)
+
+### Added
+
+- Privacy Policy page (`src/app/privacy`), linked from both footers and added to the
+  sitemap. Site collects name/email/message via the "Get Involved" form with zero privacy
+  disclosure until now — a real gap for an org collecting personal data, not just polish.
+  Content is grounded only in what's factually true about how this system actually works
+  today (what's collected, that there are no cookies, where data is stored, that Cloudflare/
+  Sentry are named as processors) — nothing fabricated (no invented retention period, no
+  named Data Protection Officer). **This should still get a human review from whoever runs
+  Seads before being treated as final** — it's an honest, working draft, not legal advice.
+
+### Known gap surfaced while writing this
+
+- DynamoDB has no TTL/automatic-deletion configured on `seads-interest-submissions` —
+  submissions are retained indefinitely until someone manually deletes them. The privacy
+  policy is worded to match this honestly ("kept for as long as reasonably needed... or
+  until you ask us to delete it") rather than promising an automatic retention period that
+  doesn't actually exist yet. Worth deciding on and implementing a real TTL later if Seads
+  wants automatic expiry.
+
+## [2026-07-13] (10)
+
+### Fixed — production bug
+
+- **The Content-Security-Policy never allowed `challenges.cloudflare.com`**, so every real
+  visitor's browser has been silently blocking the Turnstile script since it shipped (2026-07-13
+  (5)) — the widget never rendered, no token was ever sent, and every genuine form submission
+  would have been rejected by the Lambda's bot check. This wasn't caught at the time because
+  verification only checked the backend round-trip (a garbage token, sent directly via curl,
+  bypassing the browser/CSP entirely) and the static HTML markup — never an actual browser
+  render, since this sandbox's own network policy separately blocks Cloudflare's domain too,
+  masking the CSP bug behind an unrelated, expected failure. Added `challenges.cloudflare.com`
+  to `script-src`, `connect-src`, and a new `frame-src` directive (Turnstile renders its
+  challenge in an iframe). Confirmed the fix with a real Playwright browser: no CSP violation
+  is logged anymore for that domain (the request now correctly reaches the network layer,
+  where it still fails *here* only because of this sandbox's separate, expected restriction).
+
+### Added
+
+- Frontend error tracking via Sentry (`@sentry/nextjs`) — client, server, and edge runtime
+  config, plus `src/app/global-error.tsx` to catch errors in the root layout itself. Inactive
+  until `NEXT_PUBLIC_SENTRY_DSN`/`SENTRY_DSN` are set (same graceful-no-op pattern as
+  Turnstile/the interest-form endpoint); added the ingest endpoint to the CSP's `connect-src`
+  ahead of time (as a wildcard across common regions, to be tightened once a real DSN exists).
+
 ## [2026-07-13] (9)
 
 ### Added
