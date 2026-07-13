@@ -29,5 +29,5 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          NEXT_PUBLIC_INTEREST_FORM_ENDPOINT: https://h0bq61l33m.execute-api.us-east-1.amazonaws.com/submit-interest
-          NEXT_PUBLIC_SITE_URL: https://main.d1s8x62kxpmlx7.amplifyapp.com
+          NEXT_PUBLIC_INTEREST_FORM_ENDPOINT: https://jztkgrm3lh.execute-api.ap-southeast-1.amazonaws.com/submit-interest
+          NEXT_PUBLIC_SITE_URL: https://main.d2mrph1bcp6pjx.amplifyapp.com

@@ -18,10 +18,42 @@ This format is inspired by Keep a Changelog and uses a date-based release style.
 - Added `secretsmanager:GetSecretValue` (scoped to the `seads/*` name prefix) to the Lambda's
   execution role ahead of actually needing a secret, so adding one later needs no IAM change.
 
+- CI workflow (`.github/workflows/ci.yml`): lint, typecheck, and build run on every PR and
+  push to `main`, so a broken build is caught before Amplify tries to deploy it in production.
+
 ### Confirmed
 
 - SES production access is approved — the interest-form notification email is no longer
   sandbox-limited (was 200/day, verified recipients only).
+
+### Changed
+
+- Moved the backend (Lambda, API Gateway, DynamoDB) and Amplify Hosting from `us-east-1` to
+  `ap-southeast-1` (Singapore) — this project's audience is Singapore/SEA-based, and the
+  interactive form backend (unlike Amplify's already-globally-edge-cached static assets)
+  benefits directly from sitting in-region instead of round-tripping to Virginia. SES was
+  re-verified and re-approved for production access in the new region too (see
+  `docs/LEARNING_GUIDE.md` Part 7 for the full writeup, including what does and doesn't
+  actually benefit from a region move). New Amplify app: `d2mrph1bcp6pjx`
+  (`https://main.d2mrph1bcp6pjx.amplifyapp.com`). New API Gateway: `jztkgrm3lh`. Old
+  `us-east-1` stack (Amplify app `d1s8x62kxpmlx7`, Lambda, API Gateway `h0bq61l33m`, DynamoDB
+  table, SES identity, CloudWatch log group) deleted after the new region was verified working
+  end-to-end.
+- Restored the Media gallery's animated masonry layout — JS-computed absolute-positioned
+  columns with a bounce-in entrance animation and smooth reflow when switching filter
+  category, matching the original Claude Design prototype (`Media.dc.html`). This had been
+  simplified to a plain CSS-columns layout when the site was first ported to Next.js and never
+  fully restored. Used on both the dedicated `/media` page and the homepage gallery teaser.
+- Clicking a nav group label ("Get Involved", "Newsroom") now goes to that group's first child
+  alphabetically (Events, Media) instead of an arbitrary page. "Who We Are" already pointed to
+  About, which was already first alphabetically.
+
+### Known Gaps
+
+- Orphaned IAM role `seads-interest-form-lambda-role` (old `us-east-1` role) still exists —
+  couldn't be deleted because the scoped IAM policy in use didn't include
+  `iam:DeleteRole`/`DeleteRolePolicy`. Harmless (nothing references it), but needs an account
+  owner with broader IAM access to clean up.
 
 ## [2026-07-12]
 

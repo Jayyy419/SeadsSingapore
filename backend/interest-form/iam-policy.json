@@ -5,13 +5,13 @@
       "Sid": "Logs",
       "Effect": "Allow",
       "Action": ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"],
-      "Resource": "arn:aws:logs:us-east-1:140023398409:*"
+      "Resource": "arn:aws:logs:ap-southeast-1:140023398409:*"
     },
     {
       "Sid": "DynamoWrite",
       "Effect": "Allow",
       "Action": "dynamodb:PutItem",
-      "Resource": "arn:aws:dynamodb:us-east-1:140023398409:table/seads-interest-submissions"
+      "Resource": "arn:aws:dynamodb:ap-southeast-1:140023398409:table/seads-interest-submissions"
     },
     {
       "Sid": "SesSend",
@@ -23,7 +23,7 @@
       "Sid": "SecretsRead",
       "Effect": "Allow",
       "Action": "secretsmanager:GetSecretValue",
-      "Resource": "arn:aws:secretsmanager:us-east-1:140023398409:secret:seads/*"
+      "Resource": "arn:aws:secretsmanager:ap-southeast-1:140023398409:secret:seads/*"
     }
   ]
 }

@@ -107,8 +107,10 @@ to restructure the routes themselves.
 
 ## Backend Architecture
 
-The only live backend is the "Get Involved" interest-form pipeline, on AWS (`us-east-1`,
-account `140023398409`):
+The only live backend is the "Get Involved" interest-form pipeline, on AWS (`ap-southeast-1`,
+account `140023398409` — moved from `us-east-1` on 2026-07-13 since this project's audience
+is Singapore/SEA-based and this is the only part of the stack that isn't already edge-cached
+by CloudFront):
 
 ```
 Browser --POST--> API Gateway (HTTP API, seads-interest-form-api)
@@ -135,7 +137,7 @@ Browser --POST--> API Gateway (HTTP API, seads-interest-form-api)
 - **SES**: production access approved 2026-07-13 — no more sandbox limits (verified
   recipients only, 200/day). `NOTIFY_EMAIL` must still be a SES-verified *sender* address;
   re-verify and update the Lambda env var if it changes.
-- **IAM**: the Lambda's execution role (`seads-interest-form-lambda-role`) is scoped to
+- **IAM**: the Lambda's execution role (`seads-interest-form-lambda-role-sg`) is scoped to
   exactly `dynamodb:PutItem` on that one table, `ses:SendEmail`, CloudWatch Logs, and reads
   under the `seads/*` Secrets Manager prefix — not broader account access.
 - **CI/CD**: `.github/workflows/deploy-interest-form-lambda.yml` deploys the Lambda on every

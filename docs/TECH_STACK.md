@@ -35,7 +35,7 @@
 
 - Vercel Analytics (`@vercel/analytics`) — kept even after moving hosting off Vercel; it's
   just a client-side script, doesn't require Vercel hosting
-- **AWS Amplify Hosting** (`us-east-1`) — see `docs/DEPLOYMENT.md`
+- **AWS Amplify Hosting** (`ap-southeast-1`) — see `docs/DEPLOYMENT.md`
 - Legacy: Vercel hosting (`sparksg.vercel.app` / `seadssg.vercel.app`) — being phased out,
   see `docs/DEPLOYMENT.md`
 

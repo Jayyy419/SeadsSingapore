@@ -2,18 +2,27 @@
 
 ## Platform
 
-- **AWS Amplify Hosting** (`us-east-1`, account `140023398409`)
-- App: `SeadsSingapore` (App ID `d1s8x62kxpmlx7`)
+- **AWS Amplify Hosting** (`ap-southeast-1`, account `140023398409`)
+- App: `SeadsSingapore` (App ID `d2mrph1bcp6pjx`)
 - Branch: `main`, connected to `github.com/Jayyy419/SeadsSingapore`, auto-deploys on push
 - Platform type: `WEB_COMPUTE` (Amplify's native Next.js App Router support — static and
   server-rendered routes both work without a manual build spec)
-- Current URL: `https://main.d1s8x62kxpmlx7.amplifyapp.com` — update this and
+- Current URL: `https://main.d2mrph1bcp6pjx.amplifyapp.com` — update this and
   `NEXT_PUBLIC_SITE_URL` (`.env.example`, Amplify env vars) once a custom domain is attached
 
-**Legacy:** the site was previously hosted on Vercel (project `spark-sg`, alias
-`sparksg.vercel.app` / `seadssg.vercel.app`). That deployment was left running, untouched,
-as a fallback during the Amplify migration — it is not kept in sync with `main` going
-forward and should be torn down once Amplify + a real domain are confirmed working.
+**Region:** moved from `us-east-1` to `ap-southeast-1` (Singapore) on 2026-07-13 — this
+project's audience is Singapore/SEA-based, and while Amplify's static assets were already
+edge-cached globally via CloudFront regardless of region, the interactive "Get Involved"
+form's backend (API Gateway + Lambda + DynamoDB) benefits directly from sitting in-region
+instead of round-tripping to `us-east-1`. SES moved too — verification and production access
+are per-region and were redone from scratch in `ap-southeast-1` (see `docs/CHANGELOG.md`).
+The old `us-east-1` stack (Amplify app, Lambda, API Gateway, DynamoDB table) was deleted
+after the new region was verified working end-to-end.
+
+**Legacy:** the site was previously also hosted on Vercel (project `spark-sg`, alias
+`sparksg.vercel.app` / `seadssg.vercel.app`) as a fallback during the initial Amplify
+migration. That deployment is not kept in sync with `main` and should be torn down once a
+real domain is confirmed working on Amplify.
 
 ## One-Time Configuration
 
@@ -22,18 +31,20 @@ app/environment, e.g. staging):
 
 ```bash
 aws amplify create-app \
+  --region ap-southeast-1 \
   --name "SeadsSingapore" \
   --repository "https://github.com/Jayyy419/SeadsSingapore" \
   --platform "WEB_COMPUTE" \
-  --access-token "<github PAT with repo access>" \
+  --access-token "<github PAT with repo + webhook access; classic PAT with 'repo' scope is simplest>" \
   --enable-branch-auto-build \
   --environment-variables NEXT_PUBLIC_SITE_URL=<url>,NEXT_PUBLIC_INTEREST_FORM_ENDPOINT=<url>
 
 aws amplify create-branch \
+  --region ap-southeast-1 \
   --app-id <app-id> --branch-name main \
   --framework "Next.js - SSR" --stage PRODUCTION --enable-auto-build
 
-aws amplify start-job --app-id <app-id> --branch-name main --job-type RELEASE
+aws amplify start-job --region ap-southeast-1 --app-id <app-id> --branch-name main --job-type RELEASE
 ```
 
 Note: `create-app` only creates a webhook using the token at creation time — the token
@@ -47,12 +58,12 @@ Pushing to `main` on GitHub auto-deploys — no manual step needed for normal ch
 To trigger a rebuild without a new commit (e.g. after changing an env var):
 
 ```bash
-aws amplify start-job --app-id d1s8x62kxpmlx7 --branch-name main --job-type RELEASE
+aws amplify start-job --region ap-southeast-1 --app-id d2mrph1bcp6pjx --branch-name main --job-type RELEASE
 ```
 
 ## Verification Checklist
 
-1. `aws amplify get-job --app-id d1s8x62kxpmlx7 --branch-name main --job-id <id>` shows
+1. `aws amplify get-job --region ap-southeast-1 --app-id d2mrph1bcp6pjx --branch-name main --job-id <id>` shows
    `status: SUCCEED` for all of BUILD/DEPLOY/VERIFY
 2. Visit the branch URL and confirm the page renders — light + dark theme, mobile view
    specifically (this app has previously shipped a mobile-only hydration bug that a
@@ -65,7 +76,7 @@ aws amplify start-job --app-id d1s8x62kxpmlx7 --branch-name main --job-type RELE
 ### Build fails
 
 ```bash
-aws amplify get-job --app-id d1s8x62kxpmlx7 --branch-name main --job-id <id> \
+aws amplify get-job --region ap-southeast-1 --app-id d2mrph1bcp6pjx --branch-name main --job-id <id> \
   --query 'job.steps[*].[stepName,status,logUrl]' --output table
 ```
 
@@ -77,7 +88,8 @@ Not yet configured — do this once a domain is purchased:
 
 ```bash
 aws amplify create-domain-association \
-  --app-id d1s8x62kxpmlx7 \
+  --region ap-southeast-1 \
+  --app-id d2mrph1bcp6pjx \
   --domain-name <domain> \
   --sub-domain-settings prefix=,branchName=main
 ```

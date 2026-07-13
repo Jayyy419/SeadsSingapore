@@ -17,7 +17,8 @@ defined in the context of this project specifically.
 4. [Part 4: How the Frontend Deploys (Amplify)](#part-4-how-the-frontend-deploys-amplify)
 5. [Part 5: Reading and Writing AWS CLI Commands](#part-5-reading-and-writing-aws-cli-commands)
 6. [Part 6: Ops Hardening — What "Production Ready" Actually Meant Here](#part-6-ops-hardening)
-7. [Glossary](#glossary)
+7. [Part 7: CI/CD via OIDC, and Moving Regions](#part-7-cicd-via-oidc-and-moving-regions)
+8. [Glossary](#glossary)
 
 ---
 
@@ -652,6 +653,125 @@ than any feature does:
   holds the actual Lambda source and both IAM policy JSON files as the source of truth, so a
   console edit that isn't reflected back into these files is itself a bug to fix, not a
   normal way of working.
+
+---
+
+## Part 7: CI/CD via OIDC, and Moving Regions
+
+### Why OIDC instead of just pasting an AWS key into GitHub
+
+GitHub Actions needs *some* AWS credential to deploy the Lambda. The naive way is: create an
+IAM user, generate an access key, paste it into a GitHub repo secret. That works, but that key
+is now a second, permanent, easy-to-forget credential sitting in a system outside AWS — if
+GitHub is ever compromised, or the secret is accidentally logged, that key keeps working until
+someone remembers to rotate it.
+
+**OIDC (OpenID Connect)** avoids this entirely. GitHub's Actions runners can present a signed,
+short-lived identity token proving "this workflow run is really `main` on
+`Jayyy419/SeadsSingapore`." AWS has a built-in trust relationship for this
+(`token.actions.githubusercontent.com`), so an IAM role can say "I'll hand out temporary
+credentials to anyone who shows up with a valid GitHub token for *this specific repo and
+branch*" — no long-lived secret anywhere. The setup was two pieces:
+
+```bash
+# 1. Tell AWS to trust GitHub's OIDC tokens at all (done once per AWS account)
+aws iam create-open-id-connect-provider \
+  --url https://token.actions.githubusercontent.com \
+  --client-id-list sts.amazonaws.com \
+  --thumbprint-list 1c58a3a8518e8759bf075b76b750d4f2df264fcd
+
+# 2. Create a role that trusts tokens *only* from this repo's main branch
+aws iam create-role \
+  --role-name seads-gha-lambda-deploy \
+  --assume-role-policy-document file://gha-oidc-trust-policy.json
+```
+
+The trust policy's `Condition` block is what actually does the scoping:
+
+```json
+"StringLike": {
+  "token.actions.githubusercontent.com:sub": "repo:Jayyy419/SeadsSingapore:ref:refs/heads/main"
+}
+```
+
+Without this, *any* GitHub Actions workflow anywhere could try to assume the role (the OIDC
+provider itself just says "trust GitHub," not "trust this repo"). The permissions policy on
+top is scoped further still — just `lambda:UpdateFunctionCode` on one function ARN, nothing
+else. In the workflow YAML, this is one step:
+
+```yaml
+permissions:
+  id-token: write   # lets this workflow request an OIDC token at all
+steps:
+  - uses: aws-actions/configure-aws-credentials@v4
+    with:
+      role-to-assume: arn:aws:iam::140023398409:role/seads-gha-lambda-deploy
+      aws-region: ap-southeast-1
+```
+
+That action exchanges the GitHub token for temporary AWS credentials (valid ~1 hour), which
+every later `aws` CLI call in the job then uses automatically.
+
+### GitHub token permission gotchas hit along the way
+
+Two real failures worth remembering, because the error messages are non-obvious:
+
+- **Fine-grained PAT missing "Webhooks" permission**: Amplify's `create-app` needs to register
+  a webhook on the GitHub repo so pushes trigger builds. A token without repo-level
+  **Webhooks: Read and write** fails with `Resource not accessible by personal access token`
+  — easy to misread as an Amplify problem when it's actually a token scope problem.
+- **Token missing the `workflow` scope**: GitHub specifically blocks pushes that touch
+  `.github/workflows/*.yml` unless the token has the `workflow` scope (classic PATs) or
+  **Contents: Read and write** + **Workflows: Read and write** (fine-grained PATs) — even if
+  the same token can push to every other file in the repo. This is deliberate: it stops a
+  leaked lower-privilege token from silently rewriting CI. `git push` fails with `refusing to
+  allow a Personal Access Token to create or update workflow ... without workflow scope`.
+
+### Moving the backend from us-east-1 to ap-southeast-1
+
+This project's users are in Singapore/SEA, so having the *interactive* part of the backend
+sit in `us-east-1` (Virginia) meant every "Get Involved" form submission paid a real
+trans-Pacific round trip (~200ms+) before the visitor saw a response. Worth being precise
+about what actually needed to move, though — **not everything benefits equally**:
+
+- **Amplify's static/prerendered pages don't care about region** the way you'd expect. Amplify
+  Hosting serves through CloudFront, a global CDN with edge locations already in Singapore —
+  so page loads were already fast for SEA visitors regardless of which region the Amplify
+  "app" resource lived in. Moving Amplify's home region doesn't change where the HTML/JS/CSS
+  is served *from* on a page load; it only changes where the build itself runs and where the
+  API control-plane calls land.
+- **API Gateway (HTTP API type) has no edge network** — every request goes straight to the
+  regional endpoint. This is the part that actually got slower for SEA visitors sitting in
+  `us-east-1`, and the part that got genuinely faster after the move.
+- **SES verification and production-access approval are per-region.** Being approved for
+  production sending in `us-east-1` counted for nothing in `ap-southeast-1` — the identity had
+  to be re-verified (a fresh confirmation email, even for the same address) and production
+  access re-requested from scratch. (In this case AWS auto-approved the second region
+  instantly, likely because the account already had a clean sending history from the first
+  region — but that's not guaranteed, so budget time for a manual review when doing this.)
+- **IAM roles are account-wide, not regional** — so the new Lambda's execution role needed a
+  *different name* (`seads-interest-form-lambda-role-sg`) since the old role
+  (`seads-interest-form-lambda-role`) still existed in the other region during the transition.
+  Lambda functions, API Gateway APIs, DynamoDB tables, and Amplify apps, by contrast, *are*
+  regional resources, so those could all keep their exact same names in the new region without
+  any conflict.
+
+The migration order matters for safety: build the entire new stack first (DynamoDB → IAM role
+→ Lambda → API Gateway → SES → Amplify), test it end-to-end with a real POST request and a
+DynamoDB read, confirm the Amplify build succeeds and the site renders, *then* delete the old
+region's resources. Doing it in the opposite order (delete first, then rebuild) would mean
+real downtime if anything in the rebuild went wrong.
+
+### A permission mistake worth learning from
+
+When the scoped IAM policy for this work was drafted, it included `iam:CreateRole` /
+`PutRolePolicy` / `AttachRolePolicy` / `GetRole` / `PassRole` (needed to create the new
+region's execution role) but not `iam:DeleteRole` / `DeleteRolePolicy` — so cleaning up the
+*old* region's now-orphaned role hit an `AccessDenied` error partway through the cleanup.
+This is a normal, low-stakes example of why least-privilege policies are iterative: you scope
+tightly for what you know you need, and expand deliberately (one narrow action at a time, to
+the same tightly-scoped resource pattern) when a real gap shows up — rather than reaching for
+a broad policy "just in case" up front.
 
 ---
 

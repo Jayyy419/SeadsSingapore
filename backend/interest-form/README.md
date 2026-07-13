@@ -3,13 +3,16 @@
 Handles `POST /submit-interest` behind API Gateway. Validates the "Get Involved" form
 payload, writes it to DynamoDB, and best-effort sends an SES notification email.
 
-## Live resources (`us-east-1`, account `140023398409`)
+## Live resources (`ap-southeast-1`, account `140023398409`)
 
-- API Gateway: `seads-interest-form-api` (`h0bq61l33m`) — endpoint in `NEXT_PUBLIC_INTEREST_FORM_ENDPOINT`
+- API Gateway: `seads-interest-form-api` (`jztkgrm3lh`) — endpoint in `NEXT_PUBLIC_INTEREST_FORM_ENDPOINT`
 - Lambda: `seads-interest-form-handler`
 - DynamoDB table: `seads-interest-submissions`
-- IAM role: `seads-interest-form-lambda-role` (`iam-policy.json` + `iam-trust-policy.json`
+- IAM role: `seads-interest-form-lambda-role-sg` (`iam-policy.json` + `iam-trust-policy.json`
   in this directory — scoped to just this table + SES + logs + `seads/*` secrets)
+
+Moved here from `us-east-1` on 2026-07-13 to sit closer to this project's Singapore/SEA
+audience — the old stack was deleted after this one was verified working end-to-end.
 
 ## Environment variables (set on the Lambda, not here)
 
@@ -37,7 +40,7 @@ If the Lambda needs a new permission, edit `iam-policy.json` in this directory, 
 
 ```bash
 aws iam put-role-policy \
-  --role-name seads-interest-form-lambda-role \
+  --role-name seads-interest-form-lambda-role-sg \
   --policy-name seads-interest-form-exec-policy \
   --policy-document file://iam-policy.json
 ```
@@ -64,6 +67,7 @@ cd backend/interest-form
 npm ci --omit=dev
 zip -qr function.zip index.mjs node_modules package.json
 aws lambda update-function-code \
+  --region ap-southeast-1 \
   --function-name seads-interest-form-handler \
   --zip-file fileb://function.zip
 ```
