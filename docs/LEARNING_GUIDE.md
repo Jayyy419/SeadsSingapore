@@ -21,7 +21,8 @@ defined in the context of this project specifically.
 8. [Part 8: Tags, Cost Allocation, and Project-Level Billing](#part-8-tags-cost-allocation-and-project-level-billing)
 9. [Part 9: Monitoring, Bot Protection, and Accessibility](#part-9-monitoring-bot-protection-and-accessibility)
 10. [Part 10: Dynamic Routes and Fixing a "Told You To, But Couldn't" Bug](#part-10-dynamic-routes-and-fixing-a-told-you-to-but-couldnt-bug)
-11. [Glossary](#glossary)
+11. [Part 11: Making the Whole Site Actually Multi-Language](#part-11-making-the-whole-site-actually-multi-language)
+12. [Glossary](#glossary)
 
 ---
 
@@ -1285,6 +1286,160 @@ needed the same small update: the form component (new field), the Lambda (`INTER
 allow-list — never trust a value from the client without validating it against a known set),
 and the notification email (the type now appears in the subject line, e.g. "New Seads interest
 form submission (Volunteering) from...", so it's visible without even opening the email).
+
+---
+
+## Part 11: Making the Whole Site Actually Multi-Language
+
+### The gap, precisely
+
+The locale switcher (EN/中文/BM/HI) has been in the header since the very first version of
+this site, and it worked — for the homepage. Nothing else. Every subpage, and even part of
+the header itself (the nav *group* labels, as opposed to their dropdown children), stayed in
+English no matter what a visitor picked. This is worth naming as its own category of gap,
+distinct from the "told you to, but couldn't" bugs in Part 10: the feature *worked exactly as
+built*, it just was never built to cover more than one page. Nothing was broken; the scope
+had just silently stayed small while the site grew around it.
+
+### Two legitimate architectures, and why the cheaper one was chosen
+
+There are two real ways to make a multi-page Next.js site multi-language:
+
+1. **URL-based routing** (`/en/about`, `/zh/about`, ...) — every language gets its own real,
+   crawlable URL. This is what Next.js's own i18n documentation recommends, because it's the
+   only approach where Google can actually index the Mandarin/Malay/Hindi versions
+   separately. The cost: it restructures every route in the app (`src/app/[locale]/about/...`
+   instead of `src/app/about/...`), and every internal link sitewide needs to become
+   locale-aware (`/${locale}/about` instead of `/about`). Existing indexed URLs like
+   `/about` would need redirects to a default-locale prefix.
+2. **Client-side state** — a language preference held in React state and `localStorage`, with
+   every page rendering different text for the same URL depending on that state. No routing
+   changes, no redirects, much less code to touch. The real cost: search engines only ever
+   see one version (whatever the server-rendered default is — English here), since there's no
+   separate URL to crawl for the other languages.
+
+This project already had the second approach half-built (the homepage's locale switcher), so
+extending it was a fraction of the work of switching architectures mid-project — and this
+site doesn't currently depend on non-English search traffic. That's a real, accepted tradeoff
+recorded here on purpose, not an oversight: if multi-language SEO ever becomes a priority,
+option 1 is the correct next step, and it's a genuine rebuild of the routing layer, not a
+small patch.
+
+### A shared context, because prop-drilling locale through every page doesn't scale
+
+The homepage originally owned locale state directly (`useState` in `page.tsx`) and hand-passed
+it down to `SiteHeader` via an `onLocaleChange` callback prop. That doesn't extend to "every
+page" — you'd need every single page to accept and thread that prop, and `SiteHeader` itself
+is rendered from many different places. The fix is a **React Context**, which exists
+specifically so state can be read by any component anywhere in the tree without manually
+passing it down through every intermediate layer:
+
+```tsx
+// src/lib/locale-context.tsx
+const LocaleContext = createContext<LocaleContextValue | null>(null);
+
+export function LocaleProvider({ children }: { children: ReactNode }) {
+  const [locale, setLocaleState] = useState<Locale>("en"); // SSR-safe default
+  useLayoutEffect(() => { /* correct from localStorage, same pattern as Part 1's nav fix */ }, []);
+  const setLocale = (next: Locale) => {
+    setLocaleState(next);
+    window.localStorage.setItem(LOCALE_KEY, next);
+  };
+  return <LocaleContext.Provider value={{ locale, setLocale, t: translations[locale] }}>{children}</LocaleContext.Provider>;
+}
+
+export function useLocale() {
+  const ctx = useContext(LocaleContext);
+  if (!ctx) throw new Error("useLocale() must be used within a LocaleProvider");
+  return ctx;
+}
+```
+
+Wrapping `{children}` in `<LocaleProvider>` once, in the root `layout.tsx`, makes `useLocale()`
+callable from *any* Client Component anywhere in the app — no prop needed. `SiteHeader` was
+refactored to consume this instead of owning its own locale state, which also simplified it:
+it no longer needs `onLocaleChange` at all, since anything else that needs the locale just
+calls `useLocale()` itself.
+
+### Why nearly every page file had to be split in two
+
+This is the part of the exercise that took the most files, for a reason worth understanding
+properly: **a file can't both export `metadata` and have `"use client"` at the top.**
+`metadata`/`generateStaticParams` are Next.js conventions that only work in Server Components
+(they run at build/request time on the server, before any client JavaScript exists) — but
+`useLocale()` is a hook, and hooks only work in Client Components. A single page file needed
+both. The resolution is the standard pattern for this exact conflict: split into two files.
+
+```tsx
+// src/app/about/page.tsx — stays a Server Component, keeps the SEO-relevant exports
+export const metadata: Metadata = { title: "About", description: "..." };
+export default function AboutPage() {
+  return <AboutContent />;
+}
+
+// src/app/about/about-content.tsx — a Client Component, does the actual translated rendering
+"use client";
+export function AboutContent() {
+  const { t } = useLocale();
+  return <SiteShell title={t.aboutPageTitle} subtitle={t.aboutPageSubtitle}>...</SiteShell>;
+}
+```
+
+The same split applies to the dynamic detail pages from Part 10, with one extra wrinkle:
+`generateMetadata` needs a plain string for the page `<title>`, but the content is now a
+`LocalizedString` (`Record<Locale, string>`) — so metadata always uses `.en` specifically
+(`title: program.name.en`). This is a direct, visible consequence of the architecture choice
+in the previous section: since search engines only ever see the English render anyway, there
+was never a "which locale" question to answer for metadata — it's English, deliberately.
+
+### Restructuring content data: from a plain string to one object per language
+
+Beyond UI chrome (headings, buttons, nav labels — all just new keys in `i18n.ts`, the same
+file the homepage already used), the actual program/event/story/team content needed
+translating too. That meant changing the *shape* of `siteContent.ts`, not just adding
+strings to it:
+
+```ts
+// before
+export type Program = { slug: string; name: string; description: string; ... };
+
+// after
+export type LocalizedString = Record<Locale, string>;
+export type Program = { slug: string; name: LocalizedString; description: LocalizedString; ... };
+```
+
+Every place that read `program.name` as a string now reads `program.name[locale]` instead —
+TypeScript caught every single one of these automatically the moment the type changed
+(`tsc --noEmit` turned into a checklist: run it, fix the reported line, repeat, until zero
+errors), which is a concrete example of why a type system earns its keep on a refactor like
+this one — there was no way to *forget* a spot, the compiler enumerated all of them.
+
+### Keeping real links alive inside translated sentences
+
+One subtle regression happened and got caught before shipping: the Privacy Policy originally
+had actual `<a href="mailto:...">` and `<a href="https://cloudflare.com/...">` elements
+woven into its English sentences. Translating those sentences as plain strings (the
+straightforward approach used everywhere else) would have silently turned those two links
+into inert text — `hello@seads.sg` and "Cloudflare" would still *appear*, but wouldn't be
+clickable, in every language. The fix is a small helper that exploits a genuine fact about
+translation: an email address and a brand name don't get translated — they appear as the
+exact same literal substring in all four languages' sentences, just in different positions.
+So instead of hand-splitting every language's sentence around the link (fragile, and a
+maintenance trap the moment a translation changes), the code finds the untranslated substring
+wherever it naturally landed and wraps just that piece:
+
+```tsx
+function linkify(text: string, needle: string, href: string) {
+  const index = text.indexOf(needle);
+  if (index === -1) return text;
+  return <>{text.slice(0, index)}<a href={href}>{needle}</a>{text.slice(index + needle.length)}</>;
+}
+```
+
+This is a small example of a broader habit worth having on any translation/localization work:
+after translating, re-check for anything in the *original* markup that wasn't plain text —
+links, bold spans, inline icons — since a straightforward string-for-string translation
+naturally flattens all of that into plain text unless it's deliberately preserved.
 
 ---
 

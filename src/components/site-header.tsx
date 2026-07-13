@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { translations, type Locale } from "@/content/i18n";
+import type { Locale } from "@/content/i18n";
+import { useLocale } from "@/lib/locale-context";
 import { buildBloom, buildVine, computeSprigs, type BloomChild, type FillerPetal, type Sprig } from "@/lib/vine";
 
-const LOCALE_KEY = "seads-locale";
 const THEME_KEY = "seads-theme";
 const MOBILE_BREAKPOINT = 860;
 const NAV_ORDER = ["home", "programs", "stories", "about"] as const;
@@ -39,17 +39,12 @@ function activeGroupForPath(pathname: string): { group: GroupKey; child: string 
   return { group: "home", child: null };
 }
 
-type SiteHeaderProps = {
-  /** Called whenever the visitor switches language, so the page rendering the header can
-   * translate its own body copy too (mirrors the header owning locale + theme state). */
-  onLocaleChange?: (locale: Locale) => void;
-};
-
-export function SiteHeader({ onLocaleChange }: SiteHeaderProps) {
+export function SiteHeader() {
   const pathname = usePathname();
   const { group: activeGroupKey, child: activeChild } = activeGroupForPath(pathname ?? "/");
+  const { locale, setLocale, t } = useLocale();
 
-  // These three all start at the SSR-safe default (matching what the server rendered, since
+  // These start at the SSR-safe default (matching what the server rendered, since
   // window/localStorage aren't available at build/render time) and get corrected — if needed —
   // by a real post-mount setState in the effect below. Reading window/localStorage inside a
   // useState lazy initializer instead would make the *first* client render disagree with the
@@ -62,7 +57,6 @@ export function SiteHeader({ onLocaleChange }: SiteHeaderProps) {
   const [openGroup, setOpenGroup] = useState<GroupKey | null>(null);
   const [closingGroup, setClosingGroup] = useState<GroupKey | null>(null);
   const [hoveredLocale, setHoveredLocale] = useState<Locale | null>(null);
-  const [locale, setLocaleState] = useState<Locale>("en");
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [vine, setVine] = useState<{ width: number; height: number; path: string; sprigs: Sprig[] }>({
     width: 0,
@@ -96,18 +90,10 @@ export function SiteHeader({ onLocaleChange }: SiteHeaderProps) {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsMobile(mobile);
 
-    const storedLocale = window.localStorage.getItem(LOCALE_KEY) as Locale | null;
-    const resolvedLocale = storedLocale && translations[storedLocale] ? storedLocale : "en";
-    setLocaleState(resolvedLocale);
-    onLocaleChange?.(resolvedLocale);
-
     const resolvedTheme = window.localStorage.getItem(THEME_KEY) === "dark" ? "dark" : "light";
     setTheme(resolvedTheme);
     document.documentElement.setAttribute("data-theme", resolvedTheme);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const t = translations[locale];
 
   const measureVine = useCallback(() => {
     const container = containerRef.current;
@@ -176,12 +162,6 @@ export function SiteHeader({ onLocaleChange }: SiteHeaderProps) {
 
   useEffect(() => () => clearTimeout(closeTimerRef.current), []);
 
-  const setLocale = (next: Locale) => {
-    setLocaleState(next);
-    window.localStorage.setItem(LOCALE_KEY, next);
-    onLocaleChange?.(next);
-  };
-
   const toggleTheme = () => {
     const next = theme === "dark" ? "light" : "dark";
     setTheme(next);
@@ -193,17 +173,17 @@ export function SiteHeader({ onLocaleChange }: SiteHeaderProps) {
     { key: "home", label: t.navHome, href: "/", children: [] },
     {
       key: "programs",
-      label: "Get Involved",
+      label: t.navGetInvolved,
       href: "/events",
       children: [
         { key: "events", label: t.navEvents, href: "/events" },
-        { key: "partners", label: "Partners", href: "/partners" },
+        { key: "partners", label: t.navPartners, href: "/partners" },
         { key: "programs", label: t.navPrograms, href: "/programs" },
       ],
     },
     {
       key: "stories",
-      label: "Newsroom",
+      label: t.navNewsroom,
       href: "/media",
       children: [
         { key: "media", label: t.navMedia, href: "/media" },
@@ -212,12 +192,12 @@ export function SiteHeader({ onLocaleChange }: SiteHeaderProps) {
     },
     {
       key: "about",
-      label: "Who We Are",
+      label: t.navWhoWeAre,
       href: "/about",
       children: [
         { key: "about", label: t.navAbout, href: "/about" },
-        { key: "contact", label: "Contact", href: "/contact" },
-        { key: "team", label: "Team", href: "/team" },
+        { key: "contact", label: t.navContact, href: "/contact" },
+        { key: "team", label: t.navTeam, href: "/team" },
       ],
     },
   ];
@@ -274,10 +254,10 @@ export function SiteHeader({ onLocaleChange }: SiteHeaderProps) {
   };
 
   const themeIcon = theme === "dark" ? "☀" : "☽";
-  // "Get Involved" (linking to /join) rather than Donate — donations aren't live yet
-  // ("coming soon" on /donate), so the site's single most prominent CTA shouldn't be a
-  // dead end. Donate is still reachable from every footer.
-  const ctaLabel = "Get Involved";
+  // Links to /join rather than Donate — donations aren't live yet ("coming soon" on /donate),
+  // so the site's single most prominent CTA shouldn't be a dead end. Donate is still
+  // reachable from every footer.
+  const ctaLabel = t.navGetInvolved;
 
   return (
     <header className="sticky top-0 z-40 border-b border-[color:var(--foreground-soft)] bg-[color:var(--background-overlay)]">

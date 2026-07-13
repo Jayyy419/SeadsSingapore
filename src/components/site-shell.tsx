@@ -1,17 +1,9 @@
+"use client";
+
 import { ReactNode } from "react";
 import Link from "next/link";
 import { SiteHeader } from "@/components/site-header";
-
-const FOOTER_LINKS = [
-  { label: "About", href: "/about" },
-  { label: "Team", href: "/team" },
-  { label: "Programs", href: "/programs" },
-  { label: "Media", href: "/media" },
-  { label: "Partners", href: "/partners" },
-  { label: "Donate", href: "/donate" },
-  { label: "Contact", href: "/contact" },
-  { label: "Privacy", href: "/privacy" },
-];
+import { useLocale } from "@/lib/locale-context";
 
 type SiteShellProps = {
   children: ReactNode;
@@ -20,6 +12,19 @@ type SiteShellProps = {
 };
 
 export function SiteShell({ children, title, subtitle }: SiteShellProps) {
+  const { t } = useLocale();
+
+  const footerLinks = [
+    { label: t.navAbout, href: "/about" },
+    { label: t.navTeam, href: "/team" },
+    { label: t.navPrograms, href: "/programs" },
+    { label: t.navMedia, href: "/media" },
+    { label: t.navPartners, href: "/partners" },
+    { label: t.navDonate, href: "/donate" },
+    { label: t.navContact, href: "/contact" },
+    { label: t.footerPrivacy, href: "/privacy" },
+  ];
+
   return (
     <div className="min-h-screen">
       <SiteHeader />
@@ -41,20 +46,18 @@ export function SiteShell({ children, title, subtitle }: SiteShellProps) {
             <p className="font-display text-xl font-bold">
               Seads <span className="font-display text-[13px] italic text-[color:var(--footer-muted)]">/si:dz/</span>
             </p>
-            <p className="mt-1 max-w-xs text-sm text-[color:var(--footer-muted)]">
-              A youth-led movement seeding sustainability, mental health awareness, and growth across Southeast Asia.
-            </p>
+            <p className="mt-1 max-w-xs text-sm text-[color:var(--footer-muted)]">{t.footerTagline}</p>
           </div>
           <div className="text-sm text-[color:var(--footer-muted)]">
-            <p>Singapore · est. across SEA</p>
+            <p>{t.footerLocation}</p>
             <a href="mailto:hello@seads.sg" className="mt-1 block hover:text-[color:var(--footer-fg)]">
               hello@seads.sg
             </a>
           </div>
         </div>
         <div className="mx-auto mt-6 flex w-full max-w-6xl flex-wrap gap-4.5 border-t border-white/10 px-4 pt-5 text-[13px] sm:px-6 lg:px-8">
-          {FOOTER_LINKS.map((link) => (
-            <Link key={link.label} href={link.href} className="text-[color:var(--footer-muted)] hover:text-[color:var(--footer-fg)]">
+          {footerLinks.map((link) => (
+            <Link key={link.href} href={link.href} className="text-[color:var(--footer-muted)] hover:text-[color:var(--footer-fg)]">
               {link.label}
             </Link>
           ))}

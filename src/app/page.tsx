@@ -1,11 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
 import { SiteHeader } from "@/components/site-header";
 import { MediaMasonry } from "@/components/media-masonry";
 import { InterestForm } from "@/components/interest-form";
-import { translations, type Locale } from "@/content/i18n";
+import { useLocale } from "@/lib/locale-context";
 import {
   events,
   impactMetrics,
@@ -16,12 +15,11 @@ import {
 } from "@/content/siteContent";
 
 export default function Home() {
-  const [locale, setLocale] = useState<Locale>("en");
-  const t = translations[locale];
+  const { locale, t } = useLocale();
 
   return (
     <div className="min-h-screen">
-      <SiteHeader onLocaleChange={setLocale} />
+      <SiteHeader />
 
       {/* HERO */}
       <section className="relative overflow-hidden px-4 pb-[90px] pt-24 sm:px-6 lg:px-8">
@@ -77,12 +75,12 @@ export default function Home() {
         <section className="grid gap-4.5 pb-16 sm:grid-cols-2 lg:grid-cols-4">
           {impactMetrics.map((metric) => (
             <article
-              key={metric.label}
+              key={metric.label[locale]}
               className="rounded-[20px] border border-[color:var(--foreground-soft)] bg-[color:var(--surface)] p-6 shadow-[0_10px_30px_rgba(31,41,55,.05)]"
             >
               <p className="font-display text-4xl font-bold text-[color:var(--foreground)]">{metric.value}</p>
-              <p className="mt-2.5 text-sm font-bold text-[color:var(--foreground)]">{metric.label}</p>
-              <p className="mt-1 text-[13px] text-[color:var(--muted)]">{metric.note}</p>
+              <p className="mt-2.5 text-sm font-bold text-[color:var(--foreground)]">{metric.label[locale]}</p>
+              <p className="mt-1 text-[13px] text-[color:var(--muted)]">{metric.note[locale]}</p>
             </article>
           ))}
         </section>
@@ -132,11 +130,11 @@ export default function Home() {
                 className="block rounded-[20px] border border-[color:var(--foreground-soft)] bg-[color:var(--surface)] p-7 text-inherit transition-[transform,box-shadow,border-color] hover:-translate-y-1 hover:border-[color:var(--brand)] hover:shadow-[0_14px_34px_rgba(31,41,55,.1)]"
               >
                 <div className="mb-3.5 flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase tracking-wide text-[color:var(--brand)]">{program.tag}</span>
+                  <span className="text-xs font-bold uppercase tracking-wide text-[color:var(--brand)]">{program.tag[locale]}</span>
                   <span className="font-display text-sm text-[color:var(--foreground-soft)]">{String(i + 1).padStart(2, "0")}</span>
                 </div>
-                <h3 className="font-display mb-2.5 text-xl text-[color:var(--foreground)]">{program.name}</h3>
-                <p className="text-[14.5px] text-[color:var(--muted)]">{program.description}</p>
+                <h3 className="font-display mb-2.5 text-xl text-[color:var(--foreground)]">{program.name[locale]}</h3>
+                <p className="text-[14.5px] text-[color:var(--muted)]">{program.description[locale]}</p>
               </Link>
             ))}
           </div>
@@ -155,15 +153,15 @@ export default function Home() {
           <div className="grid gap-5 lg:grid-cols-3">
             {events.map((event) => (
               <article key={event.slug} className="rounded-[20px] border border-[color:var(--foreground-soft)] bg-[color:var(--surface)] p-6.5">
-                <p className="mb-2.5 text-xs font-bold uppercase tracking-wide text-[color:var(--brand)]">{event.type}</p>
-                <h3 className="font-display mb-3 text-xl text-[color:var(--foreground)]">{event.title}</h3>
+                <p className="mb-2.5 text-xs font-bold uppercase tracking-wide text-[color:var(--brand)]">{event.type[locale]}</p>
+                <h3 className="font-display mb-3 text-xl text-[color:var(--foreground)]">{event.title[locale]}</h3>
                 <p className="text-sm text-[color:var(--muted)]">{event.date}</p>
-                <p className="mb-4.5 mt-0.5 text-sm text-[color:var(--muted)]">{event.location}</p>
+                <p className="mb-4.5 mt-0.5 text-sm text-[color:var(--muted)]">{event.location[locale]}</p>
                 <Link
                   href={`/events/${event.slug}`}
                   className="inline-block rounded-full border border-[color:var(--foreground-soft)] px-5 py-2 text-[13px] font-semibold text-[color:var(--foreground)] hover:border-[color:var(--brand)] hover:text-[color:var(--brand)]"
                 >
-                  View details
+                  {t.viewDetailsRsvp}
                 </Link>
               </article>
             ))}
@@ -188,9 +186,9 @@ export default function Home() {
                   href={`/blog/${story.slug}`}
                   className="block rounded-2xl border border-[color:var(--foreground-soft)] bg-[color:var(--surface)] p-5 text-inherit transition-[transform,box-shadow,border-color] hover:-translate-y-0.5 hover:border-[color:var(--brand)] hover:shadow-[0_10px_26px_rgba(31,41,55,.08)]"
                 >
-                  <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-[color:var(--accent)]">{story.category}</p>
-                  <h3 className="font-display mb-1.5 text-lg text-[color:var(--foreground)]">{story.title}</h3>
-                  <p className="text-sm text-[color:var(--muted)]">{story.excerpt}</p>
+                  <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-[color:var(--accent)]">{story.category[locale]}</p>
+                  <h3 className="font-display mb-1.5 text-lg text-[color:var(--foreground)]">{story.title[locale]}</h3>
+                  <p className="text-sm text-[color:var(--muted)]">{story.excerpt[locale]}</p>
                 </Link>
               ))}
             </div>
@@ -224,7 +222,7 @@ export default function Home() {
                   </span>
                 </div>
                 <h3 className="font-display mb-0.5 mt-4 text-lg text-[color:var(--foreground)]">{member.name}</h3>
-                <p className="text-sm font-semibold text-[color:var(--brand)]">{member.role}</p>
+                <p className="text-sm font-semibold text-[color:var(--brand)]">{member.role[locale]}</p>
               </Link>
             ))}
           </div>
@@ -236,9 +234,9 @@ export default function Home() {
         <h2 className="font-display mb-8 text-[38px]">{t.testimonialsTitle}</h2>
         <div className="grid gap-5 lg:grid-cols-3">
           {testimonials.map((item) => (
-            <blockquote key={item.author} className="rounded-[20px] border border-[color:var(--foreground-soft)] bg-[color:var(--surface)] p-6.5">
-              <p className="font-display text-[17px] leading-relaxed text-[color:var(--foreground)]">&ldquo;{item.quote}&rdquo;</p>
-              <footer className="mt-4 text-sm font-semibold text-[color:var(--brand)]">{item.author}</footer>
+            <blockquote key={item.author[locale]} className="rounded-[20px] border border-[color:var(--foreground-soft)] bg-[color:var(--surface)] p-6.5">
+              <p className="font-display text-[17px] leading-relaxed text-[color:var(--foreground)]">&ldquo;{item.quote[locale]}&rdquo;</p>
+              <footer className="mt-4 text-sm font-semibold text-[color:var(--brand)]">{item.author[locale]}</footer>
             </blockquote>
           ))}
         </div>
@@ -246,15 +244,7 @@ export default function Home() {
 
       {/* GET INVOLVED */}
       <section id="contact" className="mx-auto max-w-6xl px-4 py-20 sm:px-6 lg:px-8">
-        <InterestForm
-          eyebrow={t.contactEyebrow}
-          heading={t.contactTitle}
-          body={t.contactBody}
-          namePlaceholder={t.namePh}
-          emailPlaceholder={t.emailPh}
-          interestPlaceholder={t.interestPh}
-          submitLabel={t.submit}
-        />
+        <InterestForm />
       </section>
 
       {/* FOOTER */}
@@ -267,19 +257,19 @@ export default function Home() {
             <p className="mt-1.5 max-w-[320px] text-[13px] text-[color:var(--footer-muted)]">{t.footerTagline}</p>
           </div>
           <div className="text-[13px] text-[color:var(--footer-muted)]">
-            <p>Singapore &middot; est. across SEA</p>
+            <p>{t.footerLocation}</p>
             <p className="mt-1">hello@seads.sg</p>
           </div>
         </div>
         <div className="mx-auto mt-6 flex max-w-6xl flex-wrap gap-4.5 border-t border-white/10 pt-5 text-[13px]">
-          <Link href="/about" className="text-[color:var(--footer-muted)] hover:text-[color:var(--footer-fg)]">About</Link>
-          <Link href="/team" className="text-[color:var(--footer-muted)] hover:text-[color:var(--footer-fg)]">Team</Link>
-          <Link href="/programs" className="text-[color:var(--footer-muted)] hover:text-[color:var(--footer-fg)]">Programs</Link>
-          <Link href="/media" className="text-[color:var(--footer-muted)] hover:text-[color:var(--footer-fg)]">Media</Link>
-          <Link href="/partners" className="text-[color:var(--footer-muted)] hover:text-[color:var(--footer-fg)]">Partners</Link>
-          <Link href="/donate" className="text-[color:var(--footer-muted)] hover:text-[color:var(--footer-fg)]">Donate</Link>
-          <Link href="/contact" className="text-[color:var(--footer-muted)] hover:text-[color:var(--footer-fg)]">Contact</Link>
-          <Link href="/privacy" className="text-[color:var(--footer-muted)] hover:text-[color:var(--footer-fg)]">Privacy</Link>
+          <Link href="/about" className="text-[color:var(--footer-muted)] hover:text-[color:var(--footer-fg)]">{t.navAbout}</Link>
+          <Link href="/team" className="text-[color:var(--footer-muted)] hover:text-[color:var(--footer-fg)]">{t.navTeam}</Link>
+          <Link href="/programs" className="text-[color:var(--footer-muted)] hover:text-[color:var(--footer-fg)]">{t.navPrograms}</Link>
+          <Link href="/media" className="text-[color:var(--footer-muted)] hover:text-[color:var(--footer-fg)]">{t.navMedia}</Link>
+          <Link href="/partners" className="text-[color:var(--footer-muted)] hover:text-[color:var(--footer-fg)]">{t.navPartners}</Link>
+          <Link href="/donate" className="text-[color:var(--footer-muted)] hover:text-[color:var(--footer-fg)]">{t.navDonate}</Link>
+          <Link href="/contact" className="text-[color:var(--footer-muted)] hover:text-[color:var(--footer-fg)]">{t.navContact}</Link>
+          <Link href="/privacy" className="text-[color:var(--footer-muted)] hover:text-[color:var(--footer-fg)]">{t.footerPrivacy}</Link>
         </div>
       </footer>
     </div>

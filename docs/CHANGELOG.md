@@ -4,6 +4,45 @@ All notable changes to this project should be documented in this file.
 
 This format is inspired by Keep a Changelog and uses a date-based release style.
 
+## [2026-07-13] (13)
+
+### Added — full site localization
+
+Previously the EN/中文/BM/HI locale switcher (prominent on every page) only ever translated
+the homepage's body text and a handful of nav labels — every subpage, and most of the nav
+chrome, stayed in English regardless of selection. Extended the existing client-side
+mechanism (React state + `localStorage`, no URL/route changes — a deliberate scope decision;
+see `docs/LEARNING_GUIDE.md` Part 11 for the tradeoff against proper `/en/`/`/zh/` URL-based
+i18n) to cover the whole site:
+
+- New `LocaleProvider`/`useLocale()` (`src/lib/locale-context.tsx`) — a shared context so
+  every page, not just the homepage, can read/set the current locale. `SiteHeader` no longer
+  owns locale state itself; `SiteShell`'s footer is now locale-aware too.
+- Every subpage split into a Server Component `page.tsx` (keeps `metadata`/
+  `generateStaticParams`, which can't coexist with `"use client"`) rendering a Client
+  Component that does the actual translated rendering — `about/about-content.tsx`,
+  `team/team-content.tsx`, etc., following the same pattern throughout.
+- `src/content/siteContent.ts` restructured so every program/event/story/team-bio/
+  testimonial/impact-metric field is a `LocalizedString` (`Record<Locale, string>`) instead
+  of a plain string — real translated content for all of it, not just UI chrome.
+- `src/content/i18n.ts` expanded from ~40 to ~150 keys covering every page's headings,
+  labels, and CTAs.
+- `InterestForm`'s interest-type dropdown and status messages are now translated; the
+  Privacy page's mailto/Cloudflare links stay real, clickable links across all four
+  languages via a small `linkify()` helper (translated sentences contain the untranslated
+  email address / brand name as a literal substring, split around it).
+
+**Caveat, same spirit as the Privacy Policy's:** these are real, careful translations, not
+placeholder text — verified end-to-end across all four locales in this session (nav, forms,
+dynamic detail pages, persistence across navigation). But this session isn't a native speaker
+of Mandarin, Malay, or Hindi; a native-speaker review is worth doing before treating the
+non-English copy as final, same as the Privacy Policy.
+
+**Known limitation (accepted as part of the architecture choice):** non-English content is
+not crawlable by search engines — Google only ever sees the English version, since there's
+no separate URL per locale. Revisit with proper `/[locale]/` routing if multi-language SEO
+becomes a priority.
+
 ## [2026-07-13] (12)
 
 ### Fixed — feature-level dead ends and non-functional UI

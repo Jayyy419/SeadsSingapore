@@ -1,0 +1,42 @@
+"use client";
+
+import { createContext, useContext, useLayoutEffect, useState, type ReactNode } from "react";
+import { translations, type Locale, type Translation } from "@/content/i18n";
+
+const LOCALE_KEY = "seads-locale";
+
+type LocaleContextValue = {
+  locale: Locale;
+  setLocale: (locale: Locale) => void;
+  t: Translation;
+};
+
+const LocaleContext = createContext<LocaleContextValue | null>(null);
+
+export function LocaleProvider({ children }: { children: ReactNode }) {
+  // Starts at the SSR-safe default ("en", matching what the server rendered, since
+  // localStorage isn't available at build/render time) and gets corrected — if needed — by a
+  // real post-mount setState below. See site-header.tsx's original comment for why a lazy
+  // useState initializer reading localStorage instead would silently break on first load.
+  const [locale, setLocaleState] = useState<Locale>("en");
+
+  useLayoutEffect(() => {
+    const stored = window.localStorage.getItem(LOCALE_KEY) as Locale | null;
+    const resolved = stored && translations[stored] ? stored : "en";
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- correcting from the SSR-safe default, not derived state
+    setLocaleState(resolved);
+  }, []);
+
+  const setLocale = (next: Locale) => {
+    setLocaleState(next);
+    window.localStorage.setItem(LOCALE_KEY, next);
+  };
+
+  return <LocaleContext.Provider value={{ locale, setLocale, t: translations[locale] }}>{children}</LocaleContext.Provider>;
+}
+
+export function useLocale() {
+  const ctx = useContext(LocaleContext);
+  if (!ctx) throw new Error("useLocale() must be used within a LocaleProvider");
+  return ctx;
+}
