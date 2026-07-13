@@ -17,6 +17,21 @@ const sourceSerif = Source_Serif_4({
 const siteName = "Seads Singapore";
 const description =
   "Seads is a youth-led non-profit cultivating sustainability, mental health awareness, and personal growth across Southeast Asia.";
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://main.d2mrph1bcp6pjx.amplifyapp.com";
+
+// NonprofitOrganization structured data — only fields backed by real content on the site
+// (see docs/CHANGELOG.md); no fabricated address/social links.
+const organizationJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "NonprofitOrganization",
+  name: siteName,
+  alternateName: "Seads",
+  url: siteUrl,
+  logo: `${siteUrl}/opengraph-image`,
+  description,
+  email: "hello@seads.sg",
+  address: { "@type": "PostalAddress", addressCountry: "SG" },
+};
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://main.d2mrph1bcp6pjx.amplifyapp.com"),
@@ -50,6 +65,10 @@ export default function RootLayout({
       className={`${manrope.variable} ${sourceSerif.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
+        />
         <ScrollProgress />
         {children}
         <Analytics />

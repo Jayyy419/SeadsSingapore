@@ -4,6 +4,18 @@ All notable changes to this project should be documented in this file.
 
 This format is inspired by Keep a Changelog and uses a date-based release style.
 
+## [2026-07-13] (9)
+
+### Added
+
+- `.nvmrc` + `package.json` `engines` field (`>=20 <21`) — nothing previously enforced that
+  local dev, CI, and Amplify's build all use the same Node version; they happened to agree
+  (20.x, matching the Lambda runtime) but nothing guaranteed it stayed that way.
+- `NonprofitOrganization` JSON-LD structured data in the root layout — helps search engines
+  understand and potentially enrich how the site appears in results. Only includes fields
+  backed by real content already on the site (name, url, description, `hello@seads.sg`,
+  Singapore as country) — no fabricated address or social links, since none exist yet.
+
 ## [2026-07-13] (8)
 
 ### Fixed
