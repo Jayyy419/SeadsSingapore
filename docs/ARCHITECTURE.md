@@ -145,8 +145,20 @@ Browser --POST--> API Gateway (HTTP API, seads-interest-form-api)
   OIDC provider (role `seads-gha-lambda-deploy`, trust scoped to this repo+branch, permissions
   scoped to `lambda:UpdateFunctionCode` on this one function) — no long-lived AWS keys stored
   in GitHub.
-- **Billing**: a $30/month AWS Budget (`seads-monthly-budget`) alerts on 80%/100% actual
-  spend and 100% forecasted spend.
+- **Billing**: this AWS account is shared with other, unrelated projects, so there are two
+  budgets — `seads-monthly-budget` ($30/month, tracks the *entire account*, a catch-all
+  safety net) and `seads-singapore-project-budget` ($30/month, scoped via a `CostFilters`
+  tag filter to only `Project=SeadsSingapore`-tagged resources, for accurate per-project
+  spend). Both alert the same address on 80%/100% actual and 100% forecasted spend. Every
+  Seads resource (Lambda, DynamoDB, API Gateway, Amplify app, CloudWatch log group, SES
+  identity) is tagged `Project=SeadsSingapore` + `Environment=Production`, and `Project`/
+  `Environment` are activated as cost allocation tags so Cost Explorer can filter/group by
+  them too (tag-based cost data typically takes up to 24h after activation to start
+  populating). Note: AWS doesn't support literally splitting *payment* by project within one
+  account — the invoice is still one consolidated charge — this gets you accurate
+  per-project cost *visibility and alerting*, which is what a budget filter is actually
+  for. True billing separation would mean separate AWS accounts under an AWS Organization,
+  overkill for a single project like this.
 
 **Known gap:** no auth/rate-limiting beyond API Gateway's per-IP-agnostic throttle (5 req/s
 account-wide for this route, not per-visitor), so a determined abuser could still exhaust it

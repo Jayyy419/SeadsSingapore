@@ -18,7 +18,8 @@ defined in the context of this project specifically.
 5. [Part 5: Reading and Writing AWS CLI Commands](#part-5-reading-and-writing-aws-cli-commands)
 6. [Part 6: Ops Hardening — What "Production Ready" Actually Meant Here](#part-6-ops-hardening)
 7. [Part 7: CI/CD via OIDC, and Moving Regions](#part-7-cicd-via-oidc-and-moving-regions)
-8. [Glossary](#glossary)
+8. [Part 8: Tags, Cost Allocation, and Project-Level Billing](#part-8-tags-cost-allocation-and-project-level-billing)
+9. [Glossary](#glossary)
 
 ---
 
@@ -772,6 +773,93 @@ This is a normal, low-stakes example of why least-privilege policies are iterati
 tightly for what you know you need, and expand deliberately (one narrow action at a time, to
 the same tightly-scoped resource pattern) when a real gap shows up — rather than reaching for
 a broad policy "just in case" up front.
+
+---
+
+## Part 8: Tags, Cost Allocation, and Project-Level Billing
+
+### Why you can't just "rename" resources for billing
+
+A natural instinct when you want cleaner billing is to rename things so they're obviously
+grouped. The problem: most AWS resource *names* are immutable once created — a Lambda
+function name, a DynamoDB table name, an IAM role name, an API Gateway API name. There's no
+`rename` API for these; the only way to "rename" one is to delete it and recreate it under
+the new name (which is what actually happened during the region move in Part 7, incidentally
+— new region meant new resources anyway).
+
+What billing and cost tools actually key off is **tags** — arbitrary key/value labels you
+attach to a resource, separate from its name. Every resource in this project got two tags:
+
+```
+Project=SeadsSingapore
+Environment=Production
+```
+
+Tagging is per-service (there's no one API that tags everything at once):
+
+```bash
+aws lambda tag-resource --resource <lambda-arn> --tags Project=SeadsSingapore
+aws dynamodb tag-resource --resource-arn <table-arn> --tags Key=Project,Value=SeadsSingapore
+aws apigatewayv2 tag-resource --resource-arn <api-arn> --tags Project=SeadsSingapore
+aws amplify tag-resource --resource-arn <app-arn> --tags Project=SeadsSingapore
+aws logs tag-log-group --log-group-name <name> --tags Project=SeadsSingapore
+aws sesv2 tag-resource --resource-arn <identity-arn> --tags Key=Project,Value=SeadsSingapore
+```
+
+Notice the tag *syntax* differs slightly per service (`Key=X,Value=Y` for some, `X=Y`
+shorthand for others) — this is just an inconsistency in how each AWS service's CLI commands
+were designed over the years, not a meaningful distinction.
+
+### Turning tags into actual cost visibility
+
+Tagging a resource doesn't automatically make it show up in cost reports — the tag *key* has
+to be activated as a **cost allocation tag** first (a one-time, account-level switch):
+
+```bash
+aws ce update-cost-allocation-tags-status \
+  --cost-allocation-tags-status TagKey=Project,Status=Active TagKey=Environment,Status=Active
+```
+
+After activation, AWS Cost Explorer can filter/group spend by that tag — but there's a real
+delay: tag-based cost data typically takes up to 24 hours to start populating, since it's
+processed from billing data that isn't instant.
+
+### Why this project ended up with two budgets
+
+This AWS account isn't dedicated to just this one project — it also hosts other, unrelated
+apps. The original `seads-monthly-budget` (from Part 6) had no cost filter, so it was
+actually tracking the *entire account's* spend, not just Seads. Once resources were tagged,
+it became possible to create a second budget scoped specifically to this project:
+
+```json
+{
+  "BudgetName": "seads-singapore-project-budget",
+  "BudgetLimit": { "Amount": "30.0", "Unit": "USD" },
+  "CostFilters": { "TagKeyValue": ["user:Project$SeadsSingapore"] },
+  "TimeUnit": "MONTHLY",
+  "BudgetType": "COST"
+}
+```
+
+The `"user:Project$SeadsSingapore"` syntax is AWS Budgets' specific format for
+`user:<tag key>$<tag value>` — the `user:` prefix distinguishes tags *you* applied from AWS's
+own built-in cost dimensions (like `LINKED_ACCOUNT` or `SERVICE`). The account-wide budget
+was kept alongside the new project-scoped one, not replaced — one is a safety net against
+*any* runaway cost in the account, the other is accurate per-project tracking.
+
+### The honest limit: you can track spend by project, but not literally split the bill
+
+Worth being direct about what this does and doesn't achieve. Tags + Cost Explorer + a scoped
+Budget give you accurate **visibility and alerting** per project — you'll know exactly what
+Seads costs and get warned before it overspends. What they *don't* do is split the actual
+**invoice/payment** — AWS still bills the account as one consolidated charge; there's no way
+to route part of a single account's bill to a different payment method by tag. If you ever
+genuinely needed separate bills (e.g., different projects billed to different clients or
+departments), the real mechanism is **separate AWS accounts under an AWS Organization** with
+consolidated billing — each linked account gets its own itemized costs, and more advanced
+Organizations billing features can even route payment differently per account. That's real
+infrastructure overhead (separate account = separate everything, IAM included), so it's only
+worth it once a single tagged budget genuinely stops being enough.
 
 ---
 

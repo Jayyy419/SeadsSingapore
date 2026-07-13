@@ -4,6 +4,34 @@ All notable changes to this project should be documented in this file.
 
 This format is inspired by Keep a Changelog and uses a date-based release style.
 
+## [2026-07-13] (2)
+
+### Added
+
+- Tagged every Seads AWS resource (`Project=SeadsSingapore`, `Environment=Production`) and
+  activated both as cost allocation tags, since this AWS account also hosts unrelated
+  projects and spend wasn't previously separable. Added `seads-singapore-project-budget`
+  ($30/month, filtered to just `Project=SeadsSingapore`) alongside the existing
+  account-wide `seads-monthly-budget`, so there's now an accurate per-project spend view in
+  addition to the account-wide safety net. (Most AWS resource names are immutable once
+  created, so tags — not a rename — are the actual mechanism for project-level cost
+  tracking; true billing separation would mean separate AWS accounts under an
+  Organization.)
+
+### Fixed
+
+- Media masonry gallery was centering itself within its container instead of left-aligning,
+  most visible after filtering to a category with few items. Left-aligned to match the rest
+  of the site's layout.
+
+### Known Gaps
+
+- IAM role tagging (`seads-interest-form-lambda-role-sg`, `seads-gha-lambda-deploy`) is
+  blocked by the same scoped-policy gap as the orphaned-role deletion above —
+  `iam:TagRole` wasn't included when the policy was drafted. Low priority (doesn't affect
+  cost tracking, since Lambda/DynamoDB/API Gateway/Amplify — the resources that actually
+  cost money — are already tagged).
+
 ## [2026-07-13]
 
 ### Added
