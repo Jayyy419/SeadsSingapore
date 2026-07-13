@@ -24,6 +24,12 @@ after the new region was verified working end-to-end.
 migration. That deployment is not kept in sync with `main` and should be torn down once a
 real domain is confirmed working on Amplify.
 
+**PR previews:** enabled on `main` (`aws amplify update-branch --enable-pull-request-preview`)
+— opening a PR against `main` builds a temporary preview deployment. Since this repo is
+connected via a personal access token rather than the installed "AWS Amplify" GitHub App,
+Amplify won't auto-comment the preview URL on the PR itself (that convenience feature needs
+the GitHub App) — check the Amplify console for the preview branch's URL instead.
+
 ## One-Time Configuration
 
 Already done for the current app/branch (documented here for setting up a new

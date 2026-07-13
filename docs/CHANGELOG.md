@@ -4,6 +4,15 @@ All notable changes to this project should be documented in this file.
 
 This format is inspired by Keep a Changelog and uses a date-based release style.
 
+## [2026-07-13] (4)
+
+### Added
+
+- Enabled Amplify PR previews on `main` — opening a PR builds a temporary preview
+  deployment instead of every change going straight to production. No preview-URL PR
+  comment though, since the repo is connected via a PAT rather than the AWS Amplify GitHub
+  App (see `docs/DEPLOYMENT.md`).
+
 ## [2026-07-13] (3)
 
 ### Added
