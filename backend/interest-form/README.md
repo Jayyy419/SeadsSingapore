@@ -36,17 +36,25 @@ audience — the old stack was deleted after this one was verified working end-t
 
 ## Secrets
 
-No real secret exists yet (this function only talks to DynamoDB/SES via its IAM role, no
-third-party API keys). The execution role already has read access to anything under the
-`seads/*` naming prefix in Secrets Manager, so adding one later is just:
+- `seads/turnstile-secret-key` — Cloudflare Turnstile secret key, used to verify the
+  `turnstileToken` field sent from the frontend against
+  `https://challenges.cloudflare.com/turnstile/v0/siteverify` before writing anything to
+  DynamoDB. Cached in-memory across warm invocations (`getTurnstileSecret()` in `index.mjs`).
+  Fails *open* (allows the submission through) if the secret itself can't be loaded — a
+  Secrets Manager or network blip shouldn't take the form down — but fails *closed* on an
+  actual failed/missing verification, which is the case this exists to catch. The matching
+  *site* key is public and lives in `NEXT_PUBLIC_TURNSTILE_SITE_KEY` (`.env.example`, Amplify
+  env vars) — safe to expose client-side, unlike the secret key.
+
+Adding another secret later is the same pattern — the execution role already has read access
+to anything under the `seads/*` naming prefix, so no IAM change needed:
 
 ```bash
 aws secretsmanager create-secret --name seads/some-api-key --secret-string "the-actual-value"
 ```
 
 ...and reading it in `index.mjs` with `@aws-sdk/client-secrets-manager`'s
-`GetSecretValueCommand` — no further IAM changes needed as long as the name starts with
-`seads/`.
+`GetSecretValueCommand`.
 
 ## Updating the IAM policy
 

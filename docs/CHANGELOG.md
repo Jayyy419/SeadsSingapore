@@ -4,6 +4,27 @@ All notable changes to this project should be documented in this file.
 
 This format is inspired by Keep a Changelog and uses a date-based release style.
 
+## [2026-07-13] (5)
+
+### Added
+
+- Cloudflare Turnstile on the "Get Involved" form — bot check, verified server-side in the
+  Lambda before anything is written to DynamoDB. Secret key stored in Secrets Manager
+  (`seads/turnstile-secret-key`, matching the convention prepped earlier); site key is public
+  and lives in `NEXT_PUBLIC_TURNSTILE_SITE_KEY`. Verified end-to-end from this session: a
+  garbage token round-tripped to Cloudflare's `siteverify` from the Lambda and was correctly
+  rejected with a 400. Widget/script only render when the site key is configured, and the
+  Lambda fails open (skips the check) if the secret can't be loaded, so neither side can
+  brick the form on a config gap — only an actual failed verification is rejected.
+- Keyboard accessibility on the nav's flower-bloom dropdowns (`site-header.tsx`) — they were
+  mouse-hover-only, so keyboard/screen-reader users could never reach a group's non-default
+  children (e.g. "Partners" under "Get Involved"). Now opens on focus, closes on blur-outside,
+  and Escape closes it and returns focus to the group link.
+- Accessible labels (`required`, `aria-label`) on the interest form's inputs — previously
+  relied on placeholder text alone, which isn't a reliable accessible name and disappears
+  once the user starts typing. Submission status messages are now in an `aria-live="polite"`
+  region so screen readers announce success/error after submit.
+
 ## [2026-07-13] (4)
 
 ### Added

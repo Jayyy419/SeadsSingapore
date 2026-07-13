@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Script from "next/script";
 import { useState } from "react";
 import { SiteHeader } from "@/components/site-header";
 import { MediaMasonry } from "@/components/media-masonry";
@@ -13,6 +14,12 @@ import {
   teamMembers,
   testimonials,
 } from "@/content/siteContent";
+
+declare global {
+  interface Window {
+    turnstile?: { reset: (widgetId?: string) => void };
+  }
+}
 
 export default function Home() {
   const [locale, setLocale] = useState<Locale>("en");
@@ -34,6 +41,7 @@ export default function Home() {
         name: formData.get("name"),
         email: formData.get("email"),
         interest: formData.get("interest"),
+        turnstileToken: formData.get("cf-turnstile-response"),
       };
 
       const response = await fetch(endpoint, {
@@ -49,6 +57,9 @@ export default function Home() {
       setSubmitStatus("done");
     } catch {
       setSubmitStatus("error");
+    } finally {
+      // Turnstile tokens are single-use — reset the widget so a retry gets a fresh one.
+      window.turnstile?.reset();
     }
   }
 
@@ -288,33 +299,47 @@ export default function Home() {
               type="text"
               name="name"
               placeholder={t.namePh}
+              aria-label={t.namePh}
+              required
               className="rounded-xl border border-white/20 bg-white/[.06] px-4 py-3.5 text-sm text-white placeholder:text-white/50"
             />
             <input
               type="email"
               name="email"
               placeholder={t.emailPh}
+              aria-label={t.emailPh}
+              required
               className="rounded-xl border border-white/20 bg-white/[.06] px-4 py-3.5 text-sm text-white placeholder:text-white/50"
             />
             <input
               type="text"
               name="interest"
               placeholder={t.interestPh}
+              aria-label={t.interestPh}
               className="rounded-xl border border-white/20 bg-white/[.06] px-4 py-3.5 text-sm text-white placeholder:text-white/50 md:col-span-2"
             />
-            {submitStatus === "done" && (
-              <p className="text-xs font-semibold text-[color:var(--brand-soft)] md:col-span-2">
-                Submission captured. Thanks for reaching out — we&rsquo;ll follow up soon.
-              </p>
+            {process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY && (
+              <div
+                className="cf-turnstile md:col-span-2"
+                data-sitekey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY}
+                data-theme="dark"
+              />
             )}
-            {submitStatus === "error" && (
-              <p className="text-xs font-semibold text-[#e2965f] md:col-span-2">Could not submit right now. Please try again.</p>
-            )}
-            {submitStatus === "unconfigured" && (
-              <p className="text-xs font-semibold text-[#e2965f] md:col-span-2">
-                This form isn&rsquo;t connected yet — please email us directly at hello@seads.sg for now.
-              </p>
-            )}
+            <div aria-live="polite" className="contents">
+              {submitStatus === "done" && (
+                <p className="text-xs font-semibold text-[color:var(--brand-soft)] md:col-span-2">
+                  Submission captured. Thanks for reaching out — we&rsquo;ll follow up soon.
+                </p>
+              )}
+              {submitStatus === "error" && (
+                <p className="text-xs font-semibold text-[#e2965f] md:col-span-2">Could not submit right now. Please try again.</p>
+              )}
+              {submitStatus === "unconfigured" && (
+                <p className="text-xs font-semibold text-[#e2965f] md:col-span-2">
+                  This form isn&rsquo;t connected yet — please email us directly at hello@seads.sg for now.
+                </p>
+              )}
+            </div>
             <button
               type="submit"
               disabled={submitStatus === "loading"}
@@ -323,6 +348,9 @@ export default function Home() {
               {submitStatus === "loading" ? "Submitting..." : t.submit}
             </button>
           </form>
+          {process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY && (
+            <Script src="https://challenges.cloudflare.com/turnstile/v0/api.js" strategy="afterInteractive" async defer />
+          )}
         </div>
       </section>
 

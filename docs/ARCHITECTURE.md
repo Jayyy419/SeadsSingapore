@@ -172,12 +172,17 @@ Browser --POST--> API Gateway (HTTP API, seads-interest-form-api)
 - **WAF**: not used. AWS WAF doesn't support API Gateway *HTTP APIs* (only REST APIs, ALBs,
   CloudFront, etc.) — fronting this with CloudFront just to attach WAF was judged not worth
   the added infrastructure for a single contact-form endpoint. Abuse mitigation instead: the
-  account-wide throttle above, plus Cloudflare Turnstile (planned) on the frontend form.
+  account-wide throttle above, plus Cloudflare Turnstile (below) on the frontend form.
+- **Turnstile**: bot check on the "Get Involved" form, verified server-side (the Lambda calls
+  Cloudflare's `siteverify` before touching DynamoDB — the frontend token alone proves
+  nothing on its own). Secret key in Secrets Manager (`seads/turnstile-secret-key`); site key
+  is public (`NEXT_PUBLIC_TURNSTILE_SITE_KEY`). Both sides degrade gracefully if unconfigured
+  (widget doesn't render / Lambda skips the check) rather than hard-failing the form.
 
 **Known gap:** no per-visitor rate-limiting (API Gateway's throttle above is account-wide, not
-per-IP) — a determined abuser could still exhaust it for everyone. Turnstile (planned) should
-close most of this in practice, since it stops scripted/bot submissions before they even hit
-the API.
+per-IP) — a determined abuser could still exhaust it for everyone. Turnstile closes most of
+this in practice, since it stops scripted/bot submissions before they even hit the API, but
+a human clicking submit repeatedly would still only be caught by the account-wide throttle.
 
 ## Styling Architecture
 

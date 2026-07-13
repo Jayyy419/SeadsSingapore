@@ -320,6 +320,16 @@ export function SiteHeader({ onLocaleChange }: SiteHeaderProps) {
               }}
               onMouseEnter={() => openGroupHandler(group.key)}
               onMouseLeave={() => closeGroupHandler(group.key)}
+              onFocus={() => openGroupHandler(group.key)}
+              onBlur={(e) => {
+                if (!e.currentTarget.contains(e.relatedTarget)) closeGroupHandler(group.key);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Escape" && openGroup === group.key) {
+                  closeGroupHandler(group.key);
+                  groupRefs.current[group.key]?.querySelector("a")?.focus();
+                }
+              }}
               className="relative"
             >
               <Link href={group.href} className="relative flex items-center justify-center rounded-full px-3.5 py-2.5">
