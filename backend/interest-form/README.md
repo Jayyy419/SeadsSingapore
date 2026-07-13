@@ -47,7 +47,17 @@ AWS console without updating this file to match.
 
 ## Deploying a change
 
-There's no CI wired up for this yet — deploy manually:
+Automatic: `.github/workflows/deploy-interest-form-lambda.yml` runs on every push to `main`
+that touches `backend/interest-form/**`. It zips `index.mjs` + `node_modules` +
+`package.json` and calls `lambda:UpdateFunctionCode`. No AWS secrets are stored in
+GitHub — the workflow authenticates via OIDC (`aws-actions/configure-aws-credentials`),
+assuming `seads-gha-lambda-deploy`, an IAM role that only trusts GitHub Actions tokens
+issued for `repo:Jayyy419/SeadsSingapore:ref:refs/heads/main` (`gha-oidc-trust-policy.json`
+in this directory) and can only call `lambda:UpdateFunctionCode` /
+`lambda:GetFunction` / `lambda:GetFunctionConfiguration` on this one function
+(`gha-deploy-policy.json`).
+
+Manual fallback (e.g. testing a change before pushing):
 
 ```bash
 cd backend/interest-form
@@ -58,5 +68,22 @@ aws lambda update-function-code \
   --zip-file fileb://function.zip
 ```
 
-Requires AWS credentials for the `SeadsSingapore` IAM user (or equivalent) with
-`lambda:UpdateFunctionCode` on this function.
+Requires AWS credentials with `lambda:UpdateFunctionCode` on this function.
+
+## Setting up the OIDC role (already done, kept here for reference)
+
+```bash
+aws iam create-open-id-connect-provider \
+  --url https://token.actions.githubusercontent.com \
+  --client-id-list sts.amazonaws.com \
+  --thumbprint-list 1c58a3a8518e8759bf075b76b750d4f2df264fcd
+
+aws iam create-role \
+  --role-name seads-gha-lambda-deploy \
+  --assume-role-policy-document file://gha-oidc-trust-policy.json
+
+aws iam put-role-policy \
+  --role-name seads-gha-lambda-deploy \
+  --policy-name seads-gha-lambda-deploy-policy \
+  --policy-document file://gha-deploy-policy.json
+```

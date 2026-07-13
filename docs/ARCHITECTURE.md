@@ -132,19 +132,23 @@ Browser --POST--> API Gateway (HTTP API, seads-interest-form-api)
   days (default is "never expire," which just accumulates cost indefinitely).
 - **DynamoDB**: `seads-interest-submissions`, on-demand billing, partition key `id` (string),
   point-in-time recovery enabled (35-day rolling restore window).
-- **SES**: production-access request submitted (AWS reviews these; sandbox limits — verified
-  addresses only, 200/day, 1/sec — apply until approved). `NOTIFY_EMAIL` must be a
-  SES-verified address; re-verify and update the Lambda env var if it changes.
+- **SES**: production access approved 2026-07-13 — no more sandbox limits (verified
+  recipients only, 200/day). `NOTIFY_EMAIL` must still be a SES-verified *sender* address;
+  re-verify and update the Lambda env var if it changes.
 - **IAM**: the Lambda's execution role (`seads-interest-form-lambda-role`) is scoped to
-  exactly `dynamodb:PutItem` on that one table, `ses:SendEmail`, and CloudWatch Logs — not
-  broader account access.
+  exactly `dynamodb:PutItem` on that one table, `ses:SendEmail`, CloudWatch Logs, and reads
+  under the `seads/*` Secrets Manager prefix — not broader account access.
+- **CI/CD**: `.github/workflows/deploy-interest-form-lambda.yml` deploys the Lambda on every
+  push to `main` that touches `backend/interest-form/**`, authenticating to AWS via GitHub's
+  OIDC provider (role `seads-gha-lambda-deploy`, trust scoped to this repo+branch, permissions
+  scoped to `lambda:UpdateFunctionCode` on this one function) — no long-lived AWS keys stored
+  in GitHub.
 - **Billing**: a $30/month AWS Budget (`seads-monthly-budget`) alerts on 80%/100% actual
   spend and 100% forecasted spend.
 
-**Known gap:** no CI for the Lambda yet — deploys are manual (`backend/interest-form/README.md`).
-Also no auth/rate-limiting beyond API Gateway's per-IP-agnostic throttle (5 req/s account-wide
-for this route, not per-visitor), so a determined abuser could still exhaust it for everyone;
-revisit if this ever becomes a real problem (e.g. add a CAPTCHA or WAF rule).
+**Known gap:** no auth/rate-limiting beyond API Gateway's per-IP-agnostic throttle (5 req/s
+account-wide for this route, not per-visitor), so a determined abuser could still exhaust it
+for everyone; revisit if this ever becomes a real problem (e.g. add a CAPTCHA or WAF rule).
 
 ## Styling Architecture
 

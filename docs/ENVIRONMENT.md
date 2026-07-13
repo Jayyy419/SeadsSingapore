@@ -34,8 +34,6 @@ Environment variables are documented in `.env.example`.
 
 ## Known Gaps
 
-- The Lambda behind `NEXT_PUBLIC_INTEREST_FORM_ENDPOINT` sends its notification email via
-  SES, which starts in sandbox mode (can only send to/from verified addresses, low daily
-  send limit). Request SES production access before relying on this for real traffic — see
-  `docs/DEPLOYMENT.md`.
+- None currently — SES production access was approved 2026-07-13, so the notification email
+  is no longer sandbox-limited (see `docs/CHANGELOG.md`).
 

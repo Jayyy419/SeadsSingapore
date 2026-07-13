@@ -4,6 +4,25 @@ All notable changes to this project should be documented in this file.
 
 This format is inspired by Keep a Changelog and uses a date-based release style.
 
+## [2026-07-13]
+
+### Added
+
+- CI/CD for the interest-form Lambda: `.github/workflows/deploy-interest-form-lambda.yml`
+  deploys on every push to `main` touching `backend/interest-form/**`, authenticating via a
+  GitHub OIDC role (`seads-gha-lambda-deploy`) instead of storing AWS keys as GitHub secrets.
+  Trust is scoped to `repo:Jayyy419/SeadsSingapore:ref:refs/heads/main`; permissions are
+  scoped to `lambda:UpdateFunctionCode`/`GetFunction`/`GetFunctionConfiguration` on just this
+  function (`backend/interest-form/gha-oidc-trust-policy.json` and `gha-deploy-policy.json`).
+  The manual deploy steps in `backend/interest-form/README.md` remain as a fallback.
+- Added `secretsmanager:GetSecretValue` (scoped to the `seads/*` name prefix) to the Lambda's
+  execution role ahead of actually needing a secret, so adding one later needs no IAM change.
+
+### Confirmed
+
+- SES production access is approved — the interest-form notification email is no longer
+  sandbox-limited (was 200/day, verified recipients only).
+
 ## [2026-07-12]
 
 ### Added (backend hardening)
