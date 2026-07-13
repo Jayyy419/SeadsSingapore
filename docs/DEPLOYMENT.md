@@ -25,10 +25,15 @@ migration. That deployment is not kept in sync with `main` and should be torn do
 real domain is confirmed working on Amplify.
 
 **PR previews:** enabled on `main` (`aws amplify update-branch --enable-pull-request-preview`)
-— opening a PR against `main` builds a temporary preview deployment. Since this repo is
-connected via a personal access token rather than the installed "AWS Amplify" GitHub App,
-Amplify won't auto-comment the preview URL on the PR itself (that convenience feature needs
-the GitHub App) — check the Amplify console for the preview branch's URL instead.
+— opening a PR against `main` builds a temporary preview deployment at
+`https://pr-<number>.d2mrph1bcp6pjx.amplifyapp.com`, and the "AWS Amplify" GitHub App (now
+installed on the repo) auto-comments that URL directly on the PR, plus posts an "AWS Amplify
+Console Web Preview" check. The preview branch and its Amplify environment are torn down
+automatically when the PR closes. Verified end-to-end with a real test PR (#3) on
+2026-07-13. If the repo's GitHub connection is ever redone via a raw personal access token
+instead of the console's OAuth "reconnect" flow, this comment/check integration is what
+breaks first — the build/deploy itself still works either way, only the GitHub-side
+integration needs the App specifically.
 
 ## One-Time Configuration
 

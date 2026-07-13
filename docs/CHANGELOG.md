@@ -4,6 +4,19 @@ All notable changes to this project should be documented in this file.
 
 This format is inspired by Keep a Changelog and uses a date-based release style.
 
+## [2026-07-13] (8)
+
+### Fixed
+
+- Reconnected the Amplify–GitHub integration via the console's OAuth flow (installing the
+  "AWS Amplify" GitHub App), closing the gap noted in the 2026-07-13 (4) entry — PR previews
+  now auto-comment their preview URL directly on the PR instead of requiring a manual check
+  in the Amplify console. Verified with a real test PR (#3): the bot commented the preview
+  link, an "AWS Amplify Console Web Preview" check passed, and the preview environment was
+  torn down automatically on close.
+- Removed a stale webhook left over from the deleted `us-east-1` Amplify app — wasn't cleaned
+  up automatically when that app was deleted during the region migration.
+
 ## [2026-07-13] (7)
 
 ### Added
