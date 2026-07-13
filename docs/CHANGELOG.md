@@ -4,6 +4,25 @@ All notable changes to this project should be documented in this file.
 
 This format is inspired by Keep a Changelog and uses a date-based release style.
 
+## [2026-07-13] (6)
+
+### Added
+
+- Custom branded 404 page (`src/app/not-found.tsx`) — previously unmatched routes fell
+  through to Next.js's bare default page with no nav, footer, or branding.
+
+### Removed
+
+- Five unused default `create-next-app` scaffold SVGs from `public/` (`file.svg`,
+  `globe.svg`, `next.svg`, `vercel.svg`, `window.svg`) — never referenced anywhere in the
+  codebase.
+
+### Checked, no action needed
+
+- Bundle size: ~836KB raw JS total across all chunks, no single route unusually heavy;
+  dependencies are just Next/React/Vercel Analytics, nothing bloated.
+- All `<Image>` usages already have `alt` text; no raw `<img>` tags anywhere.
+
 ## [2026-07-13] (5)
 
 ### Added
