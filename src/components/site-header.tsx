@@ -194,7 +194,7 @@ export function SiteHeader({ onLocaleChange }: SiteHeaderProps) {
     {
       key: "programs",
       label: "Get Involved",
-      href: "/programs",
+      href: "/events",
       children: [
         { key: "events", label: t.navEvents, href: "/events" },
         { key: "partners", label: "Partners", href: "/partners" },
@@ -204,7 +204,7 @@ export function SiteHeader({ onLocaleChange }: SiteHeaderProps) {
     {
       key: "stories",
       label: "Newsroom",
-      href: "/blog",
+      href: "/media",
       children: [
         { key: "media", label: t.navMedia, href: "/media" },
         { key: "stories", label: t.navStories, href: "/blog" },
