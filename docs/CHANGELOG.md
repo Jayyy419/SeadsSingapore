@@ -291,3 +291,4 @@ This format is inspired by Keep a Changelog and uses a date-based release style.
 - Initial Next.js project scaffold and base route structure
 - Core site pages for SparkSG content sections
 - Local typed content module and Sanity-ready query/client utilities
+
