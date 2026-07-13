@@ -26,6 +26,9 @@ function isValidEmail(email) {
   return typeof email === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
+const INTEREST_TYPES = new Set(["volunteer", "partner", "event", "other"]);
+const INTEREST_TYPE_LABELS = { volunteer: "Volunteering", partner: "Partnering", event: "Attending an event", other: "Other" };
+
 // Cached across warm Lambda invocations so we're not calling Secrets Manager on every request.
 let cachedTurnstileSecret;
 async function getTurnstileSecret() {
@@ -85,6 +88,7 @@ export const handler = async (event) => {
   const name = typeof payload.name === "string" ? payload.name.trim().slice(0, 200) : "";
   const email = typeof payload.email === "string" ? payload.email.trim().slice(0, 200) : "";
   const interest = typeof payload.interest === "string" ? payload.interest.trim().slice(0, 1000) : "";
+  const interestType = INTEREST_TYPES.has(payload.interestType) ? payload.interestType : "";
 
   if (!name || !isValidEmail(email)) {
     return { statusCode: 400, headers, body: JSON.stringify({ error: "name and a valid email are required" }) };
@@ -102,21 +106,22 @@ export const handler = async (event) => {
   await ddb.send(
     new PutCommand({
       TableName: TABLE_NAME,
-      Item: { id, name, email, interest, submittedAt },
+      Item: { id, name, email, interest, interestType, submittedAt },
     })
   );
 
   if (NOTIFY_EMAIL) {
+    const typeLabel = INTEREST_TYPE_LABELS[interestType];
     try {
       await ses.send(
         new SendEmailCommand({
           Source: NOTIFY_EMAIL,
           Destination: { ToAddresses: [NOTIFY_EMAIL] },
           Message: {
-            Subject: { Data: `New Seads interest form submission from ${name}` },
+            Subject: { Data: `New Seads interest form submission${typeLabel ? ` (${typeLabel})` : ""} from ${name}` },
             Body: {
               Text: {
-                Data: `Name: ${name}\nEmail: ${email}\nInterest: ${interest || "(none given)"}\nSubmitted: ${submittedAt}`,
+                Data: `Name: ${name}\nEmail: ${email}\nInterested in: ${typeLabel || "(not specified)"}\nMessage: ${interest || "(none given)"}\nSubmitted: ${submittedAt}`,
               },
             },
           },

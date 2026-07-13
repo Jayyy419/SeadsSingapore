@@ -16,16 +16,16 @@ export default function EventsPage() {
     >
       <section className="grid gap-4 lg:grid-cols-3">
         {events.map((event) => (
-          <article key={event.title} className="section-card p-6">
+          <article key={event.slug} className="section-card p-6">
             <p className="text-xs font-bold uppercase tracking-wide text-[color:var(--brand)]">{event.type}</p>
             <h2 className="font-display mt-2 text-xl">{event.title}</h2>
             <p className="mt-3 text-sm text-[color:var(--muted)]">{event.date}</p>
             <p className="text-sm text-[color:var(--muted)]">{event.location}</p>
             <Link
-              href="/join"
+              href={`/events/${event.slug}`}
               className="mt-4 inline-block rounded-full bg-[color:var(--inverse-bg)] px-4 py-2 text-sm font-semibold text-[color:var(--inverse-fg)] hover:opacity-85"
             >
-              Join Our Events
+              View details &amp; RSVP
             </Link>
           </article>
         ))}

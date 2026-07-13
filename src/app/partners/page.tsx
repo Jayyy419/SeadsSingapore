@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { SiteShell } from "@/components/site-shell";
 
 export const metadata: Metadata = {
@@ -35,6 +36,20 @@ export default function PartnersPage() {
           </article>
         ))}
       </section>
+
+      <div className="section-card mt-4 flex flex-col items-center gap-3 p-8 text-center">
+        <h2 className="font-display text-2xl">Ready to partner with us?</h2>
+        <p className="max-w-lg text-sm text-[color:var(--muted)]">
+          Tell us about your organization and what you&rsquo;re looking to do together — we&rsquo;ll follow up to
+          discuss the right fit.
+        </p>
+        <Link
+          href="/join"
+          className="mt-1 rounded-full bg-[color:var(--brand)] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[color:var(--brand-deep)]"
+        >
+          Become a partner
+        </Link>
+      </div>
     </SiteShell>
   );
 }

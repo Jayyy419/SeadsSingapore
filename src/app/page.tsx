@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import Script from "next/script";
 import { useState } from "react";
 import { SiteHeader } from "@/components/site-header";
 import { MediaMasonry } from "@/components/media-masonry";
+import { InterestForm } from "@/components/interest-form";
 import { translations, type Locale } from "@/content/i18n";
 import {
   events,
@@ -15,53 +15,9 @@ import {
   testimonials,
 } from "@/content/siteContent";
 
-declare global {
-  interface Window {
-    turnstile?: { reset: (widgetId?: string) => void };
-  }
-}
-
 export default function Home() {
   const [locale, setLocale] = useState<Locale>("en");
-  const [submitStatus, setSubmitStatus] = useState<"idle" | "loading" | "done" | "error" | "unconfigured">("idle");
   const t = translations[locale];
-
-  async function onInterestSubmit(formData: FormData) {
-    const endpoint = process.env.NEXT_PUBLIC_INTEREST_FORM_ENDPOINT;
-    if (!endpoint) {
-      // Don't claim success when nothing was actually captured — an unconfigured endpoint
-      // previously showed the same "Submission captured" message as a real success.
-      setSubmitStatus("unconfigured");
-      return;
-    }
-
-    setSubmitStatus("loading");
-    try {
-      const payload = {
-        name: formData.get("name"),
-        email: formData.get("email"),
-        interest: formData.get("interest"),
-        turnstileToken: formData.get("cf-turnstile-response"),
-      };
-
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        throw new Error("Submission failed");
-      }
-
-      setSubmitStatus("done");
-    } catch {
-      setSubmitStatus("error");
-    } finally {
-      // Turnstile tokens are single-use — reset the widget so a retry gets a fresh one.
-      window.turnstile?.reset();
-    }
-  }
 
   return (
     <div className="min-h-screen">
@@ -228,8 +184,8 @@ export default function Home() {
             <div className="flex flex-col gap-3.5">
               {stories.map((story) => (
                 <Link
-                  key={story.title}
-                  href="/blog"
+                  key={story.slug}
+                  href={`/blog/${story.slug}`}
                   className="block rounded-2xl border border-[color:var(--foreground-soft)] bg-[color:var(--surface)] p-5 text-inherit transition-[transform,box-shadow,border-color] hover:-translate-y-0.5 hover:border-[color:var(--brand)] hover:shadow-[0_10px_26px_rgba(31,41,55,.08)]"
                 >
                   <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-[color:var(--accent)]">{story.category}</p>
@@ -289,69 +245,16 @@ export default function Home() {
       </section>
 
       {/* GET INVOLVED */}
-      <section id="contact" className="bg-[color:var(--inverse-bg)] px-4 py-20 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-[900px] text-center">
-          <p className="mb-3.5 text-xs font-semibold uppercase tracking-[0.14em] text-[#9db3a3]">{t.contactEyebrow}</p>
-          <h2 className="font-display mb-4 text-4xl text-white">{t.contactTitle}</h2>
-          <p className="mx-auto mb-9 max-w-[560px] text-base text-[#c9d2cd]">{t.contactBody}</p>
-          <form className="mx-auto grid gap-3 text-left md:grid-cols-2" action={onInterestSubmit}>
-            <input
-              type="text"
-              name="name"
-              placeholder={t.namePh}
-              aria-label={t.namePh}
-              required
-              className="rounded-xl border border-white/20 bg-white/[.06] px-4 py-3.5 text-sm text-white placeholder:text-white/50"
-            />
-            <input
-              type="email"
-              name="email"
-              placeholder={t.emailPh}
-              aria-label={t.emailPh}
-              required
-              className="rounded-xl border border-white/20 bg-white/[.06] px-4 py-3.5 text-sm text-white placeholder:text-white/50"
-            />
-            <input
-              type="text"
-              name="interest"
-              placeholder={t.interestPh}
-              aria-label={t.interestPh}
-              className="rounded-xl border border-white/20 bg-white/[.06] px-4 py-3.5 text-sm text-white placeholder:text-white/50 md:col-span-2"
-            />
-            {process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY && (
-              <div
-                className="cf-turnstile md:col-span-2"
-                data-sitekey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY}
-                data-theme="dark"
-              />
-            )}
-            <div aria-live="polite" className="contents">
-              {submitStatus === "done" && (
-                <p className="text-xs font-semibold text-[color:var(--brand-soft)] md:col-span-2">
-                  Submission captured. Thanks for reaching out — we&rsquo;ll follow up soon.
-                </p>
-              )}
-              {submitStatus === "error" && (
-                <p className="text-xs font-semibold text-[#e2965f] md:col-span-2">Could not submit right now. Please try again.</p>
-              )}
-              {submitStatus === "unconfigured" && (
-                <p className="text-xs font-semibold text-[#e2965f] md:col-span-2">
-                  This form isn&rsquo;t connected yet — please email us directly at hello@seads.sg for now.
-                </p>
-              )}
-            </div>
-            <button
-              type="submit"
-              disabled={submitStatus === "loading"}
-              className="mt-2 w-fit justify-self-center rounded-full bg-[color:var(--accent)] px-8 py-3.5 text-sm font-semibold text-white hover:opacity-85 disabled:opacity-60 md:col-span-2"
-            >
-              {submitStatus === "loading" ? "Submitting..." : t.submit}
-            </button>
-          </form>
-          {process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY && (
-            <Script src="https://challenges.cloudflare.com/turnstile/v0/api.js" strategy="afterInteractive" async defer />
-          )}
-        </div>
+      <section id="contact" className="mx-auto max-w-6xl px-4 py-20 sm:px-6 lg:px-8">
+        <InterestForm
+          eyebrow={t.contactEyebrow}
+          heading={t.contactTitle}
+          body={t.contactBody}
+          namePlaceholder={t.namePh}
+          emailPlaceholder={t.emailPh}
+          interestPlaceholder={t.interestPh}
+          submitLabel={t.submit}
+        />
       </section>
 
       {/* FOOTER */}

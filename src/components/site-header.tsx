@@ -274,7 +274,10 @@ export function SiteHeader({ onLocaleChange }: SiteHeaderProps) {
   };
 
   const themeIcon = theme === "dark" ? "☀" : "☽";
-  const donateLabel = t.navDonate;
+  // "Get Involved" (linking to /join) rather than Donate — donations aren't live yet
+  // ("coming soon" on /donate), so the site's single most prominent CTA shouldn't be a
+  // dead end. Donate is still reachable from every footer.
+  const ctaLabel = "Get Involved";
 
   return (
     <header className="sticky top-0 z-40 border-b border-[color:var(--foreground-soft)] bg-[color:var(--background-overlay)]">
@@ -443,10 +446,10 @@ export function SiteHeader({ onLocaleChange }: SiteHeaderProps) {
             {themeIcon}
           </button>
           <Link
-            href="/donate"
+            href="/join"
             className="rounded-full bg-[color:var(--brand)] px-4.5 py-2.5 text-[13.5px] font-semibold text-white hover:bg-[color:var(--brand-deep)]"
           >
-            {donateLabel}
+            {ctaLabel}
           </Link>
         </div>
 
@@ -514,11 +517,11 @@ export function SiteHeader({ onLocaleChange }: SiteHeaderProps) {
               {themeIcon}
             </button>
             <Link
-              href="/donate"
+              href="/join"
               onClick={() => setMenuOpen(false)}
               className="rounded-full bg-[color:var(--brand)] px-4.5 py-2.5 text-sm font-semibold text-white hover:bg-[color:var(--brand-deep)]"
             >
-              {donateLabel}
+              {ctaLabel}
             </Link>
           </div>
         </div>

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { SiteShell } from "@/components/site-shell";
 import { programs } from "@/content/siteContent";
 
@@ -15,11 +16,16 @@ export default function ProgramsPage() {
     >
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {programs.map((program) => (
-          <article key={program.name} className="section-card p-6">
+          <Link
+            key={program.slug}
+            href={`/programs/${program.slug}`}
+            className="section-card block p-6 text-inherit transition-[transform,box-shadow,border-color] hover:-translate-y-0.5 hover:border-[color:var(--brand)] hover:shadow-[0_10px_26px_rgba(31,41,55,.08)]"
+          >
             <p className="text-xs font-bold uppercase tracking-wide text-[color:var(--brand)]">{program.tag}</p>
             <h2 className="font-display mt-2 text-xl">{program.name}</h2>
             <p className="mt-3 text-sm text-[color:var(--muted)]">{program.description}</p>
-          </article>
+            <span className="mt-4 inline-block text-sm font-semibold text-[color:var(--brand)]">Learn more &rarr;</span>
+          </Link>
         ))}
       </section>
     </SiteShell>

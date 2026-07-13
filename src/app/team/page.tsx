@@ -23,6 +23,7 @@ export default function TeamPage() {
             </div>
             <h2 className="font-display mt-3 text-lg">{member.name}</h2>
             <p className="text-sm font-semibold text-[color:var(--brand)]">{member.role}</p>
+            <p className="mt-2 text-sm text-[color:var(--muted)]">{member.bio}</p>
           </article>
         ))}
       </section>

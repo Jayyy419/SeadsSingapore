@@ -20,7 +20,8 @@ defined in the context of this project specifically.
 7. [Part 7: CI/CD via OIDC, and Moving Regions](#part-7-cicd-via-oidc-and-moving-regions)
 8. [Part 8: Tags, Cost Allocation, and Project-Level Billing](#part-8-tags-cost-allocation-and-project-level-billing)
 9. [Part 9: Monitoring, Bot Protection, and Accessibility](#part-9-monitoring-bot-protection-and-accessibility)
-10. [Glossary](#glossary)
+10. [Part 10: Dynamic Routes and Fixing a "Told You To, But Couldn't" Bug](#part-10-dynamic-routes-and-fixing-a-told-you-to-but-couldnt-bug)
+11. [Glossary](#glossary)
 
 ---
 
@@ -1167,6 +1168,126 @@ actual browser in the loop to be genuinely verified, not just inspected.
 
 ---
 
+## Part 10: Dynamic Routes and Fixing a "Told You To, But Couldn't" Bug
+
+### A bug worth naming precisely
+
+A feature survey of every content page (events, programs, stories, team, partners, join)
+turned up several instances of the same underlying problem, worth calling out as its own
+category of bug: **a page tells a visitor to do something, but doesn't actually let them do
+it.** The clearest example was `/join` — its own copy described a 4-step process where step 2
+was "submit your interest details," but the page had no form on it at all, just a link to
+`/events`, which linked right back to `/join`. A visitor following the page's own instructions
+would loop forever. This is a different failure mode than a crash or a broken build — the
+page renders fine, nothing throws, `next build` and every automated check pass clean — the
+gap is purely in whether the page's promises match what it actually offers, which nothing
+except an attentive human reading the whole site can catch. (The CSP/Turnstile bug in Part 9
+was the same category from a different angle: the *code* was internally consistent, the
+*infrastructure config* just quietly contradicted it.)
+
+Two smaller versions of the same problem showed up elsewhere: story and program cards on
+their listing pages weren't links at all — visually they looked exactly like the clickable
+cards used everywhere else on the site (`hover:-translate-y-0.5`, the works), but clicking one
+did nothing, because there was no page underneath to click through to. That's arguably worse
+than an obviously-static page, since the visual affordance actively promises an interaction
+the site can't deliver.
+
+### Dynamic routes: `[slug]` folders and `generateStaticParams`
+
+Fixing the story/program/event gaps meant adding real detail pages. Next.js's App Router uses
+a folder literally named `[slug]` to mean "match anything here, and expose it as a `slug`
+param":
+
+```
+src/app/blog/[slug]/page.tsx   ->  /blog/student-led-mentorship-cell, /blog/anything-else, ...
+```
+
+Since this site is fully statically prerendered (no per-request server rendering — see Part
+1), Next.js needs to know *every* valid slug value ahead of time, at build time, so it can
+generate one static HTML file per story. That's what `generateStaticParams` is for:
+
+```ts
+export function generateStaticParams() {
+  return stories.map((story) => ({ slug: story.slug }));
+}
+```
+
+This runs once during `next build`, returns an array of every valid param combination, and
+Next.js pre-renders one page per entry — confirmed in the build output as a new `●` (SSG)
+row listing each generated path:
+
+```
+● /blog/[slug]
+  ├ /blog/student-led-mentorship-cell
+  ├ /blog/campus-recycling-to-circular-systems
+  ...
+```
+
+A slug with no matching content (a typo'd URL, a deleted story someone still linked to)
+should 404, not crash or silently show blank content — that's `notFound()` from
+`next/navigation`, which renders this project's `not-found.tsx` from Part 6:
+
+```ts
+const story = stories.find((s) => s.slug === slug);
+if (!story) notFound();
+```
+
+One Next.js version-specific detail: in current Next.js, the `params` object passed into a
+page component is a `Promise`, not a plain object — you `await` it before reading `.slug`.
+This is relatively new (older Next.js versions passed params synchronously); the reasoning is
+that it lets Next.js start streaming a page's shell before route params are fully resolved,
+but the practical effect for a static site like this one is just: remember the `await`.
+
+```tsx
+export default async function StoryDetailPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  ...
+}
+```
+
+### Extracting a reusable component instead of copy-pasting a form
+
+The actual `/join` fix wasn't "add a form to `/join`" so much as "there should only be *one*
+form implementation, used in multiple places." Before this, the entire interest-form
+markup — every input, the Turnstile widget, the submit handler, the status messages — lived
+directly inside the homepage's `page.tsx`. Copy-pasting that block onto `/join` (and onto
+every new event/program detail page) would have meant four near-identical copies of the same
+~80 lines, each one a chance to fix a bug in one place and forget the other three.
+
+The fix was pulling it into `src/components/interest-form.tsx` as a real component with props
+for the parts that legitimately vary per placement — heading, body copy, submit button label,
+and (new) a `prefillInterest` string:
+
+```tsx
+<InterestForm
+  eyebrow="RSVP"
+  heading={`Join us at ${event.title}`}
+  prefillInterest={`RSVP: ${event.title} (${event.date})`}
+  prefillInterestType="event"
+/>
+```
+
+`prefillInterest` is passed straight to the text input's `defaultValue` — not `value`, which
+would make it a *controlled* input requiring `onChange` wiring to stay editable. `defaultValue`
+just sets the initial value and then leaves the input alone, which is exactly right here: the
+visitor arriving from a specific event's RSVP link sees the context pre-filled ("RSVP: Seads
+Youth Dialogue 2026 (18 Jul 2026)") but can still freely edit or clear it.
+
+### Structured data alongside free text
+
+The interest form also gained a `<select name="interestType">` (Volunteering / Partnering /
+Attending an event / Something else) alongside the existing free-text field. The reasoning:
+free text is flexible for the visitor but expensive for whoever on the Seads team has to read
+every submission and figure out what to do with it. A small, optional, structured field costs
+the visitor almost nothing (one dropdown) but lets staff filter/triage submissions instead of
+reading full sentences for every single one. This threaded through three layers that all
+needed the same small update: the form component (new field), the Lambda (`INTEREST_TYPES`
+allow-list — never trust a value from the client without validating it against a known set),
+and the notification email (the type now appears in the subject line, e.g. "New Seads interest
+form submission (Volunteering) from...", so it's visible without even opening the email).
+
+---
+
 ## Glossary
 
 - **Accessible name**: the text assistive technology (screen readers) announces for an
@@ -1174,6 +1295,12 @@ actual browser in the loop to be genuinely verified, not just inspected.
   `placeholder` if not.
 - **App Router**: Next.js's routing system where folders under `src/app/` map directly to
   URL paths.
+- **Controlled vs. uncontrolled input**: a controlled input's value is driven by React state
+  (`value` + `onChange`); an uncontrolled input just takes an initial `defaultValue` and
+  manages its own value in the DOM from then on — simpler when you only need to pre-fill,
+  not track, what's typed.
+- **Dynamic route**: a Next.js route folder named `[param]` (e.g. `[slug]`) that matches any
+  value at that URL segment, exposing it to the page as a param.
 - **aria-live region**: an HTML region marked so assistive tech announces content changes
   inside it automatically, without the user needing to navigate to it.
 - **ARN**: Amazon Resource Name — AWS's globally unique identifier format for any resource,
@@ -1204,5 +1331,7 @@ actual browser in the loop to be genuinely verified, not just inspected.
 - **Server Component vs. Client Component**: Server Components (the Next.js default) run only
   on the server/at build time and ship no JS to the browser; Client Components (`"use
   client"`) run in the browser and can hold state/handle events.
+- **SSG (Static Site Generation)**: pre-rendering a page to static HTML at build time rather
+  than per-request — what `generateStaticParams` does for each dynamic route value.
 - **Trust policy vs. permissions policy**: a trust policy says who can *assume* an IAM role; a
   permissions policy says what that role can *do* once assumed.

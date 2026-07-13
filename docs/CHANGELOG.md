@@ -4,6 +4,43 @@ All notable changes to this project should be documented in this file.
 
 This format is inspired by Keep a Changelog and uses a date-based release style.
 
+## [2026-07-13] (12)
+
+### Fixed — feature-level dead ends and non-functional UI
+
+A survey of every content page turned up several instances of the same problem: a page
+promising an interaction (a link, a described next step) that didn't actually exist.
+
+- **`/join` was circular and had no form.** Its own copy described "submit your interest
+  details" as step 2, but the page had no form — just a link to `/events`, which linked back
+  to `/join`. Fixed by extracting the interest form into a reusable
+  `src/components/interest-form.tsx` and embedding it directly on `/join` (and reusing it on
+  every new detail page below), instead of the form only ever existing on the homepage.
+- **Story cards on `/blog` weren't clickable at all**, and no story detail page existed
+  anywhere in the site. Added `/blog/[slug]` with full story bodies; cards now link through.
+- **Program cards weren't clickable either.** Added `/programs/[slug]` with full program
+  detail, a "who it's for" callout, and an Apply CTA pre-filled with that program.
+- **Every event's "Join" button led to the same generic form**, losing which event you
+  wanted. Added `/events/[slug]` with an RSVP form pre-filled with that specific event
+  (`prefillInterest`/`prefillInterestType` props on the shared form component).
+- **The header's primary CTA button was "Donate," linking to a "coming soon" dead end**, on
+  every single page. Changed to "Get Involved" → `/join`; Donate remains reachable from every
+  footer, just no longer the site's top-billed action.
+
+### Added
+
+- Structured `interestType` field (Volunteering / Partnering / Attending an event / Other)
+  alongside the existing free-text field — threaded through the form component, the Lambda
+  (allow-list validated, never trusting the raw client value), DynamoDB, and the notification
+  email subject line, so Seads staff can triage submissions without reading every one.
+- Team member bios on `/team` (previously name + role only).
+- A "Become a partner" CTA on `/partners` (previously static description cards with no next
+  step).
+- Extended `src/content/siteContent.ts` with `slug`/`body` fields on programs, events, and
+  stories to support the new detail pages — all placeholder content, consistent with the
+  rest of this project's demo data (see `docs/ARCHITECTURE.md`), not claims about real Seads
+  activities.
+
 ## [2026-07-13] (11)
 
 ### Added
