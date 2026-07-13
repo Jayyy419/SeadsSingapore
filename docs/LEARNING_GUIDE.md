@@ -19,7 +19,8 @@ defined in the context of this project specifically.
 6. [Part 6: Ops Hardening — What "Production Ready" Actually Meant Here](#part-6-ops-hardening)
 7. [Part 7: CI/CD via OIDC, and Moving Regions](#part-7-cicd-via-oidc-and-moving-regions)
 8. [Part 8: Tags, Cost Allocation, and Project-Level Billing](#part-8-tags-cost-allocation-and-project-level-billing)
-9. [Glossary](#glossary)
+9. [Part 9: Monitoring, Bot Protection, and Accessibility](#part-9-monitoring-bot-protection-and-accessibility)
+10. [Glossary](#glossary)
 
 ---
 
@@ -863,14 +864,283 @@ worth it once a single tagged budget genuinely stops being enough.
 
 ---
 
+## Part 9: Monitoring, Bot Protection, and Accessibility
+
+### Why WAF turned out not to apply here
+
+The plan was: put AWS WAF in front of the interest-form API Gateway for managed rule sets
+(SQLi/XSS patterns) and per-IP rate limiting. First attempt failed outright:
+
+```
+aws wafv2 associate-web-acl --web-acl-arn ... --resource-arn arn:aws:apigateway:...
+# Error: The ARN isn't valid.
+```
+
+The real cause wasn't a malformed ARN — it's that **AWS WAF doesn't support API Gateway HTTP
+APIs at all**, only the older REST API type (plus ALBs, CloudFront, AppSync, Cognito, a few
+others). This project deliberately used an HTTP API (cheaper, simpler, and what AWS itself
+recommends for new projects — see Part 3), which put it outside WAF's supported resource
+list. The two ways around it — migrate to a REST API, or put a CloudFront distribution in
+front of the HTTP API just to get something WAF *can* attach to — were both judged not worth
+the added infrastructure for a single contact-form endpoint. Lesson: check a service's
+supported-resource list *before* designing around it; "AWS WAF" as a name doesn't tell you
+which API Gateway generation it covers.
+
+The actual decision was to lean on two cheaper mechanisms instead: the throttle already on
+the API Gateway stage (Part 6), and Turnstile (below), which stops most bot traffic before it
+even reaches the API.
+
+### CloudWatch Alarms: turning a metric into an email
+
+A metric on its own (like the Lambda's `Errors` count) just sits in CloudWatch until someone
+happens to look at it. An **alarm** watches a metric and fires an **action** — usually
+publishing to an SNS topic — when a condition holds:
+
+```bash
+aws cloudwatch put-metric-alarm \
+  --alarm-name seads-interest-form-lambda-errors \
+  --namespace AWS/Lambda --metric-name Errors \
+  --dimensions Name=FunctionName,Value=seads-interest-form-handler \
+  --statistic Sum --period 300 --evaluation-periods 1 \
+  --threshold 1 --comparison-operator GreaterThanOrEqualToThreshold \
+  --treat-missing-data notBreaching \
+  --alarm-actions arn:aws:sns:ap-southeast-1:140023398409:seads-alerts
+```
+
+Read this as: "sum up `Errors` over each 300-second window; if any single window's sum is
+`>= 1`, fire." `--evaluation-periods 1` means react to the very first bad window rather than
+waiting for a streak — appropriate here since even one error on a low-traffic form is worth a
+look. `--treat-missing-data notBreaching` matters more than it looks: with *no* traffic at
+all (no error metric published), the default behavior is to treat that as `INSUFFICIENT_DATA`
+which some alarm configurations treat as alarming — telling it to treat silence as "fine, not
+breaching" avoids false alarms on a quiet Tuesday.
+
+SNS (Simple Notification Service) is the fan-out layer between the alarm and an actual human:
+a **topic** is a named channel, and **subscribers** (an email address, here) get a message
+every time something publishes to it:
+
+```bash
+aws sns create-topic --name seads-alerts
+aws sns subscribe --topic-arn arn:...:seads-alerts --protocol email --notification-endpoint someone@example.org
+```
+
+Subscribing doesn't take effect immediately — AWS emails a confirmation link first, so a
+malicious actor can't subscribe *your* inbox to spam by knowing the topic ARN.
+
+### Route 53 health checks: uptime monitoring without an AWS Amplify domain
+
+Uptime monitoring needed two ingredients: something that periodically hits a URL, and an
+alarm on the result. AWS Synthetics (scripted browser canaries) can do this but needs an S3
+bucket, an IAM execution role, and an actual Node.js script to write and maintain — heavy for
+"is this endpoint returning 200." **Route 53 health checks** are the lighter option, and — a
+detail worth knowing — they don't require the checked domain to actually be hosted in Route
+53's DNS at all; you just give them any hostname/IP to poll:
+
+```bash
+aws route53 create-health-check \
+  --caller-reference "seads-api-health-$(date +%s)" \
+  --health-check-config Type=HTTPS,ResourcePath=/health,FullyQualifiedDomainName=jztkgrm3lh.execute-api.ap-southeast-1.amazonaws.com,Port=443,RequestInterval=30,FailureThreshold=3
+```
+
+This polls `GET /health` (a route added to the Lambda specifically for this — see below)
+every 30 seconds, and flags unhealthy after 3 consecutive failures. `--caller-reference` is a
+uniqueness token Route 53 requires to make the create call idempotent/retry-safe — any unique
+string works, a timestamp is the easiest choice.
+
+A genuine gotcha: **Route 53 health-check metrics only publish to CloudWatch in `us-east-1`**,
+regardless of what region the checked endpoint actually lives in (Route 53 itself is a
+global, not regional, service). So even though this project's Lambda alarms are in
+`ap-southeast-1`, the health-check alarms — and a second SNS topic to notify, since SNS
+topics don't cross regions either — had to be created in `us-east-1`. Both topics ended up
+named `seads-alerts`, which is a trap: `arn:aws:sns:ap-southeast-1:...` and
+`arn:aws:sns:us-east-1:...` are two completely different resources that happen to share a
+name. Always check the region in an ARN, not just the resource name.
+
+Adding the `/health` route itself was two small changes: in the Lambda,
+
+```js
+if (method === "GET" && event.rawPath === "/health") {
+  return { statusCode: 200, headers, body: JSON.stringify({ ok: true }) };
+}
+```
+
+placed *before* the JSON-body parsing (a GET request has no body to parse), and in API
+Gateway, a second route on the same integration:
+
+```bash
+aws apigatewayv2 create-route --api-id jztkgrm3lh --route-key "GET /health" --target integrations/24qff8m
+aws lambda add-permission --function-name seads-interest-form-handler \
+  --statement-id apigw-invoke-health --action lambda:InvokeFunction \
+  --principal apigateway.amazonaws.com \
+  --source-arn "arn:aws:execute-api:ap-southeast-1:140023398409:jztkgrm3lh/*/*/health"
+```
+
+Reusing the same Lambda integration for a second route is fine — routes are just "which
+path/method maps to which backend," and one Lambda can happily serve several routes by
+branching on `event.rawPath`/`event.requestContext.http.method` inside the handler, same as
+this file already does for `OPTIONS`.
+
+### Amplify PR previews, and the GitHub App vs. personal access token distinction
+
+```bash
+aws amplify update-branch --app-id d2mrph1bcp6pjx --branch-name main --enable-pull-request-preview
+```
+
+turns on temporary preview deployments for any PR opened against `main`. Worth understanding
+why this project doesn't get the fuller experience (an automatic comment on the PR with the
+preview link): Amplify was connected to GitHub via a **personal access token** (`--access-token`
+on `create-app`, Part 4), which is enough to create a webhook and pull code, but AWS's own
+**"AWS Amplify" GitHub App** is a separate, more deeply integrated connection type that also
+gets permission to post commit statuses and PR comments back to GitHub. Installing that App
+requires an interactive OAuth consent screen in a browser — not something scriptable from a
+CLI session — so this project's automation could turn *previews* on, but not the GitHub-side
+comment integration; that's a one-time manual step (Amplify console → reconnect the repo) for
+whoever owns the GitHub account.
+
+### Verifying a CAPTCHA server-side: the pattern, not just Turnstile specifically
+
+Adding Cloudflare Turnstile to the interest form is a concrete example of a pattern that
+applies to any "prove you're not a bot" widget (reCAPTCHA works the same way): **the widget
+only produces a token in the browser — it proves nothing by itself**. A bot could simply skip
+rendering the widget and POST straight to the API without ever running Cloudflare's
+JavaScript. The token only means something once your *backend* asks the CAPTCHA provider
+"is this token real," server-to-server:
+
+```js
+async function verifyTurnstile(token, remoteIp) {
+  const secret = await getTurnstileSecret();
+  if (!secret) return true;   // fail open: our own infra problem, not a bot signal
+  if (!token) return false;   // fail closed: no token at all
+
+  const body = new URLSearchParams({ secret, response: token, remoteip: remoteIp });
+  const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", { method: "POST", body });
+  const data = await res.json();
+  return data.success === true;
+}
+```
+
+The **fail open / fail closed** distinction here is a deliberate design choice, not an
+oversight: if Secrets Manager has a blip and the secret key can't be loaded, that's *our*
+infrastructure problem, and the form shouldn't go down over it (fail open — let the
+submission through). But if the token is missing entirely, or Cloudflare explicitly says
+`success: false`, that's the actual case this exists to catch, so it's rejected outright
+(fail closed). Getting this backwards in either direction is a real category of bug: too
+strict, and a Secrets Manager hiccup takes down a public form; too lenient, and the whole
+check becomes decorative.
+
+The secret key itself uses the `seads/*` Secrets Manager convention set up back in Part 6/8,
+specifically so that adding it later needed zero IAM changes:
+
+```bash
+aws secretsmanager create-secret --name seads/turnstile-secret-key --secret-string "..."
+```
+
+...while the *site* key (the public half, embedded directly in the page's HTML) is just a
+normal `NEXT_PUBLIC_*` env var — the asymmetry between "safe to expose" (site key) and
+"never expose" (secret key) is the whole reason CAPTCHA providers hand out two different
+keys instead of one.
+
+### Accessibility bugs that are easy to ship by accident
+
+Two real, shipped bugs worth understanding rather than just the fix:
+
+**Hover-only interactive elements are invisible to keyboard/screen-reader users.** The nav's
+dropdown children only ever opened via `onMouseEnter`/`onMouseLeave` — functionally
+reasonable for a mouse user, but someone tabbing through the page with a keyboard could reach
+the group's link (which now goes to its first child, per an earlier fix) but had *no way at
+all* to reach the other children, since they only rendered into the DOM while the mouse was
+hovering. The fix mirrors the mouse handlers with focus equivalents:
+
+```tsx
+onFocus={() => openGroupHandler(group.key)}
+onBlur={(e) => {
+  if (!e.currentTarget.contains(e.relatedTarget)) closeGroupHandler(group.key);
+}}
+```
+
+`onBlur`'s `e.relatedTarget` is the element about to *receive* focus — checking whether the
+container still `.contains()` it is what stops the menu from closing when focus moves from
+the group's main link to one of its own now-visible children (which is a legitimate focus
+move within the same widget, not the user leaving it). Without that check, tabbing from the
+group link to its first child would immediately close the very menu you just opened.
+
+**Placeholder text is not a substitute for a label.** The interest-form inputs only ever had
+`placeholder="Your name"`-style text, no `<label>` or `aria-label`. This looks fine visually
+but has two real problems: placeholder text vanishes the moment a sighted user starts typing
+(losing context), and it isn't reliably exposed as the field's *accessible name* to every
+screen reader/browser combination the way an explicit label is. Fix was minimal —
+`aria-label` reusing the same translated placeholder copy, plus `required` so the browser's
+own validation catches an empty submit before it ever reaches the network:
+
+```tsx
+<input type="email" name="email" placeholder={t.emailPh} aria-label={t.emailPh} required ... />
+```
+
+A form's **result** also needs to be perceivable without vision. A sighted user sees the
+"Submission captured" message appear after clicking submit; a screen-reader user hears
+nothing unless that DOM change happens inside an `aria-live` region, which tells assistive
+tech to announce content changes as they happen rather than only on next navigation:
+
+```tsx
+<div aria-live="polite" className="contents">
+  {submitStatus === "done" && <p>Submission captured...</p>}
+  {submitStatus === "error" && <p>Could not submit right now...</p>}
+</div>
+```
+
+`className="contents"` (Tailwind's `display: contents`) is there for a CSS reason, not an
+accessibility one: the surrounding form is a CSS grid with `md:col-span-2` on its children,
+which only works on *direct* grid children. Wrapping the status paragraphs in a plain `<div>`
+would break that layout since the div itself would become the grid item instead of the
+paragraph inside it; `display: contents` makes the wrapper invisible to the grid/box model
+while keeping it present in the DOM (and accessibility tree) for `aria-live` to attach to.
+
+### Auditing bundle size without a full Lighthouse run
+
+No Lighthouse/Chrome available meant checking performance more directly: the `next build`
+output lists every route, and the actual compiled JS lives in `.next/static/chunks/`:
+
+```bash
+du -sh .next/static/chunks/*.js | sort -rh | head -15   # biggest chunks first
+du -sh .next/static/chunks                              # total
+```
+
+This project came back small (~836KB raw JS across *every* chunk combined, not per-page —
+most routes only load a fraction of that) with nothing to trim, so the real finding was
+elsewhere: `grep`-ing `package.json` showed dependencies were already just
+Next/React/`@vercel/analytics` — no accidentally-bloated library to remove — and a look at
+`public/` turned up five unused SVGs left over from the original `create-next-app` scaffold
+(`file.svg`, `globe.svg`, etc.), never referenced anywhere in `src/`. Confirmed with:
+
+```bash
+grep -rn "file\.svg\|globe\.svg\|next\.svg\|vercel\.svg\|window\.svg" src/
+# (no output = safe to delete)
+```
+
+The lesson isn't really about this specific project (which turned out to already be lean) —
+it's the general audit shape: check total/per-chunk JS size, check `package.json` for
+anything unexpectedly heavy, and grep for dead assets before assuming a performance pass
+needs code changes at all. Sometimes the honest answer is "already fine, here's the evidence."
+
+---
+
 ## Glossary
 
+- **Accessible name**: the text assistive technology (screen readers) announces for an
+  element — computed from a `<label>`/`aria-label` if present, and unreliably from
+  `placeholder` if not.
 - **App Router**: Next.js's routing system where folders under `src/app/` map directly to
   URL paths.
+- **aria-live region**: an HTML region marked so assistive tech announces content changes
+  inside it automatically, without the user needing to navigate to it.
 - **ARN**: Amazon Resource Name — AWS's globally unique identifier format for any resource,
   e.g. `arn:aws:lambda:us-east-1:140023398409:function:seads-interest-form-handler`.
 - **CORS**: Cross-Origin Resource Sharing — the browser security rule that blocks JavaScript
   on one domain from calling an API on another domain unless that API explicitly allows it.
+- **Fail open vs. fail closed**: what a check does when it can't run at all (not when it
+  runs and fails) — fail open lets the request through anyway (favors availability), fail
+  closed blocks it (favors strictness). Which is correct depends entirely on what the check
+  protects.
 - **Hydration**: the process of React "waking up" static server-rendered HTML in the browser
   — attaching event handlers and reconciling its own understanding of the UI with what's
   already in the DOM.
