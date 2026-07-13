@@ -4,6 +4,23 @@ All notable changes to this project should be documented in this file.
 
 This format is inspired by Keep a Changelog and uses a date-based release style.
 
+## [2026-07-13] (7)
+
+### Added
+
+- OpenGraph/Twitter card metadata — the site previously had no `og:`/`twitter:` tags at all,
+  so sharing a link on social media (a real growth channel for a youth NPO) showed a bare
+  fallback with no preview. Added a dynamically-generated branded share image
+  (`src/app/opengraph-image.tsx`, via `next/og`'s `ImageResponse` — no external image asset
+  needed, matches the site's actual brand palette) plus `openGraph`/`twitter` metadata in the
+  root layout, and `metadataBase` (previously unset, which would have resolved the image to
+  a broken/localhost URL in production).
+
+### Fixed
+
+- `sitemap.ts`/`robots.ts` fell back to the old, retired `seadssg.vercel.app` URL if
+  `NEXT_PUBLIC_SITE_URL` was ever unset — updated to the current Amplify URL.
+
 ## [2026-07-13] (6)
 
 ### Added

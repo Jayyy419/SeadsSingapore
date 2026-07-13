@@ -14,13 +14,29 @@ const sourceSerif = Source_Serif_4({
   subsets: ["latin"],
 });
 
+const siteName = "Seads Singapore";
+const description =
+  "Seads is a youth-led non-profit cultivating sustainability, mental health awareness, and personal growth across Southeast Asia.";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://main.d2mrph1bcp6pjx.amplifyapp.com"),
   title: {
-    default: "Seads Singapore",
+    default: siteName,
     template: "%s | Seads Singapore",
   },
-  description:
-    "Seads is a youth-led non-profit cultivating sustainability, mental health awareness, and personal growth across Southeast Asia.",
+  description,
+  openGraph: {
+    siteName,
+    title: siteName,
+    description,
+    type: "website",
+    locale: "en_SG",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: siteName,
+    description,
+  },
 };
 
 export default function RootLayout({
