@@ -22,16 +22,14 @@ type Photo = MediaItem & { id: number; h: number };
 type Position = { left: number; top: number };
 type Rect = Position & { width: number; height: number };
 
-function computeMasonry(items: Photo[], maxColCount: number, colWidth: number, gap: number, containerWidth: number) {
+function computeMasonry(items: Photo[], maxColCount: number, colWidth: number, gap: number) {
   const colCount = Math.max(1, Math.min(maxColCount, items.length || 1));
-  const blockWidth = colCount * colWidth + (colCount - 1) * gap;
-  const offsetX = Math.max(0, (containerWidth - blockWidth) / 2);
   const colHeights = new Array(colCount).fill(0);
   const positions: Record<number, Position> = {};
   items.forEach((p) => {
     let col = 0;
     for (let c = 1; c < colCount; c++) if (colHeights[c] < colHeights[col]) col = c;
-    positions[p.id] = { left: offsetX + col * (colWidth + gap), top: colHeights[col] };
+    positions[p.id] = { left: col * (colWidth + gap), top: colHeights[col] };
     colHeights[col] += p.h + gap;
   });
   const height = Math.max(0, Math.max(...colHeights) - gap);
@@ -87,15 +85,15 @@ export function MediaMasonry({ limit, showFilter = true }: MediaMasonryProps) {
   const colCount = containerWidth >= 1000 ? 4 : containerWidth >= 700 ? 3 : containerWidth >= 460 ? 2 : 1;
   const colWidth = (containerWidth - GAP * (colCount - 1)) / colCount;
   const layout = useMemo(
-    () => computeMasonry(matching, colCount, colWidth, GAP, containerWidth),
-    [matching, colCount, colWidth, containerWidth],
+    () => computeMasonry(matching, colCount, colWidth, GAP),
+    [matching, colCount, colWidth],
   );
 
   function setCategory(next: Category) {
     if (next === activeCategory) return;
 
     const prevMatching = photosBase.filter((p) => matches(p, activeCategory)).slice(0, limit ?? undefined);
-    const prevLayout = computeMasonry(prevMatching, colCount, colWidth, GAP, containerWidth);
+    const prevLayout = computeMasonry(prevMatching, colCount, colWidth, GAP);
     const nextMatching = photosBase.filter((p) => matches(p, next)).slice(0, limit ?? undefined);
     const nextIds = new Set(nextMatching.map((p) => p.id));
 
