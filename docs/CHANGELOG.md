@@ -24,13 +24,14 @@ This format is inspired by Keep a Changelog and uses a date-based release style.
   most visible after filtering to a category with few items. Left-aligned to match the rest
   of the site's layout.
 
-### Known Gaps
+### Fixed (2)
 
-- IAM role tagging (`seads-interest-form-lambda-role-sg`, `seads-gha-lambda-deploy`) is
-  blocked by the same scoped-policy gap as the orphaned-role deletion above —
-  `iam:TagRole` wasn't included when the policy was drafted. Low priority (doesn't affect
-  cost tracking, since Lambda/DynamoDB/API Gateway/Amplify — the resources that actually
-  cost money — are already tagged).
+- The scoped IAM policy on `seads-singapore` was missing `iam:DeleteRole` /
+  `DeleteRolePolicy` / `TagRole`, which blocked both known gaps below. Policy updated (by
+  the account owner, since the identity that needs more IAM permissions can't grant them to
+  itself); orphaned `seads-interest-form-lambda-role` deleted, and both live IAM roles
+  (`seads-interest-form-lambda-role-sg`, `seads-gha-lambda-deploy`) tagged
+  `Project=SeadsSingapore` + `Environment=Production` to match every other Seads resource.
 
 ## [2026-07-13]
 
@@ -78,10 +79,8 @@ This format is inspired by Keep a Changelog and uses a date-based release style.
 
 ### Known Gaps
 
-- Orphaned IAM role `seads-interest-form-lambda-role` (old `us-east-1` role) still exists —
-  couldn't be deleted because the scoped IAM policy in use didn't include
-  `iam:DeleteRole`/`DeleteRolePolicy`. Harmless (nothing references it), but needs an account
-  owner with broader IAM access to clean up.
+- ~~Orphaned IAM role `seads-interest-form-lambda-role`~~ — resolved, see the 2026-07-13 (2)
+  entry above.
 
 ## [2026-07-12]
 
