@@ -127,8 +127,8 @@ export default function Home() {
           <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
             {programs.map((program, i) => (
               <Link
-                key={program.name}
-                href="/programs"
+                key={program.slug}
+                href={`/programs/${program.slug}`}
                 className="block rounded-[20px] border border-[color:var(--foreground-soft)] bg-[color:var(--surface)] p-7 text-inherit transition-[transform,box-shadow,border-color] hover:-translate-y-1 hover:border-[color:var(--brand)] hover:shadow-[0_14px_34px_rgba(31,41,55,.1)]"
               >
                 <div className="mb-3.5 flex items-center justify-between">
@@ -154,13 +154,13 @@ export default function Home() {
           </div>
           <div className="grid gap-5 lg:grid-cols-3">
             {events.map((event) => (
-              <article key={event.title} className="rounded-[20px] border border-[color:var(--foreground-soft)] bg-[color:var(--surface)] p-6.5">
+              <article key={event.slug} className="rounded-[20px] border border-[color:var(--foreground-soft)] bg-[color:var(--surface)] p-6.5">
                 <p className="mb-2.5 text-xs font-bold uppercase tracking-wide text-[color:var(--brand)]">{event.type}</p>
                 <h3 className="font-display mb-3 text-xl text-[color:var(--foreground)]">{event.title}</h3>
                 <p className="text-sm text-[color:var(--muted)]">{event.date}</p>
                 <p className="mb-4.5 mt-0.5 text-sm text-[color:var(--muted)]">{event.location}</p>
                 <Link
-                  href="/events"
+                  href={`/events/${event.slug}`}
                   className="inline-block rounded-full border border-[color:var(--foreground-soft)] px-5 py-2 text-[13px] font-semibold text-[color:var(--foreground)] hover:border-[color:var(--brand)] hover:text-[color:var(--brand)]"
                 >
                   View details
