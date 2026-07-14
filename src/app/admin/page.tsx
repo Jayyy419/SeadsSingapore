@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AdminLogoutButton } from "@/components/admin-logout-button";
 
 const SECTIONS = [
   { href: "/admin/impact-metrics", label: "Impact metrics", description: "Edit the homepage's 4 impact numbers." },
@@ -12,11 +13,7 @@ export default function AdminDashboardPage() {
     <div className="mx-auto max-w-3xl px-4 py-10">
       <div className="mb-8 flex items-center justify-between">
         <h1 className="font-display text-2xl">Admin</h1>
-        <form method="POST" action="/admin/api/logout">
-          <button type="submit" className="text-sm font-semibold text-[color:var(--muted)] hover:text-[color:var(--brand)]">
-            Log out
-          </button>
-        </form>
+        <AdminLogoutButton />
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         {SECTIONS.map((section) => (

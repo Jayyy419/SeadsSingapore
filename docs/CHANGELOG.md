@@ -4,6 +4,24 @@ All notable changes to this project should be documented in this file.
 
 This format is inspired by Keep a Changelog and uses a date-based release style.
 
+## [2026-07-14] (18)
+
+### Fixed — admin login, for real this time
+
+The previous entry's fix (explicit headers in `proxy.ts`) didn't resolve it in production —
+same `form-action 'self'` violation on the same-origin login POST, confirmed still happening
+after that deploy. Rather than keep guessing at *why* a same-origin form-action check was
+failing without direct access to the production environment to inspect it, sidestepped the
+directive entirely: `/admin/login` and the logout button now submit via `fetch()`
+(`src/app/admin/login/page.tsx`, `src/components/admin-logout-button.tsx`) instead of a
+native `<form method="POST">`. A `fetch()` POST is governed by the CSP's `connect-src`
+directive, not `form-action` — and `connect-src` was already confirmed correct via the
+earlier Playwright check. The login/logout Route Handlers changed from returning redirects to
+plain JSON responses (`{ ok: true }` + Set-Cookie), with the client doing a full
+`window.location.href` navigation afterward so `proxy.ts` re-evaluates with the fresh cookie.
+Verified end-to-end with Playwright driving a real Chromium browser through login → dashboard
+→ logout → redirected back to login, with zero console errors.
+
 ## [2026-07-14] (17)
 
 ### Fixed — admin login blocked by its own CSP in production

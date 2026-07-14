@@ -1,27 +1,25 @@
 import { NextResponse } from "next/server";
 import { createSessionToken, SESSION_COOKIE, SESSION_TTL_SECONDS } from "@/lib/admin-session";
 
-// Plain <form method="POST"> submission, no client JS required for login itself.
-// Note on brute force: there's deliberately no rate limiting here — the shared password is a
-// long random value (~120 bits of entropy), not a memorable phrase, so throttling attempts
-// wouldn't meaningfully add security. See docs/LEARNING_GUIDE.md.
+// Called via fetch() from the login page's client-side form handler, not a native <form>
+// POST — a native submission is governed by the CSP's form-action directive, which (for
+// reasons not fully pinned down without direct production access — see
+// docs/LEARNING_GUIDE.md) was blocking the login form in production despite being same-origin.
+// A fetch() POST is governed by connect-src instead, which is already known-correct.
+//
+// No login rate limiting: the shared password is a long random value (~120 bits of entropy),
+// not a memorable phrase, so throttling attempts wouldn't meaningfully add security.
 export async function POST(request: Request) {
-  const formData = await request.formData();
-  const password = formData.get("password");
+  const body = await request.json().catch(() => null);
+  const password = body?.password;
   const adminPassword = process.env.ADMIN_PASSWORD;
 
-  const url = new URL(request.url);
-
   if (!adminPassword || password !== adminPassword) {
-    url.pathname = "/admin/login";
-    url.searchParams.set("error", "1");
-    return NextResponse.redirect(url, 303);
+    return NextResponse.json({ ok: false, error: "Incorrect password" }, { status: 401 });
   }
 
   const token = await createSessionToken();
-  url.pathname = "/admin";
-  url.search = "";
-  const response = NextResponse.redirect(url, 303);
+  const response = NextResponse.json({ ok: true });
   response.cookies.set(SESSION_COOKIE, token, {
     path: "/",
     httpOnly: true,
