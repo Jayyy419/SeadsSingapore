@@ -4,6 +4,9 @@ import { BlogContent } from "./blog-content";
 export const metadata: Metadata = {
   title: "Latest Stories",
   description: "Fresh stories from Seads programs, events, and community outcomes across Southeast Asia.",
+  alternates: {
+    types: { "application/rss+xml": "/blog/rss.xml" },
+  },
 };
 
 export default function BlogPage() {

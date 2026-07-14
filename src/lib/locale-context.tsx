@@ -13,6 +13,19 @@ type LocaleContextValue = {
 
 const LocaleContext = createContext<LocaleContextValue | null>(null);
 
+// Matches navigator.languages (e.g. "zh-SG", "en-US") against our supported locales by
+// 2-letter prefix, in the browser's own preference order. Only consulted when there's no
+// stored choice yet — once someone picks a locale (including implicitly via this detection),
+// LOCALE_KEY takes over and this never runs again for them.
+function detectBrowserLocale(): Locale | null {
+  for (const lang of window.navigator.languages ?? [window.navigator.language]) {
+    const prefix = lang.slice(0, 2).toLowerCase();
+    const match = (Object.keys(translations) as Locale[]).find((locale) => locale === prefix);
+    if (match) return match;
+  }
+  return null;
+}
+
 export function LocaleProvider({ children }: { children: ReactNode }) {
   // Starts at the SSR-safe default ("en", matching what the server rendered, since
   // localStorage isn't available at build/render time) and gets corrected — if needed — by a
@@ -22,7 +35,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
 
   useLayoutEffect(() => {
     const stored = window.localStorage.getItem(LOCALE_KEY) as Locale | null;
-    const resolved = stored && translations[stored] ? stored : "en";
+    const resolved = (stored && translations[stored] ? stored : null) ?? detectBrowserLocale() ?? "en";
     // eslint-disable-next-line react-hooks/set-state-in-effect -- correcting from the SSR-safe default, not derived state
     setLocaleState(resolved);
   }, []);

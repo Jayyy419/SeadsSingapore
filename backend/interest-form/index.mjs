@@ -1,5 +1,5 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient, PutCommand } from "@aws-sdk/lib-dynamodb";
+import { DynamoDBDocumentClient, PutCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
 import { SecretsManagerClient, GetSecretValueCommand } from "@aws-sdk/client-secrets-manager";
 import { randomUUID } from "node:crypto";
@@ -28,6 +28,37 @@ function isValidEmail(email) {
 
 const INTEREST_TYPES = new Set(["volunteer", "partner", "event", "other"]);
 const INTEREST_TYPE_LABELS = { volunteer: "Volunteering", partner: "Partnering", event: "Attending an event", other: "Other" };
+
+// API Gateway's own throttle (5 rps / burst 10) is global across every caller, not per-IP —
+// AWS WAF can't attach to HTTP APIs (see docs/LEARNING_GUIDE.md), so this is the per-caller
+// backstop instead. Fixed 10-minute buckets stored as ordinary rate-limit items in the same
+// table, keyed off the same "id" partition key everything else uses; TTL cleans them up.
+const RATE_LIMIT_WINDOW_SECONDS = 600;
+
+async function checkRateLimit(key, limit) {
+  const windowStart = Math.floor(Date.now() / 1000 / RATE_LIMIT_WINDOW_SECONDS) * RATE_LIMIT_WINDOW_SECONDS;
+  const itemId = `ratelimit#${key}#${windowStart}`;
+  const ttl = windowStart + RATE_LIMIT_WINDOW_SECONDS + 60;
+
+  try {
+    const result = await ddb.send(
+      new UpdateCommand({
+        TableName: TABLE_NAME,
+        Key: { id: itemId },
+        UpdateExpression: "SET #ttl = if_not_exists(#ttl, :ttl) ADD #count :incr",
+        ExpressionAttributeNames: { "#ttl": "ttl", "#count": "count" },
+        ExpressionAttributeValues: { ":ttl": ttl, ":incr": 1 },
+        ReturnValues: "UPDATED_NEW",
+      })
+    );
+    return (result.Attributes?.count ?? 0) <= limit;
+  } catch (err) {
+    // Fails open on our own infra errors, same policy as the Turnstile check below — a
+    // DynamoDB blip shouldn't block a legitimate submission.
+    console.error("Rate limit check failed:", err);
+    return true;
+  }
+}
 
 // Cached across warm Lambda invocations so we're not calling Secrets Manager on every request.
 let cachedTurnstileSecret;
@@ -94,8 +125,16 @@ export const handler = async (event) => {
     return { statusCode: 400, headers, body: JSON.stringify({ error: "name and a valid email are required" }) };
   }
 
-  const turnstileToken = typeof payload.turnstileToken === "string" ? payload.turnstileToken : "";
   const remoteIp = event.requestContext?.http?.sourceIp;
+  const [ipOk, emailOk] = await Promise.all([
+    remoteIp ? checkRateLimit(`ip#${remoteIp}`, 5) : true,
+    checkRateLimit(`email#${email.toLowerCase()}`, 3),
+  ]);
+  if (!ipOk || !emailOk) {
+    return { statusCode: 429, headers, body: JSON.stringify({ error: "Too many submissions — please try again in a few minutes." }) };
+  }
+
+  const turnstileToken = typeof payload.turnstileToken === "string" ? payload.turnstileToken : "";
   if (!(await verifyTurnstile(turnstileToken, remoteIp))) {
     return { statusCode: 400, headers, body: JSON.stringify({ error: "Could not verify you're not a bot. Please try again." }) };
   }

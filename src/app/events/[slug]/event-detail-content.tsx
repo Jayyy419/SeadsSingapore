@@ -7,6 +7,8 @@ import { InterestForm } from "@/components/interest-form";
 import { useLocale } from "@/lib/locale-context";
 import { events } from "@/content/siteContent";
 import { buildEventIcsDataUrl } from "@/lib/ics";
+import { eventCapacityLabel, isEventFull } from "@/lib/event-capacity";
+import { buildWhatsAppLink } from "@/lib/whatsapp";
 
 export function EventDetailContent({ slug }: { slug: string }) {
   const { locale, t } = useLocale();
@@ -19,34 +21,58 @@ export function EventDetailContent({ slug }: { slug: string }) {
     location: event.location[locale],
     date: event.date,
   });
+  const capacityLabel = eventCapacityLabel(event, t);
+  const full = isEventFull(event);
 
   return (
     <SiteShell title={event.title[locale]} subtitle={`${event.type[locale]} · ${event.date} · ${event.location[locale]}`}>
       <div className="space-y-10">
         <article className="section-card space-y-4 p-6 sm:p-8">
+          {capacityLabel && (
+            <p className={`text-xs font-semibold uppercase tracking-wide ${full ? "text-[#e2965f]" : "text-[color:var(--accent)]"}`}>
+              {capacityLabel}
+            </p>
+          )}
           {event.body[locale].map((paragraph, i) => (
             <p key={i} className="text-sm text-[color:var(--muted)]">
               {paragraph}
             </p>
           ))}
-          {icsUrl && (
+          <div className="flex flex-wrap gap-3">
+            {icsUrl && (
+              <a
+                href={icsUrl}
+                download={`${event.slug}.ics`}
+                className="inline-block rounded-full border border-[color:var(--foreground-soft)] px-4 py-2 text-sm font-semibold text-[color:var(--foreground)] hover:border-[color:var(--brand)] hover:text-[color:var(--brand)]"
+              >
+                {t.addToCalendar}
+              </a>
+            )}
             <a
-              href={icsUrl}
-              download={`${event.slug}.ics`}
+              href={buildWhatsAppLink(`${full ? t.joinWaitlist : t.rsvpLabel}: ${event.title[locale]} (${event.date})`)}
+              target="_blank"
+              rel="noopener noreferrer"
               className="inline-block rounded-full border border-[color:var(--foreground-soft)] px-4 py-2 text-sm font-semibold text-[color:var(--foreground)] hover:border-[color:var(--brand)] hover:text-[color:var(--brand)]"
             >
-              {t.addToCalendar}
+              {t.rsvpViaWhatsApp}
             </a>
-          )}
+            <a
+              href={`/events/${event.slug}/qr`}
+              download={`${event.slug}-qr.png`}
+              className="inline-block rounded-full border border-[color:var(--foreground-soft)] px-4 py-2 text-sm font-semibold text-[color:var(--foreground)] hover:border-[color:var(--brand)] hover:text-[color:var(--brand)]"
+            >
+              {t.downloadQrCode}
+            </a>
+          </div>
         </article>
 
         <InterestForm
-          eyebrow={t.rsvpLabel}
+          eyebrow={full ? t.waitlistLabel : t.rsvpLabel}
           heading={`${t.joinUsAtPrefix}${event.title[locale]}`}
           body={t.rsvpFormBody}
           interestPlaceholder={t.anythingElseOptional}
-          submitLabel={t.rsvpLabel}
-          prefillInterest={`${t.rsvpLabel}: ${event.title[locale]} (${event.date})`}
+          submitLabel={full ? t.joinWaitlist : t.rsvpLabel}
+          prefillInterest={`${full ? t.joinWaitlist : t.rsvpLabel}: ${event.title[locale]} (${event.date})`}
           prefillInterestType="event"
         />
 

@@ -4,6 +4,65 @@ All notable changes to this project should be documented in this file.
 
 This format is inspired by Keep a Changelog and uses a date-based release style.
 
+## [2026-07-14] (15)
+
+### Security
+
+- **GitHub secret scanning, push protection, and Dependabot security updates enabled**
+  (repo is public, so these are free) via the repo settings API, plus a `gitleaks` GitHub
+  Action (`.github/workflows/gitleaks.yml`) as a CI-level backstop that doesn't depend on
+  GitHub's own scanner. Confirmed via a full `git log --all -p` scan that no credential
+  pasted into chat this session ever actually landed in a commit.
+- **Branch protection on `main`**: force-pushes and branch deletion now hard-blocked for
+  everyone; merges require the `build` CI check. `enforce_admins` is left off so the repo
+  owner can still push directly, matching the existing workflow — flagged as a deliberate
+  choice, not an oversight, since flipping it on would require routing every change through
+  a PR with no second reviewer available.
+- **`.github/dependabot.yml`** added for the Next.js app, the Lambda's own `package.json`,
+  and GitHub Actions versions.
+- **`/.well-known/security.txt`** (RFC 9116) added as a Next.js Route Handler (not a static
+  file) so its `Canonical` URL stays correct via the same `NEXT_PUBLIC_SITE_URL` fallback
+  pattern as `sitemap.ts`/`robots.ts`.
+- **Per-IP/email rate limiting on the interest-form Lambda.** API Gateway's own throttle
+  (5 rps / burst 10) is global across every caller — AWS WAF can't attach to HTTP APIs (see
+  the "Why WAF turned out not to apply here" section of `LEARNING_GUIDE.md`), so there was
+  no per-caller limit underneath it. Added a DynamoDB-backed fixed-window counter (10-minute
+  buckets, 5/window per IP, 3/window per email) using `UpdateCommand`'s
+  `ADD #count :incr` on an ordinary item in the same table, cleaned up via TTL (now enabled
+  on the table's `ttl` attribute). Requires `dynamodb:UpdateItem` on the Lambda's execution
+  role — the deploy pipeline only pushes code, not IAM policy, so this needs a manual
+  `aws iam put-role-policy` run once with admin credentials (documented in
+  `backend/interest-form/iam-policy.json`).
+
+### Added — event capacity/waitlist, calendar/RSS feeds, WhatsApp, QR codes
+
+- `EventItem` gained optional `capacity`/`spotsFilled` fields. When set, listing and detail
+  pages show "X / Y spots filled" or a "Waitlist — event full" state that also relabels the
+  RSVP form's button/heading. Manually maintained for now — real RSVP counts aren't tracked
+  yet (see the open admin/CMS question in this same entry).
+- Locale now auto-detects from `navigator.languages` on first visit (matching against the
+  four supported locales by 2-letter prefix) instead of always defaulting to English —
+  only when there's no stored `seads-locale` preference yet, so it never overrides an
+  explicit choice.
+- `/events/calendar.ics` — a single subscribable feed of every event (English-only; feeds
+  have no per-viewer locale). `/blog/rss.xml` similarly for stories, with RSS auto-discovery
+  wired into `/blog`'s metadata.
+- WhatsApp deep links (`wa.me`) added alongside the existing form on event RSVP, program
+  apply, and the contact page — the org's WhatsApp number lives in one place
+  (`src/lib/whatsapp.ts`) so it's a one-line change if it's updated.
+- Downloadable QR codes (`/events/[slug]/qr`, `/programs/[slug]/qr`, generated server-side
+  via the `qrcode` package, no external QR API call — keeps this within the existing CSP's
+  `img-src 'self' data:`) encoding a UTM-tagged URL (`utm_source=qr&utm_medium=print`) so
+  scans from physical events/print materials show up distinctly in analytics.
+
+### Known gap — no admin/CMS layer yet
+
+Several of the above (live capacity counts, and the larger backlog item of live impact
+metrics, volunteer certificates, and community-submitted stories) all need some
+admin-managed data layer and auth that doesn't exist yet — the site is still fully static
+content in `siteContent.ts`, hand-edited and redeployed via git. This is an open
+architecture question, not an oversight; see the conversation/next entry once resolved.
+
 ## [2026-07-14] (14)
 
 ### Fixed — sitemap missing every detail page

@@ -6,6 +6,7 @@ import { SiteShell } from "@/components/site-shell";
 import { InterestForm } from "@/components/interest-form";
 import { useLocale } from "@/lib/locale-context";
 import { programs } from "@/content/siteContent";
+import { buildWhatsAppLink } from "@/lib/whatsapp";
 
 export function ProgramDetailContent({ slug }: { slug: string }) {
   const { locale, t } = useLocale();
@@ -25,6 +26,23 @@ export function ProgramDetailContent({ slug }: { slug: string }) {
           <div className="rounded-2xl bg-[color:var(--surface-2)] p-5">
             <p className="text-xs font-bold uppercase tracking-wide text-[color:var(--accent)]">{t.whoItsFor}</p>
             <p className="mt-2 text-sm text-[color:var(--muted)]">{program.who[locale]}</p>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <a
+              href={buildWhatsAppLink(`${t.askViaWhatsApp}: ${program.name[locale]}`)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block rounded-full border border-[color:var(--foreground-soft)] px-4 py-2 text-sm font-semibold text-[color:var(--foreground)] hover:border-[color:var(--brand)] hover:text-[color:var(--brand)]"
+            >
+              {t.askViaWhatsApp}
+            </a>
+            <a
+              href={`/programs/${program.slug}/qr`}
+              download={`${program.slug}-qr.png`}
+              className="inline-block rounded-full border border-[color:var(--foreground-soft)] px-4 py-2 text-sm font-semibold text-[color:var(--foreground)] hover:border-[color:var(--brand)] hover:text-[color:var(--brand)]"
+            >
+              {t.downloadQrCode}
+            </a>
           </div>
         </article>
 

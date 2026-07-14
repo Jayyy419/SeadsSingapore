@@ -21,16 +21,15 @@ function escapeIcsText(text: string): string {
   return text.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\n/g, "\\n");
 }
 
-export function buildEventIcsDataUrl(event: { title: string; description: string; location: string; date: string }): string | null {
+export type IcsEvent = { title: string; description: string; location: string; date: string };
+
+function buildVEvent(event: IcsEvent): string[] | null {
   const start = parseEventDate(event.date);
   if (!start) return null;
   const end = new Date(start);
   end.setUTCDate(end.getUTCDate() + 1);
 
-  const lines = [
-    "BEGIN:VCALENDAR",
-    "VERSION:2.0",
-    "PRODID:-//Seads Singapore//Event//EN",
+  return [
     "BEGIN:VEVENT",
     `UID:${toIcsDate(start)}-${escapeIcsText(event.title).slice(0, 40).replace(/\s+/g, "-")}@seads.sg`,
     `DTSTAMP:${toIcsDate(new Date())}T000000Z`,
@@ -40,8 +39,25 @@ export function buildEventIcsDataUrl(event: { title: string; description: string
     `DESCRIPTION:${escapeIcsText(event.description)}`,
     `LOCATION:${escapeIcsText(event.location)}`,
     "END:VEVENT",
-    "END:VCALENDAR",
   ];
+}
 
-  return `data:text/calendar;charset=utf-8,${encodeURIComponent(lines.join("\r\n"))}`;
+function buildCalendar(vEventBlocks: string[][]): string {
+  return ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Seads Singapore//Event//EN", ...vEventBlocks.flat(), "END:VCALENDAR"].join(
+    "\r\n"
+  );
+}
+
+export function buildEventIcsDataUrl(event: IcsEvent): string | null {
+  const vEvent = buildVEvent(event);
+  if (!vEvent) return null;
+  return `data:text/calendar;charset=utf-8,${encodeURIComponent(buildCalendar([vEvent]))}`;
+}
+
+// Used server-side by the /events/calendar.ics route to build one subscribable feed for
+// every event — silently skips any event whose date fails to parse rather than failing
+// the whole feed over one bad entry.
+export function buildEventsIcsFeed(events: IcsEvent[]): string {
+  const vEvents = events.map(buildVEvent).filter((v): v is string[] => v !== null);
+  return buildCalendar(vEvents);
 }

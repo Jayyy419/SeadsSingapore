@@ -38,7 +38,7 @@ export function InterestForm({
   prefillInterestType,
 }: InterestFormProps) {
   const { t } = useLocale();
-  const [submitStatus, setSubmitStatus] = useState<"idle" | "loading" | "done" | "error" | "unconfigured">("idle");
+  const [submitStatus, setSubmitStatus] = useState<"idle" | "loading" | "done" | "error" | "unconfigured" | "rateLimited">("idle");
 
   const interestTypes: { value: InterestType; label: string }[] = [
     { value: "", label: t.interestTypeDefault },
@@ -73,6 +73,10 @@ export function InterestForm({
         body: JSON.stringify(payload),
       });
 
+      if (response.status === 429) {
+        setSubmitStatus("rateLimited");
+        return;
+      }
       if (!response.ok) {
         throw new Error("Submission failed");
       }
@@ -145,6 +149,9 @@ export function InterestForm({
             )}
             {submitStatus === "unconfigured" && (
               <p className="text-xs font-semibold text-[#e2965f] md:col-span-2">{t.statusUnconfigured}</p>
+            )}
+            {submitStatus === "rateLimited" && (
+              <p className="text-xs font-semibold text-[#e2965f] md:col-span-2">{t.statusRateLimited}</p>
             )}
           </div>
           <button

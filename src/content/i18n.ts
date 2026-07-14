@@ -54,6 +54,7 @@ export type Translation = {
   statusDone: string;
   statusError: string;
   statusUnconfigured: string;
+  statusRateLimited: string;
   aboutPageTitle: string;
   aboutPageSubtitle: string;
   missionHeading: string;
@@ -82,6 +83,14 @@ export type Translation = {
   rsvpFormBody: string;
   backToEvents: string;
   addToCalendar: string;
+  spotsFilledUnit: string;
+  waitlistLabel: string;
+  joinWaitlist: string;
+  subscribeToCalendar: string;
+  rsvpViaWhatsApp: string;
+  askViaWhatsApp: string;
+  chatOnWhatsApp: string;
+  downloadQrCode: string;
   blogPageTitle: string;
   blogPageSubtitle: string;
   readStory: string;
@@ -179,6 +188,7 @@ export const translations: Record<Locale, Translation> = {
     statusDone: "Submission captured. Thanks for reaching out — we'll follow up soon.",
     statusError: "Could not submit right now. Please try again.",
     statusUnconfigured: "This form isn't connected yet — please email us directly at hello@seads.sg for now.",
+    statusRateLimited: "Too many submissions — please try again in a few minutes.",
     aboutPageTitle: "About Seads",
     aboutPageSubtitle: "Seads is a youth-led non-profit cultivating sustainability, mental health awareness, and personal growth across Southeast Asia.",
     missionHeading: "Our Mission",
@@ -202,6 +212,14 @@ export const translations: Record<Locale, Translation> = {
     rsvpFormBody: "Tell us a bit about yourself and we'll follow up with the details.",
     backToEvents: "Back to all events",
     addToCalendar: "Add to calendar",
+    spotsFilledUnit: "spots filled",
+    waitlistLabel: "Waitlist — event full",
+    joinWaitlist: "Join waitlist",
+    subscribeToCalendar: "Subscribe to all events",
+    rsvpViaWhatsApp: "RSVP via WhatsApp",
+    askViaWhatsApp: "Ask about this on WhatsApp",
+    chatOnWhatsApp: "Chat with us on WhatsApp",
+    downloadQrCode: "Download QR code",
     blogPageTitle: "Latest Stories",
     blogPageSubtitle: "Fresh stories from Seads programs, events, and community outcomes across Southeast Asia.",
     readStory: "Read story",
@@ -293,6 +311,7 @@ export const translations: Record<Locale, Translation> = {
     statusDone: "提交成功，感谢您的联系——我们会尽快跟进。",
     statusError: "暂时无法提交，请重试。",
     statusUnconfigured: "此表单尚未连接——请直接发送电子邮件至 hello@seads.sg。",
+    statusRateLimited: "提交次数过多，请几分钟后再试。",
     aboutPageTitle: "关于 Seads",
     aboutPageSubtitle: "Seads 是一个植根于可持续发展、心理健康意识和东南亚青年个人成长的青年主导非营利组织。",
     missionHeading: "我们的使命",
@@ -316,6 +335,14 @@ export const translations: Record<Locale, Translation> = {
     rsvpFormBody: "告诉我们一些关于您的信息，我们会跟进详细安排。",
     backToEvents: "返回所有活动",
     addToCalendar: "添加到日历",
+    spotsFilledUnit: "个名额已满",
+    waitlistLabel: "候补名单——名额已满",
+    joinWaitlist: "加入候补名单",
+    subscribeToCalendar: "订阅所有活动",
+    rsvpViaWhatsApp: "通过 WhatsApp 报名",
+    askViaWhatsApp: "通过 WhatsApp 咨询",
+    chatOnWhatsApp: "通过 WhatsApp 与我们联系",
+    downloadQrCode: "下载二维码",
     blogPageTitle: "最新故事",
     blogPageSubtitle: "来自 Seads 项目、活动和东南亚社区成果的最新故事。",
     readStory: "阅读故事",
@@ -407,6 +434,7 @@ export const translations: Record<Locale, Translation> = {
     statusDone: "Penyerahan berjaya direkodkan. Terima kasih kerana menghubungi kami — kami akan hubungi anda semula.",
     statusError: "Tidak dapat menghantar sekarang. Sila cuba lagi.",
     statusUnconfigured: "Borang ini belum disambungkan — sila e-mel kami terus di hello@seads.sg buat masa ini.",
+    statusRateLimited: "Terlalu banyak penyerahan — sila cuba lagi dalam beberapa minit.",
     aboutPageTitle: "Tentang Seads",
     aboutPageSubtitle: "Seads ialah pertubuhan bukan untung diterajui belia yang memupuk kelestarian, kesedaran kesihatan mental, dan pertumbuhan peribadi di seluruh Asia Tenggara.",
     missionHeading: "Misi Kami",
@@ -430,6 +458,14 @@ export const translations: Record<Locale, Translation> = {
     rsvpFormBody: "Beritahu kami sedikit tentang diri anda dan kami akan hubungi anda semula dengan butiran lanjut.",
     backToEvents: "Kembali ke semua acara",
     addToCalendar: "Tambah ke kalendar",
+    spotsFilledUnit: "tempat telah diisi",
+    waitlistLabel: "Senarai menunggu — acara penuh",
+    joinWaitlist: "Sertai senarai menunggu",
+    subscribeToCalendar: "Langgan semua acara",
+    rsvpViaWhatsApp: "RSVP melalui WhatsApp",
+    askViaWhatsApp: "Bertanya melalui WhatsApp",
+    chatOnWhatsApp: "Berbual dengan kami di WhatsApp",
+    downloadQrCode: "Muat turun kod QR",
     blogPageTitle: "Kisah Terkini",
     blogPageSubtitle: "Kisah terbaharu daripada program, acara, dan hasil komuniti Seads di seluruh Asia Tenggara.",
     readStory: "Baca kisah",
@@ -521,6 +557,7 @@ export const translations: Record<Locale, Translation> = {
     statusDone: "सबमिशन दर्ज हो गया। संपर्क करने के लिए धन्यवाद — हम जल्द ही आपसे संपर्क करेंगे।",
     statusError: "अभी सबमिट नहीं हो सका। कृपया पुनः प्रयास करें।",
     statusUnconfigured: "यह फ़ॉर्म अभी कनेक्ट नहीं है — कृपया अभी के लिए सीधे hello@seads.sg पर ईमेल करें।",
+    statusRateLimited: "बहुत अधिक सबमिशन — कृपया कुछ मिनटों में फिर से प्रयास करें।",
     aboutPageTitle: "सीड्स के बारे में",
     aboutPageSubtitle: "सीड्स एक युवा-नेतृत्व वाला गैर-लाभकारी संगठन है जो दक्षिण-पूर्व एशिया में स्थिरता, मानसिक स्वास्थ्य जागरूकता और व्यक्तिगत विकास को बढ़ावा देता है।",
     missionHeading: "हमारा मिशन",
@@ -544,6 +581,14 @@ export const translations: Record<Locale, Translation> = {
     rsvpFormBody: "हमें अपने बारे में थोड़ा बताएं और हम विवरण के साथ संपर्क करेंगे।",
     backToEvents: "सभी कार्यक्रमों पर वापस जाएं",
     addToCalendar: "कैलेंडर में जोड़ें",
+    spotsFilledUnit: "सीटें भर चुकी हैं",
+    waitlistLabel: "प्रतीक्षा सूची — कार्यक्रम पूर्ण भरा हुआ",
+    joinWaitlist: "प्रतीक्षा सूची में शामिल हों",
+    subscribeToCalendar: "सभी कार्यक्रमों की सदस्यता लें",
+    rsvpViaWhatsApp: "WhatsApp के ज़रिए RSVP करें",
+    askViaWhatsApp: "WhatsApp पर पूछें",
+    chatOnWhatsApp: "WhatsApp पर हमसे बात करें",
+    downloadQrCode: "क्यूआर कोड डाउनलोड करें",
     blogPageTitle: "नवीनतम कहानियाँ",
     blogPageSubtitle: "सीड्स के कार्यक्रमों, इवेंट्स और दक्षिण-पूर्व एशिया भर के सामुदायिक परिणामों की ताज़ा कहानियाँ।",
     readStory: "कहानी पढ़ें",

@@ -24,6 +24,11 @@ export type EventItem = {
   date: string;
   location: LocalizedString;
   body: Record<Locale, string[]>;
+  // Optional: omit for events with no fixed cap (e.g. "sign up, we'll match you to a site").
+  // Manually maintained until RSVPs are counted live from real submissions (see
+  // docs/LEARNING_GUIDE.md's admin/CMS section) — update spotsFilled as RSVPs come in.
+  capacity?: number;
+  spotsFilled?: number;
 };
 
 export type Story = {
@@ -335,6 +340,8 @@ export const events: EventItem[] = [
         "पैनल चर्चाओं, ब्रेकआउट वर्कशॉप, और क्षेत्र भर के साथियों तथा साझेदार संगठनों के साथ संरचित नेटवर्किंग की अपेक्षा करें।",
       ],
     },
+    capacity: 150,
+    spotsFilled: 112,
   },
   {
     slug: "community-storytelling-bootcamp",
@@ -370,6 +377,8 @@ export const events: EventItem[] = [
         "किसी अनुभव की आवश्यकता नहीं। यदि आपके पास फ़ोन या कैमरा है तो लाएं; उस दिन उपकरण उधार भी लिए जा सकते हैं।",
       ],
     },
+    capacity: 40,
+    spotsFilled: 40,
   },
   {
     slug: "neighborhood-action-weekend",

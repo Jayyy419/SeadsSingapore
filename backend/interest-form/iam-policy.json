@@ -10,7 +10,7 @@
     {
       "Sid": "DynamoWrite",
       "Effect": "Allow",
-      "Action": "dynamodb:PutItem",
+      "Action": ["dynamodb:PutItem", "dynamodb:UpdateItem"],
       "Resource": "arn:aws:dynamodb:ap-southeast-1:140023398409:table/seads-interest-submissions"
     },
     {
