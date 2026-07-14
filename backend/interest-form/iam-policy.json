@@ -10,20 +10,32 @@
     {
       "Sid": "DynamoSubmissions",
       "Effect": "Allow",
-      "Action": ["dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:GetItem", "dynamodb:Scan"],
+      "Action": ["dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:GetItem", "dynamodb:Scan", "dynamodb:DeleteItem"],
       "Resource": "arn:aws:dynamodb:ap-southeast-1:140023398409:table/seads-interest-submissions"
     },
     {
       "Sid": "DynamoImpactMetrics",
       "Effect": "Allow",
-      "Action": ["dynamodb:PutItem", "dynamodb:GetItem", "dynamodb:Scan"],
+      "Action": ["dynamodb:PutItem", "dynamodb:GetItem", "dynamodb:Scan", "dynamodb:DeleteItem"],
       "Resource": "arn:aws:dynamodb:ap-southeast-1:140023398409:table/seads-impact-metrics"
     },
     {
       "Sid": "DynamoStorySubmissions",
       "Effect": "Allow",
-      "Action": ["dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:Scan"],
+      "Action": ["dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:Scan", "dynamodb:DeleteItem"],
       "Resource": "arn:aws:dynamodb:ap-southeast-1:140023398409:table/seads-story-submissions"
+    },
+    {
+      "Sid": "DynamoAdminConfig",
+      "Effect": "Allow",
+      "Action": ["dynamodb:PutItem", "dynamodb:GetItem"],
+      "Resource": "arn:aws:dynamodb:ap-southeast-1:140023398409:table/seads-admin-config"
+    },
+    {
+      "Sid": "DynamoEvents",
+      "Effect": "Allow",
+      "Action": ["dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:GetItem", "dynamodb:Scan", "dynamodb:DeleteItem"],
+      "Resource": "arn:aws:dynamodb:ap-southeast-1:140023398409:table/seads-events"
     },
     {
       "Sid": "SesSend",

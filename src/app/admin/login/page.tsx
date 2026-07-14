@@ -32,26 +32,32 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-4">
-      <h1 className="font-display mb-6 text-2xl">Admin login</h1>
-      <form onSubmit={onSubmit} className="flex flex-col gap-3">
-        <input
-          type="password"
-          name="password"
-          placeholder="Password"
-          required
-          autoFocus
-          className="rounded-xl border border-[color:var(--foreground-soft)] px-4 py-3 text-sm"
-        />
-        {status === "error" && <p className="text-xs font-semibold text-[#e2965f]">Incorrect password.</p>}
-        <button
-          type="submit"
-          disabled={status === "loading"}
-          className="rounded-full bg-[color:var(--brand)] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[color:var(--brand-deep)] disabled:opacity-60"
-        >
-          {status === "loading" ? "..." : "Log in"}
-        </button>
-      </form>
+    <div className="flex min-h-screen flex-col items-center justify-center bg-[color:var(--surface-2)] px-4">
+      <div className="w-full max-w-sm">
+        <p className="mb-8 text-center font-display text-2xl font-bold text-[color:var(--foreground)]">
+          Seads <span className="text-[color:var(--brand)]">Admin</span>
+        </p>
+        <div className="section-card p-6 sm:p-8">
+          <form onSubmit={onSubmit} className="flex flex-col gap-3">
+            <input
+              type="password"
+              name="password"
+              placeholder="Password"
+              required
+              autoFocus
+              className="rounded-xl border border-[color:var(--foreground-soft)] bg-[color:var(--surface)] px-4 py-3 text-sm text-[color:var(--foreground)]"
+            />
+            {status === "error" && <p className="text-xs font-semibold text-[#e2965f]">Incorrect password.</p>}
+            <button
+              type="submit"
+              disabled={status === "loading"}
+              className="rounded-full bg-[color:var(--brand)] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[color:var(--brand-deep)] disabled:opacity-60"
+            >
+              {status === "loading" ? "..." : "Log in"}
+            </button>
+          </form>
+        </div>
+      </div>
     </div>
   );
 }

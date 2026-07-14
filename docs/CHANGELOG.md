@@ -4,6 +4,71 @@ All notable changes to this project should be documented in this file.
 
 This format is inspired by Keep a Changelog and uses a date-based release style.
 
+## [2026-07-14] (21)
+
+### Added — full admin CRUD, in-app password change, visual redesign
+
+Follow-up to entry (20)'s auth fix: the admin panel could only edit existing rows and had no
+way to change the shared password short of an AWS console edit. Added, all backed by the
+interest-form Lambda (`backend/interest-form/index.mjs`) which remains the only place secrets
+live:
+
+- **DB-backed password + in-app change flow**: the password now lives hashed
+  (`scryptSync`, random salt) in a new `seads-admin-config` table instead of only as the
+  Lambda's `ADMIN_PASSWORD` env var. On first successful login against the bootstrap env-var
+  value, it's transparently migrated into the table; from then on the env var is ignored.
+  `PATCH /internal/admin-password` (current password required) backs a new `/admin/settings`
+  page.
+- **Impact metrics & events: create/delete**, not just edit. Events moved off the static
+  `siteContent.ts` array entirely onto a new `seads-events` DynamoDB table (seeded from the 3
+  original events), with full CRUD (`GET/POST /internal/events`, `PUT/DELETE
+  /internal/events/{slug}`) and a public read-only `GET /events`. Every public consumer that
+  used to import the static array now fetches live: `events-content.tsx`,
+  `event-detail-content.tsx` (via a shared `useEvents()` hook with a static-fallback +
+  `loaded` flag so a newly-created event doesn't 404 before the live fetch resolves),
+  `/events/[slug]/page.tsx` (metadata), `/events/[slug]/qr/route.ts`, and
+  `/events/calendar.ics/route.ts`. Since events are no longer enumerable at build time,
+  `/events/[slug]` dropped `generateStaticParams` and is now fully dynamic.
+- **Submissions & story submissions: delete**, alongside the existing approve/reject.
+- **Visual redesign**: every `/admin/*` page now shares an `AdminShell` component (nav +
+  logout header, consistent typography) reusing the main site's CSS custom properties instead
+  of ad hoc unstyled markup.
+
+New tables (`seads-admin-config`, `seads-events`) needed a corresponding IAM policy update on
+the Lambda's execution role — applied by the site owner via CloudShell using a base64-encoded
+single-line command, since multi-line heredoc pastes had repeatedly failed to fully execute in
+that environment (only partial commands ran; verified via a follow-up `get-role-policy` call
+showing the old policy, twice, before switching approaches).
+
+### Fixed — two bugs found while verifying the above with Playwright
+
+- **Admin nav prefetch waste**: `AdminShell`'s nav links had default Next.js `prefetch`
+  behavior, which fires on every render since all 6 links are always visible in the header.
+  Every admin page is `force-dynamic` and reads protected data, so each prefetch was a full
+  extra round-trip to the Lambda per link per page view — multiplying load for no benefit
+  (nobody benefits from a pre-warmed cache of a page that re-fetches live data anyway) and,
+  during testing, was enough request volume on its own to trip API Gateway's 5rps/burst-10
+  global throttle. Set `prefetch={false}` on all `AdminShell` nav links.
+- **`useEvents()`/`useEventRsvpCounts()` silently never fetched if
+  `NEXT_PUBLIC_API_BASE_URL` was unset**: every other consumer of that build-time env var in
+  this codebase (`calendar.ics`, `qr/route.ts`, `[slug]/page.tsx`, `security-headers.ts`) falls
+  back to the known API Gateway URL if it's missing; these two client hooks just returned
+  early and stayed frozen on stale/empty data with no error, no console warning, nothing. Only
+  caught because a local production build without the var set (deliberately, to mirror the
+  worst case) left `/events` stuck on the static fallback while every other page correctly
+  showed live data. Added the same hardcoded fallback both files were missing.
+
+Verified via Playwright driving a real Chromium browser against a local production build
+talking to the live Lambda: settings password change (then reverted), impact metric
+create+delete, event create+edit+delete, event propagation to the public listing/detail/QR/ICS
+routes, and submissions/stories page loads. One check (the public `/events` listing picking up
+a newly-created event via its client-side fetch) couldn't be exercised from this sandbox — the
+Lambda's CORS `ALLOWED_ORIGINS` allowlist correctly rejects requests from `localhost`, which
+is the intended behavior, not a bug; the same code path was verified indirectly via the
+server-rendered detail page and ICS feed, both of which picked up the new event correctly.
+Cleaned up all test data (`Test Metric *`, `Verify Event *`) from production DynamoDB tables
+after each verification pass.
+
 ## [2026-07-14] (20)
 
 ### Fixed — admin auth moved off Amplify env vars entirely (root cause found)

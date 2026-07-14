@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { SiteShell } from "@/components/site-shell";
 import { useLocale } from "@/lib/locale-context";
-import { events } from "@/content/siteContent";
 import { eventCapacityLabel, isEventFull } from "@/lib/event-capacity";
 import { useEventRsvpCounts } from "@/lib/use-event-rsvp-counts";
+import { useEvents } from "@/lib/use-events";
 
 export function EventsContent() {
   const { locale, t } = useLocale();
   const rsvpCounts = useEventRsvpCounts();
+  const { events } = useEvents();
 
   return (
     <SiteShell title={t.eventsPageTitle} subtitle={t.eventsPageSubtitle}>

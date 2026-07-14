@@ -5,17 +5,22 @@ import { notFound } from "next/navigation";
 import { SiteShell } from "@/components/site-shell";
 import { InterestForm } from "@/components/interest-form";
 import { useLocale } from "@/lib/locale-context";
-import { events } from "@/content/siteContent";
 import { buildEventIcsDataUrl } from "@/lib/ics";
 import { eventCapacityLabel, isEventFull } from "@/lib/event-capacity";
 import { buildWhatsAppLink } from "@/lib/whatsapp";
 import { useEventRsvpCounts } from "@/lib/use-event-rsvp-counts";
+import { useEvents } from "@/lib/use-events";
 
 export function EventDetailContent({ slug }: { slug: string }) {
   const { locale, t } = useLocale();
-  const event = events.find((e) => e.slug === slug);
+  const { events, loaded } = useEvents();
   const rsvpCounts = useEventRsvpCounts();
-  if (!event) notFound();
+  const event = events.find((e) => e.slug === slug);
+  // Wait for the live fetch before 404ing — a newly admin-created event won't be in the
+  // static fallback useEvents() starts with, so a slug "not found" against just the fallback
+  // doesn't mean it doesn't really exist.
+  if (!event && loaded) notFound();
+  if (!event) return null;
 
   const icsUrl = buildEventIcsDataUrl({
     title: event.title[locale],
