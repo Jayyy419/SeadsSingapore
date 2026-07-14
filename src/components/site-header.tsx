@@ -405,6 +405,7 @@ export function SiteHeader() {
                 <button
                   type="button"
                   onClick={() => setLocale(loc.code)}
+                  aria-label={`${t.switchLanguageTo} ${loc.full}`}
                   className={`rounded-full px-2 py-1.5 text-[11px] font-bold ${loc.active ? "" : "hover:bg-[color:var(--surface-2)]"}`}
                   style={{ background: loc.bg, color: loc.color }}
                 >
@@ -421,6 +422,7 @@ export function SiteHeader() {
           <button
             type="button"
             onClick={toggleTheme}
+            aria-label={theme === "dark" ? t.themeToggleToLight : t.themeToggleToDark}
             className="flex h-9 w-9 items-center justify-center rounded-full border border-[color:var(--foreground-soft)] bg-[color:var(--surface)] text-[15px] leading-none text-[color:var(--foreground)] hover:border-[color:var(--brand)]"
           >
             {themeIcon}
@@ -436,6 +438,9 @@ export function SiteHeader() {
         <button
           type="button"
           onClick={() => setMenuOpen((prev) => !prev)}
+          aria-label={menuOpen ? t.navMenuToggleClose : t.navMenuToggleOpen}
+          aria-expanded={menuOpen}
+          aria-controls="seads-mobile-menu"
           className={`${isMobile ? "flex" : "hidden"} h-[38px] w-[38px] flex-col items-center justify-center gap-1 rounded-full border border-[color:var(--foreground-soft)] bg-[color:var(--surface)] justify-self-end hover:border-[color:var(--brand)]`}
         >
           <span className="h-0.5 w-4 rounded-sm bg-[color:var(--foreground)]" />
@@ -444,7 +449,7 @@ export function SiteHeader() {
       </div>
 
       {menuOpen && (
-        <div className="flex flex-col gap-1 border-t border-[color:var(--foreground-soft)] bg-[color:var(--background)] px-6 pb-5.5 pt-4">
+        <div id="seads-mobile-menu" className="flex flex-col gap-1 border-t border-[color:var(--foreground-soft)] bg-[color:var(--background)] px-6 pb-5.5 pt-4">
           {navGroups.map((group) => (
             <div key={group.key}>
               <Link
@@ -482,6 +487,7 @@ export function SiteHeader() {
                   key={loc.code}
                   type="button"
                   onClick={() => setLocale(loc.code)}
+                  aria-label={`${t.switchLanguageTo} ${loc.full}`}
                   className={`rounded-full px-2.5 py-1.5 text-[11px] font-bold ${loc.active ? "" : "hover:bg-[color:var(--surface-2)]"}`}
                   style={{ background: loc.bg, color: loc.color }}
                 >
@@ -492,6 +498,7 @@ export function SiteHeader() {
             <button
               type="button"
               onClick={toggleTheme}
+              aria-label={theme === "dark" ? t.themeToggleToLight : t.themeToggleToDark}
               className="flex h-9 w-9 items-center justify-center rounded-full border border-[color:var(--foreground-soft)] bg-[color:var(--surface)] text-[color:var(--foreground)] hover:border-[color:var(--brand)]"
             >
               {themeIcon}

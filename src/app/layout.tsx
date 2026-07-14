@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Manrope, Source_Serif_4 } from "next/font/google";
-import { Analytics } from "@vercel/analytics/next";
 import { ScrollProgress } from "@/components/scroll-progress";
 import { LocaleProvider } from "@/lib/locale-context";
 import "./globals.css";
@@ -72,7 +71,6 @@ export default function RootLayout({
         />
         <ScrollProgress />
         <LocaleProvider>{children}</LocaleProvider>
-        <Analytics />
       </body>
     </html>
   );
