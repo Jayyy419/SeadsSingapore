@@ -1,8 +1,8 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient, PutCommand, UpdateCommand, GetCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
+import { DynamoDBDocumentClient, PutCommand, UpdateCommand, GetCommand, ScanCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
 import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
 import { SecretsManagerClient, GetSecretValueCommand } from "@aws-sdk/client-secrets-manager";
-import { randomUUID, createHmac, timingSafeEqual } from "node:crypto";
+import { randomUUID, createHmac, timingSafeEqual, scryptSync, randomBytes } from "node:crypto";
 
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 const ses = new SESClient({});
@@ -11,6 +11,8 @@ const secretsManager = new SecretsManagerClient({});
 const TABLE_NAME = process.env.TABLE_NAME;
 const IMPACT_METRICS_TABLE = process.env.IMPACT_METRICS_TABLE;
 const STORY_SUBMISSIONS_TABLE = process.env.STORY_SUBMISSIONS_TABLE;
+const ADMIN_CONFIG_TABLE = process.env.ADMIN_CONFIG_TABLE;
+const EVENTS_TABLE = process.env.EVENTS_TABLE;
 const NOTIFY_EMAIL = process.env.NOTIFY_EMAIL;
 // Admin auth lives here, not on the Amplify/Next.js side — Amplify Hosting's environment
 // variables for this app never reliably reach the deployed SSR compute's process.env at
@@ -21,6 +23,10 @@ const NOTIFY_EMAIL = process.env.NOTIFY_EMAIL;
 // (`aws lambda update-function-configuration`). So the Next.js side is now a thin, secret-free
 // proxy: it forwards the password to POST /admin-login and forwards the resulting session
 // token on every subsequent /internal/* call, and this Lambda does all real verification.
+//
+// ADMIN_PASSWORD (env var) is only the *bootstrap* value now — the real source of truth is a
+// salted/hashed entry in ADMIN_CONFIG_TABLE, lazily migrated on first successful login so
+// changing the password later never requires an AWS CLI call again (see handleChangePassword).
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const ADMIN_SESSION_SECRET = process.env.ADMIN_SESSION_SECRET;
 const SESSION_TTL_SECONDS = 60 * 60 * 8;
@@ -31,7 +37,7 @@ function corsHeaders(origin) {
   const allowOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0] || "*";
   return {
     "Access-Control-Allow-Origin": allowOrigin,
-    "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, X-Admin-Token",
   };
 }
@@ -254,6 +260,46 @@ function requireValidAdminToken(event) {
   return isValidSessionToken(provided);
 }
 
+function hashPassword(password, salt) {
+  return scryptSync(password, salt, 64).toString("hex");
+}
+
+async function getStoredPasswordConfig() {
+  const result = await ddb.send(new GetCommand({ TableName: ADMIN_CONFIG_TABLE, Key: { configId: "password" } }));
+  return result.Item ?? null;
+}
+
+async function storePassword(password) {
+  const salt = randomBytes(16).toString("hex");
+  const hash = hashPassword(password, salt);
+  await ddb.send(
+    new PutCommand({
+      TableName: ADMIN_CONFIG_TABLE,
+      Item: { configId: "password", salt, hash, updatedAt: new Date().toISOString() },
+    })
+  );
+}
+
+// The DynamoDB-stored hash is the real source of truth once it exists; ADMIN_PASSWORD (the
+// Lambda env var) is only the bootstrap value, checked and auto-migrated on first successful
+// login so that changing the password afterward never needs an AWS CLI call again.
+async function checkPassword(password) {
+  if (!password) return false;
+
+  const stored = await getStoredPasswordConfig();
+  if (stored) {
+    const expected = Buffer.from(stored.hash, "hex");
+    const actual = Buffer.from(hashPassword(password, stored.salt), "hex");
+    return expected.length === actual.length && timingSafeEqual(expected, actual);
+  }
+
+  if (ADMIN_PASSWORD && password === ADMIN_PASSWORD.trim()) {
+    await storePassword(password);
+    return true;
+  }
+  return false;
+}
+
 async function handleAdminLogin(event, headers) {
   let payload;
   try {
@@ -263,11 +309,33 @@ async function handleAdminLogin(event, headers) {
   }
 
   const password = typeof payload.password === "string" ? payload.password.trim() : "";
-  if (!ADMIN_PASSWORD || password !== ADMIN_PASSWORD.trim()) {
+  if (!(await checkPassword(password))) {
     return json(401, headers, { ok: false, error: "Incorrect password" });
   }
 
   return json(200, headers, { ok: true, token: createSessionToken() });
+}
+
+async function handleChangePassword(event, headers) {
+  let payload;
+  try {
+    payload = JSON.parse(event.body || "{}");
+  } catch {
+    return json(400, headers, { error: "Invalid JSON body" });
+  }
+
+  const currentPassword = typeof payload.currentPassword === "string" ? payload.currentPassword.trim() : "";
+  const newPassword = typeof payload.newPassword === "string" ? payload.newPassword.trim() : "";
+
+  if (!(await checkPassword(currentPassword))) {
+    return json(401, headers, { ok: false, error: "Current password is incorrect" });
+  }
+  if (newPassword.length < 8) {
+    return json(400, headers, { ok: false, error: "New password must be at least 8 characters" });
+  }
+
+  await storePassword(newPassword);
+  return json(200, headers, { ok: true });
 }
 
 async function handleVerifySession(event, headers) {
@@ -325,12 +393,70 @@ async function handleUpdateImpactMetric(event, headers, metricId) {
   return json(200, headers, { ok: true });
 }
 
+function slugify(text) {
+  return text
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+}
+
+// Other locales default to the English text on create (same "needs translation" convention
+// used for admin-created events) — there's no existing translated value to preserve yet.
+async function handleCreateImpactMetric(event, headers) {
+  let payload;
+  try {
+    payload = JSON.parse(event.body || "{}");
+  } catch {
+    return json(400, headers, { error: "Invalid JSON body" });
+  }
+
+  const labelEn = typeof payload.labelEn === "string" ? payload.labelEn.trim().slice(0, 100) : "";
+  const value = typeof payload.value === "string" ? payload.value.trim().slice(0, 40) : "";
+  const noteEn = typeof payload.noteEn === "string" ? payload.noteEn.trim().slice(0, 200) : "";
+  if (!labelEn || !value) {
+    return json(400, headers, { error: "value and labelEn are required" });
+  }
+
+  const metricId = slugify(labelEn) || randomUUID();
+  const existing = await ddb.send(new GetCommand({ TableName: IMPACT_METRICS_TABLE, Key: { metricId } }));
+  if (existing.Item) {
+    return json(409, headers, { error: "A metric with that label already exists" });
+  }
+
+  const all = await ddb.send(new ScanCommand({ TableName: IMPACT_METRICS_TABLE }));
+  const nextOrder = Math.max(0, ...(all.Items || []).map((m) => m.order ?? 0)) + 1;
+
+  const label = Object.fromEntries(LOCALES.map((l) => [l, labelEn]));
+  const note = Object.fromEntries(LOCALES.map((l) => [l, noteEn]));
+
+  await ddb.send(
+    new PutCommand({
+      TableName: IMPACT_METRICS_TABLE,
+      Item: { metricId, value, label, note, order: nextOrder, updatedAt: new Date().toISOString() },
+    })
+  );
+
+  return json(200, headers, { ok: true, metricId });
+}
+
+async function handleDeleteImpactMetric(headers, metricId) {
+  await ddb.send(new DeleteCommand({ TableName: IMPACT_METRICS_TABLE, Key: { metricId } }));
+  return json(200, headers, { ok: true });
+}
+
 async function handleGetSubmissions(headers) {
   const result = await ddb.send(new ScanCommand({ TableName: TABLE_NAME }));
   const items = (result.Items || [])
     .filter((item) => !String(item.id).startsWith("ratelimit#"))
     .sort((a, b) => (b.submittedAt || "").localeCompare(a.submittedAt || ""));
   return json(200, headers, { submissions: items });
+}
+
+async function handleDeleteSubmission(headers, id) {
+  await ddb.send(new DeleteCommand({ TableName: TABLE_NAME, Key: { id } }));
+  return json(200, headers, { ok: true });
 }
 
 async function handleGetEventRsvpCounts(headers) {
@@ -375,6 +501,11 @@ async function handleUpdateStorySubmission(event, headers, id) {
   return json(200, headers, { ok: true });
 }
 
+async function handleDeleteStorySubmission(headers, id) {
+  await ddb.send(new DeleteCommand({ TableName: STORY_SUBMISSIONS_TABLE, Key: { id } }));
+  return json(200, headers, { ok: true });
+}
+
 async function handleGetApprovedStories(headers) {
   const result = await ddb.send(new ScanCommand({ TableName: STORY_SUBMISSIONS_TABLE }));
   const items = (result.Items || [])
@@ -382,6 +513,95 @@ async function handleGetApprovedStories(headers) {
     .sort((a, b) => (b.submittedAt || "").localeCompare(a.submittedAt || ""))
     .map((item) => ({ id: item.id, authorName: item.authorName, title: item.title, body: item.body, submittedAt: item.submittedAt }));
   return json(200, headers, { stories: items });
+}
+
+async function handleGetEvents(headers) {
+  const result = await ddb.send(new ScanCommand({ TableName: EVENTS_TABLE }));
+  const items = (result.Items || []).sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+  return json(200, headers, { events: items });
+}
+
+// Same "other locales default to English on create, preserved on update" convention as
+// impact metrics — see handleCreateImpactMetric / handleUpdateImpactMetric above.
+async function handleCreateEvent(event, headers) {
+  let payload;
+  try {
+    payload = JSON.parse(event.body || "{}");
+  } catch {
+    return json(400, headers, { error: "Invalid JSON body" });
+  }
+
+  const titleEn = typeof payload.titleEn === "string" ? payload.titleEn.trim().slice(0, 200) : "";
+  const typeEn = typeof payload.typeEn === "string" ? payload.typeEn.trim().slice(0, 60) : "";
+  const date = typeof payload.date === "string" ? payload.date.trim().slice(0, 20) : "";
+  const locationEn = typeof payload.locationEn === "string" ? payload.locationEn.trim().slice(0, 200) : "";
+  const bodyEn = typeof payload.bodyEn === "string" ? payload.bodyEn.trim().slice(0, 5000) : "";
+  const capacity = Number.isFinite(Number(payload.capacity)) && payload.capacity !== "" ? Number(payload.capacity) : undefined;
+
+  if (!titleEn || !typeEn || !date || !locationEn || !bodyEn) {
+    return json(400, headers, { error: "titleEn, typeEn, date, locationEn, and bodyEn are required" });
+  }
+
+  const slug = slugify(titleEn);
+  if (!slug) {
+    return json(400, headers, { error: "Could not derive a slug from titleEn" });
+  }
+  const existing = await ddb.send(new GetCommand({ TableName: EVENTS_TABLE, Key: { slug } }));
+  if (existing.Item) {
+    return json(409, headers, { error: "An event with that title/slug already exists" });
+  }
+
+  const bodyParagraphs = bodyEn.split(/\n+/).filter(Boolean);
+  const item = {
+    slug,
+    type: Object.fromEntries(LOCALES.map((l) => [l, typeEn])),
+    title: Object.fromEntries(LOCALES.map((l) => [l, titleEn])),
+    date,
+    location: Object.fromEntries(LOCALES.map((l) => [l, locationEn])),
+    body: Object.fromEntries(LOCALES.map((l) => [l, bodyParagraphs])),
+    ...(capacity !== undefined ? { capacity } : {}),
+    updatedAt: new Date().toISOString(),
+  };
+
+  await ddb.send(new PutCommand({ TableName: EVENTS_TABLE, Item: item }));
+  return json(200, headers, { ok: true, slug });
+}
+
+async function handleUpdateEvent(event, headers, slug) {
+  let payload;
+  try {
+    payload = JSON.parse(event.body || "{}");
+  } catch {
+    return json(400, headers, { error: "Invalid JSON body" });
+  }
+
+  const existing = await ddb.send(new GetCommand({ TableName: EVENTS_TABLE, Key: { slug } }));
+  if (!existing.Item) {
+    return json(404, headers, { error: "Event not found" });
+  }
+
+  const item = { ...existing.Item };
+  if (typeof payload.titleEn === "string") item.title = { ...item.title, en: payload.titleEn.trim().slice(0, 200) };
+  if (typeof payload.typeEn === "string") item.type = { ...item.type, en: payload.typeEn.trim().slice(0, 60) };
+  if (typeof payload.locationEn === "string") item.location = { ...item.location, en: payload.locationEn.trim().slice(0, 200) };
+  if (typeof payload.date === "string" && payload.date.trim()) item.date = payload.date.trim().slice(0, 20);
+  if (typeof payload.bodyEn === "string") {
+    item.body = { ...item.body, en: payload.bodyEn.trim().slice(0, 5000).split(/\n+/).filter(Boolean) };
+  }
+  if (payload.capacity !== undefined) {
+    const capacity = Number(payload.capacity);
+    if (payload.capacity === "" || payload.capacity === null) delete item.capacity;
+    else if (Number.isFinite(capacity)) item.capacity = capacity;
+  }
+  item.updatedAt = new Date().toISOString();
+
+  await ddb.send(new PutCommand({ TableName: EVENTS_TABLE, Item: item }));
+  return json(200, headers, { ok: true });
+}
+
+async function handleDeleteEvent(headers, slug) {
+  await ddb.send(new DeleteCommand({ TableName: EVENTS_TABLE, Key: { slug } }));
+  return json(200, headers, { ok: true });
 }
 
 export const handler = async (event) => {
@@ -425,6 +645,12 @@ export const handler = async (event) => {
     return handleGetEventRsvpCounts(headers);
   }
 
+  // Public read of events themselves — the source of truth moved from siteContent.ts (static)
+  // to DynamoDB so admins can create/edit/delete events without a code change + deploy.
+  if (method === "GET" && path === "/events") {
+    return handleGetEvents(headers);
+  }
+
   // Public: the password check itself obviously can't require already being authenticated.
   if (method === "POST" && path === "/admin-login") {
     return handleAdminLogin(event, headers);
@@ -448,12 +674,22 @@ export const handler = async (event) => {
     if (method === "GET" && path === "/internal/impact-metrics") {
       return handleGetImpactMetrics(headers);
     }
+    if (method === "POST" && path === "/internal/impact-metrics") {
+      return handleCreateImpactMetric(event, headers);
+    }
     const metricMatch = path.match(/^\/internal\/impact-metrics\/([^/]+)$/);
     if (method === "PUT" && metricMatch) {
       return handleUpdateImpactMetric(event, headers, decodeURIComponent(metricMatch[1]));
     }
+    if (method === "DELETE" && metricMatch) {
+      return handleDeleteImpactMetric(headers, decodeURIComponent(metricMatch[1]));
+    }
     if (method === "GET" && path === "/internal/submissions") {
       return handleGetSubmissions(headers);
+    }
+    const submissionMatch = path.match(/^\/internal\/submissions\/([^/]+)$/);
+    if (method === "DELETE" && submissionMatch) {
+      return handleDeleteSubmission(headers, decodeURIComponent(submissionMatch[1]));
     }
     if (method === "GET" && path === "/internal/event-rsvp-counts") {
       return handleGetEventRsvpCounts(headers);
@@ -464,6 +700,25 @@ export const handler = async (event) => {
     const storyMatch = path.match(/^\/internal\/story-submissions\/([^/]+)$/);
     if (method === "PATCH" && storyMatch) {
       return handleUpdateStorySubmission(event, headers, decodeURIComponent(storyMatch[1]));
+    }
+    if (method === "DELETE" && storyMatch) {
+      return handleDeleteStorySubmission(headers, decodeURIComponent(storyMatch[1]));
+    }
+    if (method === "GET" && path === "/internal/events") {
+      return handleGetEvents(headers);
+    }
+    if (method === "POST" && path === "/internal/events") {
+      return handleCreateEvent(event, headers);
+    }
+    const eventMatch = path.match(/^\/internal\/events\/([^/]+)$/);
+    if (method === "PUT" && eventMatch) {
+      return handleUpdateEvent(event, headers, decodeURIComponent(eventMatch[1]));
+    }
+    if (method === "DELETE" && eventMatch) {
+      return handleDeleteEvent(headers, decodeURIComponent(eventMatch[1]));
+    }
+    if (method === "PATCH" && path === "/internal/admin-password") {
+      return handleChangePassword(event, headers);
     }
 
     return json(404, headers, { error: "Not found" });

@@ -1,5 +1,6 @@
-import Link from "next/link";
 import { internalApiFetch } from "@/lib/internal-api";
+import { AdminShell } from "@/components/admin-shell";
+import { deleteSubmission } from "./actions";
 
 // See admin/events/page.tsx for why this must be force-dynamic.
 export const dynamic = "force-dynamic";
@@ -25,37 +26,43 @@ export default async function AdminSubmissionsPage() {
   const submissions = await getSubmissions();
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-10">
-      <Link href="/admin" className="text-sm font-semibold text-[color:var(--muted)] hover:text-[color:var(--brand)]">
-        &larr; Admin
-      </Link>
-      <h1 className="font-display mt-4 mb-6 text-2xl">Interest form submissions ({submissions.length})</h1>
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[720px] text-left text-sm">
+    <AdminShell title={`Interest form submissions (${submissions.length})`}>
+      <div className="section-card overflow-x-auto p-2">
+        <table className="w-full min-w-[780px] text-left text-sm">
           <thead>
             <tr className="border-b border-[color:var(--foreground-soft)] text-xs uppercase text-[color:var(--muted)]">
-              <th className="py-2 pr-4">Submitted</th>
-              <th className="py-2 pr-4">Name</th>
-              <th className="py-2 pr-4">Email</th>
-              <th className="py-2 pr-4">Type</th>
-              <th className="py-2 pr-4">Message</th>
+              <th className="px-3 py-3">Submitted</th>
+              <th className="px-3 py-3">Name</th>
+              <th className="px-3 py-3">Email</th>
+              <th className="px-3 py-3">Type</th>
+              <th className="px-3 py-3">Message</th>
+              <th className="px-3 py-3" />
             </tr>
           </thead>
           <tbody>
             {submissions.map((s) => (
-              <tr key={s.id} className="border-b border-[color:var(--foreground-soft)]/50">
-                <td className="py-2 pr-4 whitespace-nowrap">{new Date(s.submittedAt).toLocaleString()}</td>
-                <td className="py-2 pr-4">{s.name}</td>
-                <td className="py-2 pr-4">{s.email}</td>
-                <td className="py-2 pr-4">{s.interestType || "—"}</td>
-                <td className="py-2 pr-4 max-w-[320px] truncate" title={s.interest}>
+              <tr key={s.id} className="border-b border-[color:var(--foreground-soft)]/50 text-[color:var(--foreground)]">
+                <td className="whitespace-nowrap px-3 py-3">{new Date(s.submittedAt).toLocaleString()}</td>
+                <td className="px-3 py-3">{s.name}</td>
+                <td className="px-3 py-3">{s.email}</td>
+                <td className="px-3 py-3">{s.interestType || "—"}</td>
+                <td className="max-w-[280px] truncate px-3 py-3" title={s.interest}>
                   {s.interest || "—"}
+                </td>
+                <td className="px-3 py-3">
+                  <form action={deleteSubmission}>
+                    <input type="hidden" name="id" value={s.id} />
+                    <button type="submit" className="text-xs font-semibold text-[color:var(--muted)] hover:text-[#e2965f]">
+                      Delete
+                    </button>
+                  </form>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
+        {submissions.length === 0 && <p className="p-4 text-sm text-[color:var(--muted)]">No submissions yet.</p>}
       </div>
-    </div>
+    </AdminShell>
   );
 }

@@ -18,3 +18,15 @@ export async function reviewStorySubmission(formData: FormData) {
   revalidatePath("/admin/stories");
   revalidatePath("/blog");
 }
+
+export async function deleteStorySubmission(formData: FormData) {
+  const id = String(formData.get("id"));
+
+  const res = await internalApiFetch(`/internal/story-submissions/${encodeURIComponent(id)}`, { method: "DELETE" });
+  if (!res.ok) {
+    throw new Error(`Failed to delete story submission ${id}: ${res.status}`);
+  }
+
+  revalidatePath("/admin/stories");
+  revalidatePath("/blog");
+}

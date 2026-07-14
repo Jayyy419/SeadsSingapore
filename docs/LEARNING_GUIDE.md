@@ -1628,6 +1628,125 @@ doesn't depend on Amplify's env var propagation ever getting resolved.
 
 ---
 
+## Part 13: Finishing the Admin Panel — Full CRUD, and Two Bugs That Only Showed Up Under Test
+
+### From "edit existing rows" to "own the whole record"
+
+Part 12 gave the admin panel a working login and the ability to edit impact metrics and events
+that already existed. It couldn't create new ones, delete anything, or change its own
+password without an AWS console session. Closing those gaps meant extending the same pattern
+established in Part 12 rather than inventing a new one: every admin write still goes through
+the interest-form Lambda's `/internal/*` routes (never DynamoDB directly from Next.js, since
+the SSR compute still has no AWS credentials of its own), and every new entity follows the
+same "English editable in the admin UI, other locales default to English on create and are
+left alone on update" rule already used for impact metrics.
+
+The one genuinely new piece was the password itself. It had been living purely as a Lambda
+environment variable — fine for a bootstrap value, bad for something meant to be changed
+routinely (every change would need `aws lambda update-function-configuration`, i.e. AWS CLI
+access). The fix follows a pattern worth naming: **the env var becomes a bootstrap-once seed,
+not the permanent source of truth.** On the first successful login, `checkPassword()` compares
+against the env var and, if it matches, immediately hashes and stores it in a new DynamoDB
+table (`seads-admin-config`) — from that point on, every login checks the table first and the
+env var is never consulted again. This is a lazy migration: no explicit "migrate now" step, no
+downtime, no special first-run mode. It just becomes true the first time anyone logs in after
+the deploy. The same idea shows up all over infrastructure work (config that starts as a
+hardcoded default and becomes a stored value the first time someone changes it) and is usually
+simpler than a dedicated migration script for a single row.
+
+### Events: from a static array to a table, and what has to change everywhere
+
+Moving events off `siteContent.ts` and onto DynamoDB touched more files than the DB table
+itself, because *every* consumer of the static `events` array had implicitly assumed the full
+list was known at build time. That assumption showed up in three different forms, each needing
+its own fix:
+
+1. **`generateStaticParams`** on `/events/[slug]/page.tsx` used the static array to tell
+   Next.js which slugs to prerender at build time. An admin-created event wouldn't exist yet
+   at the last build, so it could never be one of those prerendered paths. Fix: drop
+   `generateStaticParams` entirely and let the route render dynamically per request — the
+   tradeoff is one Lambda round-trip per page view instead of a prebuilt static file, which is
+   the right tradeoff for content that changes without a deploy.
+2. **Client components reading the array directly** (`events-content.tsx`,
+   `event-detail-content.tsx`) needed a hook that fetches live data instead. The natural
+   instinct is to just replace the import with a `fetch()` in a `useEffect` — but that leaves a
+   blank/loading flash on first render, and if the fetch fails there's nothing to show at all.
+   `useEvents()` instead **initializes state from the static array** (so there's always
+   something to render immediately) and swaps in live data once the fetch resolves, falling
+   back to the static list forever if the fetch fails. This is the same "seed becomes stale
+   fallback, not permanent truth" shape as the password migration above, just applied to
+   read-side resilience instead of a one-time write.
+3. **The false-404 trap.** `event-detail-content.tsx` needs to call `notFound()` for a slug
+   that genuinely doesn't exist — but if it checks the static-fallback state before the live
+   fetch has resolved, a *brand new* admin-created event (which by definition isn't in the
+   static fallback) would 404 for every visitor until the live fetch happened to complete
+   client-side. The fix is a second piece of state, `loaded`, that's `true` only once the live
+   fetch has resolved (successfully or not) — `notFound()` only fires when `!event && loaded`.
+   The general lesson: whenever a component starts on a fallback and swaps to live data, "the
+   data I have right now says X doesn't exist" and "X definitely doesn't exist" are different
+   claims, and conflating them produces false negatives during the fallback window.
+
+### Two bugs Playwright caught that nothing else would have
+
+Both of these were found not by reading the code and spotting a mistake, but by actually
+running the create/edit/delete flows in a real browser against a real deployed backend and
+watching what happened — the same lesson as the CSP bug in Part 10's addendum, applied again.
+
+**The prefetch bill.** `AdminShell`'s nav bar renders all six admin section links on every
+admin page. Next.js's default `<Link>` behavior prefetches the destination as soon as the link
+is on screen — normally a good default, since it makes navigation feel instant. But every admin
+page here is `force-dynamic` (it reads live, per-request protected data), so "prefetch" doesn't
+mean "warm a static cache" — it means "make a real authenticated round-trip to the Lambda,
+right now, for a page the admin probably isn't about to click." Six links means six extra
+Lambda calls fired the instant any admin page loads, for data that may never be looked at. This
+was invisible in code review (the `<Link>` usage looks completely ordinary) and only became
+obvious when a Playwright test hammering the admin UI started tripping API Gateway's
+5-requests-per-second throttle — a symptom that looked at first like a rate-limiting bug in the
+*application*, until the request log showed most of the traffic was prefetches nobody asked
+for. Fix: `prefetch={false}` on those links. The general lesson: a performance default that's
+correct for static content can become a liability once a component starts fetching live,
+protected, per-request data — the cost of "maybe convenient later" changes with what's on the
+other end of the link.
+
+**The missing fallback that only one client hook forgot.** `NEXT_PUBLIC_API_BASE_URL` is a
+build-time env var with a hardcoded fallback (`?? "https://jztkgrm3lh...`) in every file that
+reads it — `calendar.ics`, the QR route, the event metadata function, the CSP config — every
+file, that is, except the two client-side data hooks (`useEvents`, `useEventRsvpCounts`), which
+instead did `if (!baseUrl) return;` and silently stayed on stale/empty data forever. This is a
+copy-paste-adjacent bug: the two hooks were clearly written by adapting a similar existing
+hook rather than copying the fallback pattern used everywhere else client fetches happen. It
+was only caught because a *local* production build was deliberately run with the env var unset
+(to mirror the worst case — what if it's ever misconfigured?) and every other page kept working
+off the fallback while `/events` alone stayed frozen. The general lesson: when the same
+external value is read in many places, an inconsistency in how one of them handles "the value
+is missing" is invisible until you specifically test the missing-value case — and a fallback
+being present in nine call sites doesn't mean it's present in the tenth.
+
+### What a CORS rejection in a test run does and doesn't tell you
+
+While verifying the fix above, a Playwright run against a local build still failed one check:
+the public `/events` listing page never picked up a newly-created event via its client-side
+fetch, even after the missing fallback was fixed. The browser console explained why directly:
+`Access to fetch ... has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header`.
+The Lambda's CORS handling (`corsHeaders()` in `backend/interest-form/index.mjs`) only echoes
+back an `Access-Control-Allow-Origin` for origins in an explicit allowlist
+(`ALLOWED_ORIGINS`), and `http://localhost:3100` — where the test happened to be running — was
+never going to be on it, because it shouldn't be. This is the correct, intended behavior of a
+security control doing its job against a request from an origin that has no business calling a
+production API. The temptation in this situation is to "fix" the test by loosening the
+allowlist — which would be fixing the test by breaking the thing it's supposed to verify.
+Instead, the right response is to recognize which failures are sandbox artifacts (this one, and
+also a same-run `ERR_CERT_AUTHORITY_INVALID` from the sandbox's TLS-intercepting network
+proxy, resolved for testing purposes with Playwright's `ignoreHTTPSErrors`) versus real
+application bugs (the prefetch waste and the missing fallback above, both fixed in the
+application code, not worked around in the test), and to independently corroborate the
+untestable path through a different route — here, the server-rendered event detail page and
+the ICS feed both correctly picked up the new event via the exact same Lambda endpoint, just
+from server-side `fetch()` calls that aren't subject to browser CORS at all, which is enough
+confirmation that the data pipeline itself is correct.
+
+---
+
 ## Glossary
 
 - **Accessible name**: the text assistive technology (screen readers) announces for an
