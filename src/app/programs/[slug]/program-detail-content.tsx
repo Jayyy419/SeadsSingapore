@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { SiteShell } from "@/components/site-shell";
 import { InterestForm } from "@/components/interest-form";
@@ -36,6 +37,10 @@ export function ProgramDetailContent({ slug }: { slug: string }) {
           prefillInterest={program.name[locale]}
           prefillInterestType="volunteer"
         />
+
+        <Link href="/programs" className="inline-block text-sm font-semibold text-[color:var(--foreground)] hover:text-[color:var(--brand)]">
+          &larr; {t.backToPrograms}
+        </Link>
       </div>
     </SiteShell>
   );

@@ -73,12 +73,15 @@ export type Translation = {
   applyFormBody: string;
   anythingElseOptional: string;
   whoItsFor: string;
+  backToPrograms: string;
   eventsPageTitle: string;
   eventsPageSubtitle: string;
   viewDetailsRsvp: string;
   rsvpLabel: string;
   joinUsAtPrefix: string;
   rsvpFormBody: string;
+  backToEvents: string;
+  addToCalendar: string;
   blogPageTitle: string;
   blogPageSubtitle: string;
   readStory: string;
@@ -191,11 +194,14 @@ export const translations: Record<Locale, Translation> = {
     applyFormBody: "Tell us a bit about yourself and we'll follow up with next steps.",
     anythingElseOptional: "Anything else we should know? (optional)",
     whoItsFor: "Who it's for",
+    backToPrograms: "Back to all programs",
     eventsPageTitle: "Events",
     eventsPageSubtitle: "Join upcoming Seads forums, workshops, and volunteer activations.",
     viewDetailsRsvp: "View details & RSVP",
     rsvpLabel: "RSVP", joinUsAtPrefix: "Join us at ",
     rsvpFormBody: "Tell us a bit about yourself and we'll follow up with the details.",
+    backToEvents: "Back to all events",
+    addToCalendar: "Add to calendar",
     blogPageTitle: "Latest Stories",
     blogPageSubtitle: "Fresh stories from Seads programs, events, and community outcomes across Southeast Asia.",
     readStory: "Read story",
@@ -302,11 +308,14 @@ export const translations: Record<Locale, Translation> = {
     applyFormBody: "告诉我们一些关于您的信息，我们会跟进后续步骤。",
     anythingElseOptional: "还有什么我们应该知道的吗？（可选）",
     whoItsFor: "适合人群",
+    backToPrograms: "返回所有项目",
     eventsPageTitle: "活动",
     eventsPageSubtitle: "参加即将举行的 Seads 论坛、工作坊和志愿活动。",
     viewDetailsRsvp: "查看详情并报名",
     rsvpLabel: "报名", joinUsAtPrefix: "参加",
     rsvpFormBody: "告诉我们一些关于您的信息，我们会跟进详细安排。",
+    backToEvents: "返回所有活动",
+    addToCalendar: "添加到日历",
     blogPageTitle: "最新故事",
     blogPageSubtitle: "来自 Seads 项目、活动和东南亚社区成果的最新故事。",
     readStory: "阅读故事",
@@ -413,11 +422,14 @@ export const translations: Record<Locale, Translation> = {
     applyFormBody: "Beritahu kami sedikit tentang diri anda dan kami akan hubungi anda semula dengan langkah seterusnya.",
     anythingElseOptional: "Ada perkara lain yang perlu kami tahu? (pilihan)",
     whoItsFor: "Untuk siapa",
+    backToPrograms: "Kembali ke semua program",
     eventsPageTitle: "Acara",
     eventsPageSubtitle: "Sertai forum, bengkel, dan aktiviti sukarelawan Seads yang akan datang.",
     viewDetailsRsvp: "Lihat butiran & RSVP",
     rsvpLabel: "RSVP", joinUsAtPrefix: "Sertai kami di ",
     rsvpFormBody: "Beritahu kami sedikit tentang diri anda dan kami akan hubungi anda semula dengan butiran lanjut.",
+    backToEvents: "Kembali ke semua acara",
+    addToCalendar: "Tambah ke kalendar",
     blogPageTitle: "Kisah Terkini",
     blogPageSubtitle: "Kisah terbaharu daripada program, acara, dan hasil komuniti Seads di seluruh Asia Tenggara.",
     readStory: "Baca kisah",
@@ -524,11 +536,14 @@ export const translations: Record<Locale, Translation> = {
     applyFormBody: "हमें अपने बारे में थोड़ा बताएं और हम अगले कदमों के साथ संपर्क करेंगे।",
     anythingElseOptional: "क्या हमें कुछ और जानना चाहिए? (वैकल्पिक)",
     whoItsFor: "यह किसके लिए है",
+    backToPrograms: "सभी कार्यक्रमों पर वापस जाएं",
     eventsPageTitle: "इवेंट्स",
     eventsPageSubtitle: "आगामी सीड्स फोरम, कार्यशालाओं और स्वयंसेवी गतिविधियों में शामिल हों।",
     viewDetailsRsvp: "विवरण देखें और आरएसवीपी करें",
     rsvpLabel: "आरएसवीपी", joinUsAtPrefix: "हमारे साथ शामिल हों ",
     rsvpFormBody: "हमें अपने बारे में थोड़ा बताएं और हम विवरण के साथ संपर्क करेंगे।",
+    backToEvents: "सभी कार्यक्रमों पर वापस जाएं",
+    addToCalendar: "कैलेंडर में जोड़ें",
     blogPageTitle: "नवीनतम कहानियाँ",
     blogPageSubtitle: "सीड्स के कार्यक्रमों, इवेंट्स और दक्षिण-पूर्व एशिया भर के सामुदायिक परिणामों की ताज़ा कहानियाँ।",
     readStory: "कहानी पढ़ें",

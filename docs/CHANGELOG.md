@@ -4,6 +4,30 @@ All notable changes to this project should be documented in this file.
 
 This format is inspired by Keep a Changelog and uses a date-based release style.
 
+## [2026-07-14] (14)
+
+### Fixed — sitemap missing every detail page
+
+`src/app/sitemap.ts` only ever listed the static top-level routes. Adding
+`/blog/[slug]`, `/events/[slug]`, and `/programs/[slug]` in earlier work never
+updated it, so all 23 detail pages were fully built and crawlable but absent
+from `sitemap.xml` — invisible to search engines despite being real, linked
+pages. Sitemap now derives the detail routes directly from `programs`,
+`events`, and `stories` in `siteContent.ts`, so new content is picked up
+automatically instead of needing a second manual edit.
+
+### Added — event/program detail page QOL
+
+- `/events/[slug]` and `/programs/[slug]` now have a "back to all ___" link,
+  matching the pattern `/blog/[slug]` already had. Previously the only way
+  back from a detail page was the browser back button.
+- `/events/[slug]` now has an "Add to calendar" link that downloads a real
+  `.ics` file (`src/lib/ics.ts`) for the event — an all-day event on the
+  listed date, since the content model only stores a date, not a time.
+  Parses the site's fixed `"DD Mon YYYY"` date format directly rather than
+  relying on `Date` constructor string leniency, which isn't guaranteed
+  consistent across browsers.
+
 ## [2026-07-13] (13)
 
 ### Added — full site localization
