@@ -11,8 +11,11 @@ import { createSessionToken, SESSION_COOKIE, SESSION_TTL_SECONDS } from "@/lib/a
 // not a memorable phrase, so throttling attempts wouldn't meaningfully add security.
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
-  const password = body?.password;
-  const adminPassword = process.env.ADMIN_PASSWORD;
+  // Trimmed on both sides — copying the password out of the Amplify console's env var field
+  // (or pasting it anywhere) can easily pick up a trailing space/newline; trimming a random
+  // string like this costs no real security margin.
+  const password = typeof body?.password === "string" ? body.password.trim() : body?.password;
+  const adminPassword = process.env.ADMIN_PASSWORD?.trim();
 
   if (!adminPassword || password !== adminPassword) {
     return NextResponse.json({ ok: false, error: "Incorrect password" }, { status: 401 });

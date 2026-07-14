@@ -4,6 +4,18 @@ All notable changes to this project should be documented in this file.
 
 This format is inspired by Keep a Changelog and uses a date-based release style.
 
+## [2026-07-14] (19)
+
+### Fixed — "Incorrect password" with the correct password
+
+After the `fetch()` fix, login reached the server correctly but still rejected the actual
+`ADMIN_PASSWORD` value copied from the Amplify console. Most likely cause: a stray
+space/newline picked up when copying the value out of the console's text field — the
+comparison was a strict `===` with no normalization. Now trims both sides
+(`src/app/admin/api/login/route.ts`) before comparing; verified locally that a
+deliberately whitespace-padded password now succeeds while a genuinely wrong one still
+correctly fails.
+
 ## [2026-07-14] (18)
 
 ### Fixed — admin login, for real this time
