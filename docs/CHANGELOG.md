@@ -4,6 +4,21 @@ All notable changes to this project should be documented in this file.
 
 This format is inspired by Keep a Changelog and uses a date-based release style.
 
+## [2026-07-14] (17)
+
+### Fixed — admin login blocked by its own CSP in production
+
+Reported: clicking "Log in" on `/admin/login` did nothing. Browser DevTools showed:
+`Sending form data to '.../admin/api/login' violates the following Content Security Policy
+directive: "form-action 'self'"` — on a same-origin form, which `'self'` should always permit.
+Root cause not fully provable without direct production access, but the likely explanation is
+that `next.config.ts`'s `headers()` doesn't reliably apply to responses that also pass through
+`proxy.ts` (Next's middleware) in this Next.js version. Fixed defensively rather than chasing
+the exact mechanism further: extracted the security headers into `src/lib/security-headers.ts`
+and now set them explicitly on every response `proxy.ts` returns (the login/logout redirect
+included), not just relying on `next.config.ts`. Verified locally that `/admin/login`, the
+`/admin` → `/admin/login` redirect, and a normal page all carry the identical, correct header.
+
 ## [2026-07-14] (16)
 
 ### Added — custom admin panel
