@@ -2,8 +2,9 @@ import Link from "next/link";
 import { internalApiFetch } from "@/lib/internal-api";
 import { events } from "@/content/siteContent";
 
-// Fetches live protected data on every request — must never be statically prerendered (which
-// would also fail the build outright in CI, where the server-only INTERNAL_API_KEY isn't set).
+// Fetches live protected data on every request via internalApiFetch(), which reads the
+// session cookie through next/headers' cookies() — that throws if called outside a real
+// request context, so this must never be statically prerendered.
 export const dynamic = "force-dynamic";
 
 async function getRsvpCounts(): Promise<Record<string, number>> {

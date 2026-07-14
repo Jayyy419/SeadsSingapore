@@ -1549,6 +1549,83 @@ own local secrets tell you the code is *type-correct*, not that it *works in the
 it'll actually run in*. Testing against the real CI environment and a real browser surfaced two
 bugs that would otherwise have shipped silently.
 
+### Addendum: the real root cause was one level deeper — and how it was actually found
+
+The CSP fix above genuinely fixed a real bug (confirmed: the form-action violation stopped
+appearing in later testing), but login *still* failed afterward — now with "Incorrect
+password" on the actually-correct password. Chasing that down to the real root cause is worth
+walking through, because the debugging path matters as much as the fix.
+
+**Ruling things out in order, from the outside in.** First reflex: is the code wrong? Compared
+the live Amplify app config (`aws amplify get-app --query app.environmentVariables`) against
+what the login route reads — they matched. Tried a completely different password
+("abc123", set fresh via the console) — same "Incorrect password" result regardless of value.
+That's the tell: if *no* password works, the comparison logic isn't the problem — the
+`adminPassword` side of the comparison is never actually receiving a real value in the first
+place, no matter what gets typed.
+
+**Building a diagnostic instead of continuing to guess.** At this point, further back-and-forth
+guessing at browser-side causes would have wasted the user's time. Instead: a temporary,
+deliberately narrow endpoint (`/admin/api/debug-env`) that reports only `{set: boolean, length:
+number}` per environment variable — enough to answer the actual question ("does `process.env`
+have this at all?") without exposing any real secret value even briefly, in a public repo,
+over an unauthenticated URL. This is a generally useful pattern: when you can't attach a
+debugger to a remote environment, ship the smallest possible probe that answers one specific
+question, safely, and remove it once you have the answer.
+
+The probe's answer was unambiguous: every server-only variable read `false`, including ones
+that had supposedly just been set. That ruled out "wrong value" entirely and pointed at
+"never reaches the runtime at all."
+
+**Following the infrastructure, not just the code.** The build log had shown a `[WARNING]:
+!Failed to set up process.env.secrets` line since the very first admin-panel deploy — dismissed
+at the time as unrelated to plain (non-"Secrets") environment variables. It wasn't unrelated.
+Checking where Amplify Hosting is documented to actually store these values —
+`aws ssm get-parameters-by-path --path /amplify/<appId>/<branch>/` — returned an empty list.
+Not "access denied," not "wrong value" — genuinely nothing there, despite the Amplify API
+confidently reporting the values back via `get-app`. That's the shape of a **control-plane /
+data-plane split**: the API that lets you *set* configuration and the actual mechanism that
+*delivers* it to the running system are two different things, and one can silently succeed
+while the other silently does nothing.
+
+**The fix that was tried and didn't work — and why that's still useful information.** Amplify
+apps can have an `iamServiceRoleArn` (lets Amplify's own control plane act on your behalf
+during builds/deploys) and separately a `computeRoleArn` (lets the deployed SSR functions
+themselves call AWS services). This app had neither set. Attaching both — a new IAM role,
+trusted by `amplify.amazonaws.com`, with the `AdministratorAccess-Amplify` managed policy —
+is the textbook fix for exactly this class of symptom, and the build log's secrets-setup
+warning did disappear afterward. But the runtime probe still read `false` across the board
+after two more fresh deploys. Confirming a fix *didn't* work is not wasted effort — it
+eliminated an entire plausible hypothesis with actual evidence, rather than leaving it as an
+unresolved "maybe that was it."
+
+**Deciding when to stop debugging the platform and change the architecture instead.** After
+that many independent, correctly-executed configuration changes failed to move the needle,
+the responsible call was to stop treating "make Amplify's env-var pipeline work" as the
+problem to solve, and instead ask: *what mechanism has actually been reliable all session?*
+The interest-form Lambda's own environment variables — set via
+`aws lambda update-function-configuration` — had worked correctly every single time, no
+exceptions, across many earlier changes. That's a genuinely different code path from Amplify
+Hosting's env var propagation (a direct Lambda API call vs. Amplify's internal
+build/deploy/SSM plumbing), so its reliability isn't circumstantial.
+
+The fix: move `ADMIN_PASSWORD` and `ADMIN_SESSION_SECRET` off Amplify entirely, onto the
+Lambda. The Lambda gained `POST /admin-login` and `POST /verify-session`; the Next.js side
+became a thin proxy that forwards a password or a session token and trusts the Lambda's
+answer, never touching a local secret itself. `/internal/*` write access now checks the same
+session token instead of a separate static key — one less secret to keep in sync, and access
+is now tied to *being currently logged in* rather than *possessing a long-lived static value*,
+which is a strictly better property anyway.
+
+**Verifying the fix couldn't quietly rely on the same broken assumption.** The easy mistake
+here would be to test locally with all the right environment variables exported and call it
+done — which is exactly the blind spot that let this bug reach production in the first place.
+Instead: rebuilt and ran the *entire* build with zero `ADMIN_*`/`INTERNAL_*` variables set
+locally, matching production's actual (broken) environment exactly, and drove the full
+login → dashboard → logout flow with Playwright against that build. It worked, with no
+environment variables involved anywhere in the admin auth path — which is the point: the fix
+doesn't depend on Amplify's env var propagation ever getting resolved.
+
 ---
 
 ## Glossary

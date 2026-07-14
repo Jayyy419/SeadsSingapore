@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE, isValidSessionToken } from "@/lib/admin-session";
 import { securityHeaders } from "@/lib/security-headers";
 
-const PUBLIC_ADMIN_PATHS = ["/admin/login", "/admin/api/login", "/admin/api/logout", "/admin/api/debug-env"];
+const PUBLIC_ADMIN_PATHS = ["/admin/login", "/admin/api/login", "/admin/api/logout"];
 
 // next.config.ts's headers() applies to normal page responses, but responses proxy.ts (Next's
 // middleware) returns directly — like the redirect below — don't reliably pick those up. Set

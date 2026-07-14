@@ -2,7 +2,7 @@ import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, PutCommand, UpdateCommand, GetCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
 import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
 import { SecretsManagerClient, GetSecretValueCommand } from "@aws-sdk/client-secrets-manager";
-import { randomUUID } from "node:crypto";
+import { randomUUID, createHmac, timingSafeEqual } from "node:crypto";
 
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 const ses = new SESClient({});
@@ -12,7 +12,18 @@ const TABLE_NAME = process.env.TABLE_NAME;
 const IMPACT_METRICS_TABLE = process.env.IMPACT_METRICS_TABLE;
 const STORY_SUBMISSIONS_TABLE = process.env.STORY_SUBMISSIONS_TABLE;
 const NOTIFY_EMAIL = process.env.NOTIFY_EMAIL;
-const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY;
+// Admin auth lives here, not on the Amplify/Next.js side — Amplify Hosting's environment
+// variables for this app never reliably reach the deployed SSR compute's process.env at
+// request time (confirmed via a temporary diagnostic endpoint; see docs/LEARNING_GUIDE.md),
+// despite the app-level config showing correct values and both the service role and compute
+// role being properly attached. Lambda's own env vars, by contrast, have worked reliably all
+// session via a completely different, well-established mechanism
+// (`aws lambda update-function-configuration`). So the Next.js side is now a thin, secret-free
+// proxy: it forwards the password to POST /admin-login and forwards the resulting session
+// token on every subsequent /internal/* call, and this Lambda does all real verification.
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+const ADMIN_SESSION_SECRET = process.env.ADMIN_SESSION_SECRET;
+const SESSION_TTL_SECONDS = 60 * 60 * 8;
 
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "").split(",").filter(Boolean);
 
@@ -21,7 +32,7 @@ function corsHeaders(origin) {
   return {
     "Access-Control-Allow-Origin": allowOrigin,
     "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, X-Internal-Key",
+    "Access-Control-Allow-Headers": "Content-Type, X-Admin-Token",
   };
 }
 
@@ -216,9 +227,58 @@ async function handleSubmitStory(event, headers) {
   return json(200, headers, { ok: true });
 }
 
-function requireInternalAuth(event) {
-  const provided = event.headers?.["x-internal-key"] || event.headers?.["X-Internal-Key"];
-  return Boolean(INTERNAL_API_KEY) && provided === INTERNAL_API_KEY;
+function signToken(payload) {
+  return createHmac("sha256", ADMIN_SESSION_SECRET).update(payload).digest("hex");
+}
+
+function createSessionToken() {
+  const expiresAt = String(Date.now() + SESSION_TTL_SECONDS * 1000);
+  return `${expiresAt}.${signToken(expiresAt)}`;
+}
+
+function isValidSessionToken(token) {
+  if (!token || !ADMIN_SESSION_SECRET) return false;
+  const [payload, signature] = token.split(".");
+  if (!payload || !signature) return false;
+
+  const expected = signToken(payload);
+  const a = Buffer.from(signature);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length || !timingSafeEqual(a, b)) return false;
+
+  return Number.isFinite(Number(payload)) && Date.now() < Number(payload);
+}
+
+function requireValidAdminToken(event) {
+  const provided = event.headers?.["x-admin-token"] || event.headers?.["X-Admin-Token"];
+  return isValidSessionToken(provided);
+}
+
+async function handleAdminLogin(event, headers) {
+  let payload;
+  try {
+    payload = JSON.parse(event.body || "{}");
+  } catch {
+    return json(400, headers, { error: "Invalid JSON body" });
+  }
+
+  const password = typeof payload.password === "string" ? payload.password.trim() : "";
+  if (!ADMIN_PASSWORD || password !== ADMIN_PASSWORD.trim()) {
+    return json(401, headers, { ok: false, error: "Incorrect password" });
+  }
+
+  return json(200, headers, { ok: true, token: createSessionToken() });
+}
+
+async function handleVerifySession(event, headers) {
+  let payload;
+  try {
+    payload = JSON.parse(event.body || "{}");
+  } catch {
+    return json(400, headers, { error: "Invalid JSON body" });
+  }
+
+  return json(200, headers, { valid: isValidSessionToken(payload?.token) });
 }
 
 async function handleGetImpactMetrics(headers) {
@@ -365,11 +425,23 @@ export const handler = async (event) => {
     return handleGetEventRsvpCounts(headers);
   }
 
-  // Everything else under /internal/* is server-to-server only, called from the Next.js
-  // admin panel's own Route Handlers (never the browser directly) — protected by a shared
-  // key rather than the end-user's session, since this Lambda has no concept of that session.
+  // Public: the password check itself obviously can't require already being authenticated.
+  if (method === "POST" && path === "/admin-login") {
+    return handleAdminLogin(event, headers);
+  }
+
+  // Public: called by proxy.ts (Next's middleware, Edge runtime) on every /admin/* page load
+  // to check the session cookie's validity — safe to be unauthenticated since it only answers
+  // "is this specific token currently valid", it can't be used to forge or discover one.
+  if (method === "POST" && path === "/verify-session") {
+    return handleVerifySession(event, headers);
+  }
+
+  // Everything else under /internal/* requires a currently-valid admin session token (the
+  // same one issued by /admin-login and checked by /verify-session) rather than a separate
+  // static key — ties data-access authorization directly to being logged in as admin.
   if (path.startsWith("/internal/")) {
-    if (!requireInternalAuth(event)) {
+    if (!requireValidAdminToken(event)) {
       return json(401, headers, { error: "Unauthorized" });
     }
 

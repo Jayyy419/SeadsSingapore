@@ -4,6 +4,42 @@ All notable changes to this project should be documented in this file.
 
 This format is inspired by Keep a Changelog and uses a date-based release style.
 
+## [2026-07-14] (20)
+
+### Fixed — admin auth moved off Amplify env vars entirely (root cause found)
+
+The real root cause of every admin-login symptom this session (CSP violation, then
+"Incorrect password" with the actually-correct password): **Amplify Hosting's environment
+variables for this app never reliably reach the deployed Next.js SSR compute's `process.env`
+at request time**, regardless of value, regardless of being set at app level or branch level,
+and regardless of attaching both an `iamServiceRoleArn` and a `computeRoleArn` (both now
+attached — `seads-amplify-service-role`, trusted by `amplify.amazonaws.com`, policy
+`AdministratorAccess-Amplify`). Confirmed with a temporary diagnostic endpoint
+(`/admin/api/debug-env`, now removed) that reported every server-only var as unset even
+immediately after a fresh deploy with correct app config. `aws ssm get-parameters-by-path`
+under Amplify's expected `/amplify/<appId>/<branch>/` prefix returned zero results throughout
+— the app-level config the AWS API reports back is never actually synced anywhere the running
+compute can read it. `NEXT_PUBLIC_*` variables were never affected by this, since those are
+resolved to literal strings in client bundles at *build* time (a completely different
+mechanism from server-runtime `process.env`), which is also why nothing else broke visibly —
+every server-side env var read elsewhere in the app happened to have a fallback matching the
+real value.
+
+Fix: stopped depending on Amplify env vars for anything security-sensitive. Moved
+`ADMIN_PASSWORD` and `ADMIN_SESSION_SECRET` to the interest-form Lambda's own environment
+variables instead — which *have* worked reliably all session via a completely different,
+well-established mechanism (`aws lambda update-function-configuration`). The Lambda gained
+`POST /admin-login` (password → signed session token) and `POST /verify-session` (token →
+valid/invalid), both intentionally public/unauthenticated since neither can be used to forge
+or discover a valid token without already knowing the password. `/internal/*` routes now
+require a valid session token (`X-Admin-Token` header) instead of the old static
+`INTERNAL_API_KEY`, tying data-access authorization directly to being logged in rather than a
+separate shared secret. The Next.js side (`src/lib/admin-session.ts`, `src/proxy.ts`,
+`src/lib/internal-api.ts`, `src/app/admin/api/login/route.ts`) is now a thin, secret-free
+proxy — verified by rebuilding and running the full login → dashboard → logout flow locally
+with **zero** admin-related environment variables set at all, matching exactly what
+production has (nothing), and it worked.
+
 ## [2026-07-14] (19)
 
 ### Fixed — "Incorrect password" with the correct password
