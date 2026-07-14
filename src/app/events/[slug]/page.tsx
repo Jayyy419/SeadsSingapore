@@ -23,7 +23,30 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   };
 }
 
+// Only fields backed by real event data — no fabricated end time/pricing/performer info.
+function buildEventJsonLd(event: { title: { en: string }; date: string; location: { en: string }; body: { en: string[] } }) {
+  const startDate = new Date(event.date);
+  return {
+    "@context": "https://schema.org",
+    "@type": "Event",
+    name: event.title.en,
+    ...(Number.isNaN(startDate.getTime()) ? {} : { startDate: startDate.toISOString() }),
+    location: { "@type": "Place", name: event.location.en },
+    description: event.body.en.join(" "),
+    eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
+    eventStatus: "https://schema.org/EventScheduled",
+  };
+}
+
 export default async function EventDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  return <EventDetailContent slug={slug} />;
+  const event = await getEvent(slug);
+  return (
+    <>
+      {event && (
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(buildEventJsonLd(event)) }} />
+      )}
+      <EventDetailContent slug={slug} />
+    </>
+  );
 }
