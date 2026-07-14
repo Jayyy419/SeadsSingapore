@@ -1747,6 +1747,187 @@ confirmation that the data pipeline itself is correct.
 
 ---
 
+## Part 14: Git and GitHub, From the Ground Up — Using This Session's Real Events
+
+Everything below actually happened in this repo. Rather than explain Git in the abstract, each
+concept is tied to the specific command, error, or decision that came up while shipping the
+admin CRUD work and cleaning up afterward.
+
+### The basic shape: commits, branches, and "origin"
+
+A Git repository is a history of **commits** — each one a snapshot of every file at a point in
+time, plus a message describing what changed and a pointer back to the commit before it. `git
+log --oneline` shows that chain: `860ab1d Merge pull request #17 ... / 6f39f6a Add full admin
+CRUD ... / ff63097 Move admin auth off Amplify env vars ...` — each hash is a specific snapshot,
+and reading top to bottom is reading history backwards from "most recent."
+
+A **branch** is nothing more than a movable label pointing at one commit. `main` is just the
+name conventionally given to the primary line of history — there's no technical difference
+between it and any other branch. When this session ran `git checkout -b
+admin-crud-and-redesign`, that created a new label pointing at the same commit `main` was
+pointing at; committing on that branch afterward moved *its* label forward while `main` stayed
+put, giving two diverging lines of history sharing a common ancestor.
+
+**`origin`** is just a nickname for a remote copy of the repository — in this case, the GitHub-
+hosted repo. Your local clone and GitHub's copy are two independent sets of commits that happen
+to overlap; `git push` copies commits from local to remote, `git fetch` copies commits from
+remote to local (without touching your current branch), and `git pull` is `fetch` immediately
+followed by merging the result into your current branch. `git status`'s "ahead by N commits" /
+"behind by N commits" is comparing your local branch's tip against `origin`'s equivalent
+branch — it's telling you how far the two copies have diverged, not judging anything.
+
+### Why `git push origin main` returned "403 ... denied to Jayyy419" instead of just working
+
+This was the first real surprise this session: pushing a normal, non-secret commit failed
+outright, with `fetch` (read) working fine but `push` (write) rejected. The failure happened at
+the network layer — Git talks to GitHub over plain HTTPS with credentials baked into the
+connection, and the specific credential this session was using (a proxy set up by the Claude
+Code environment, visible in `git remote -v` as `http://local_proxy@127.0.0.1:41729/...`) turned
+out to have read access but not write access to this particular repository. No amount of retrying
+or rephrasing the push would fix that — a 403 at this layer means the *server* refuses the
+request regardless of what's in it, which is different from (and much less fixable locally than)
+a merge conflict or a bad commit.
+
+The actual fix was providing a different credential with write access: a GitHub **Personal
+Access Token (PAT)**, a long random string (`ghp_...` for the "classic" kind) that acts as a
+password scoped to specific permissions, generated at github.com/settings/tokens. Passing it
+inline in the remote URL for one command
+(`git push https://<token>@github.com/...` — deliberately *not* `git remote set-url`, which
+would have written the token into `.git/config` where it'd persist on disk) let that single push
+succeed while leaving the normal proxy-based remote untouched for everything else.
+
+**Token scopes matter, and get discovered by trial and error more often than you'd like.** The
+first PAT (`repo` scope only) could push code and merge most pull requests, but was rejected
+specifically when merging the two PRs that modified files under `.github/workflows/` — GitHub
+requires a separate `workflow` scope to touch workflow-definition files, as an extra guardrail
+against a stolen low-privilege token being used to inject arbitrary commands into CI. This isn't
+documented anywhere obvious enough to get right on the first guess; the practical lesson is that
+a 403 naming a specific missing scope is progress, not a dead end — it tells you exactly what
+to add to the next token rather than leaving you guessing.
+
+**Any token pasted into a chat is compromised the moment it's pasted**, full stop, regardless of
+whether it ever gets used for anything malicious — the conversation log is now a place that
+string lives, outside of anyone's control over where it goes next. This is exactly the same
+reasoning as every other secret flagged during this session (AWS keys, the admin session
+secret): the fix isn't "hope no one finds it," it's "revoke it and issue a new one," which costs
+nothing and eliminates the risk completely.
+
+### Pull requests: proposing a change instead of just making it
+
+A **pull request (PR)** is GitHub's layer on top of branches and commits — it doesn't change how
+Git itself works, it's a request that says "here's a branch with some commits on it; please
+review it and, if it looks good, merge it into another branch (usually `main`)." Under the hood,
+`gh pr create` / the `POST /repos/.../pulls` API call this session used just records "compare
+branch X against branch Y" and gives it a number, a title, a description, and a place for
+comments and CI results to attach. **Merging** a PR is the actual Git operation — folding the
+feature branch's commits into `main` — with a few strategies for *how*: a plain merge commit
+(what PR #17, the admin CRUD work, used) keeps every individual commit from the branch plus adds
+one new "merge" commit tying them together; a **squash merge** (what all 12 Dependabot PRs used)
+instead collapses the whole branch into a single new commit on `main`, which is why the final
+`git log` shows one tidy line per dependency bump (`Bump actions/checkout from 4 to 7 (#4)`)
+instead of Dependabot's own multi-commit history for each.
+
+**Branch protection** is a repo setting (configured earlier this session, per the QOL pass) that
+adds rules a branch must satisfy before it can be changed — commonly "no direct pushes, only via
+PR" and "PR must have passing CI before it can merge." That's almost certainly the deeper reason
+the very first `git push origin main` in this batch was rejected (on top of the credential issue
+uncovered later): even with a fully write-capable credential, a protected `main` branch simply
+refuses a direct push and insists on a PR instead. This is a deliberate speed bump, not a bug —
+its entire purpose is making it structurally impossible to accidentally (or maliciously) skip
+review and CI on the branch that actually deploys.
+
+### GitHub Actions: what actually runs when you push
+
+**GitHub Actions** is GitHub's built-in automation system: YAML files under `.github/workflows/`
+(this repo has three — `ci.yml`, `deploy-interest-form-lambda.yml`, `gitleaks.yml`) each describe
+a **workflow** — a set of steps to run automatically in response to an event, like "a push
+happened" or "a pull request was opened." Each workflow runs on a fresh, temporary virtual
+machine that GitHub provisions and destroys per run; nothing persists between runs except what
+the workflow explicitly saves (build caches, artifacts). A step like `actions/checkout` is itself
+a small, reusable, versioned piece of automation — literally someone else's published GitHub
+repo, referenced by name and a version tag — that this workflow depends on the same way
+`package.json` depends on an npm package. That's exactly why "bump actions/checkout from 4 to 7"
+was a real, independent dependency update rather than just a version-number formality: v7 of that
+action is different code than v4, running with different behavior inside every CI run from then
+on.
+
+`ci.yml` is what ran `tsc`, `eslint`, and `next build` on every push and PR this whole session —
+the thing that would have caught, for instance, an admin page accidentally left able to break the
+production build. `gitleaks.yml` is the automated secret-scanning backstop set up earlier this
+session, scanning every commit for anything that looks like a credential before it can land on
+`main`. `deploy-interest-form-lambda.yml` is what actually ships changes to
+`backend/interest-form/index.mjs` to the live Lambda whenever that file changes on `main` — the
+CI/CD counterpart to Amplify Hosting doing the equivalent for the Next.js frontend.
+
+### Dependabot: why there were 13 PRs, and how to tell which ones are safe
+
+**Dependabot** is a GitHub feature (turned on via `.github/dependabot.yml`, added during the
+earlier security-hardening pass) that periodically checks every dependency file in the repo
+(`package.json` in two places, `package-lock.json`, the workflow files' `uses: action@version`
+lines) against the latest published versions, and for each one that's out of date, opens its own
+PR: a new branch (named like
+`dependabot/npm_and_yarn/backend/interest-form/aws-sdk/client-secrets-manager-3.1086.0`), a
+one-line diff bumping the version number, and a description of what changed upstream. One PR per
+dependency is deliberate, not sloppy — it means each update can be reviewed, tested, and merged
+(or rejected) completely independently, rather than one bad bump blocking nine unrelated good
+ones bundled into the same PR.
+
+The reason 13 PRs doesn't mean 13 equally-safe changes comes down to **semantic versioning
+(semver)**: a version number like `3.1085.0 → 3.1086.0` is `MAJOR.MINOR.PATCH`, and by convention
+(not a hard guarantee) a **patch** bump is a bug fix with no intentional behavior change, a
+**minor** bump adds functionality without breaking existing usage, and a **major** bump is
+explicitly allowed to break things. That convention is exactly what separated this session's
+"merge without much thought" pile (four `aws-sdk` clients and `@tailwindcss/postcss`, all patch;
+`next`, patch; `react`/`@types/react`, patch despite the misleadingly-generic branch name
+`dependabot/npm_and_yarn/multi-b0dfc253ff`) from the "stop and check first" pile: `typescript`
+jumping `5.9.3 → 7.0.2` is a major bump, and its CI check had already failed before anyone looked
+at it, which is about as clear a "don't merge this" signal as Git ever gives you directly in a PR
+list. `@types/node` jumping `20.19.41 → 26.1.1` is also major and its CI *passed* — but passing
+CI only proves the code typechecks against the *newer* types, not that those types accurately
+describe the *actual* Node runtime this app requires
+(`package.json`'s `"engines": { "node": ">=20 <21" }`, from earlier session work). A green
+checkmark answers "does this compile," not "is this the right change" — those are different
+questions, and only one of them shows up automatically in a PR list.
+
+**GitHub Actions version bumps got a different, more lenient default** than npm packages in this
+session's triage, even though several were also major bumps (`actions/checkout` 4→7,
+`gitleaks/gitleaks-action` 2→3). The reasoning: these are extremely widely-used, GitHub-
+maintained or GitHub-adjacent actions where a major version bump is common practice (annual major
+version releases are normal for `actions/checkout`) and the blast radius of a bad one is CI
+failing loudly on the very next push — compare that to a bad application dependency bump, which
+can ship a subtle runtime bug straight to production users. Risk tolerance isn't one-size-fits-
+all across every kind of dependency; it depends on how quickly and visibly a mistake would
+surface.
+
+### Why two "safe" PRs still failed to merge, and what a stale branch actually is
+
+Two of the patch-level `aws-sdk` bumps (`client-dynamodb`, `client-ses`) failed to merge with
+`mergeable: false, mergeable_state: "dirty"` — a genuine **merge conflict**: both PRs, generated
+independently by Dependabot at slightly different times, touched overlapping lines of the same
+generated `package-lock.json`, and once the *first* of that group merged and changed those lines,
+the *others* no longer applied cleanly on top of the new `main`. This is completely ordinary and
+not a sign anything is broken — Dependabot itself watches for this and will regenerate a fresh,
+non-conflicting version of each affected PR shortly after detecting its base branch moved,
+without anyone needing to resolve the conflict by hand. Closing the stale ones was the right
+call specifically *because* they're going to reappear automatically anyway; manually resolving a
+lockfile conflict by hand is real work worth skipping when the tooling will just redo it
+correctly on its own.
+
+A **stale branch** is simply a branch label nobody's pointed anywhere useful in a while — most
+commonly because its PR merged (its commits now live on `main` too, under a different route
+through history) or closed, and the branch itself is just leftover scaffolding. GitHub's
+"automatically delete head branches" repo setting (why the branches list dropped straight from 13
+Dependabot branches to just `main` + one leftover, without deleting them one at a time by hand)
+handles the common case. `seads-homepage-redesign` survived that automatic cleanup because it had
+been reused across *two* separate historical PRs (#1 and #2) — GitHub's auto-delete fires once,
+right after a merge, and by the time the second PR against that same branch merged, there was
+nothing left flagged to delete. Confirming it was safe to delete manually meant checking that
+every commit ever pushed to it was already `merged: true` on both PRs (via the GitHub API) *and*
+already present in `main`'s history — deleting a branch permanently discards any commits on it
+that exist *nowhere* else, so that check is the whole point, not a formality.
+
+---
+
 ## Glossary
 
 - **Accessible name**: the text assistive technology (screen readers) announces for an
