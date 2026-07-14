@@ -1,9 +1,12 @@
 import { internalApiFetch } from "@/lib/internal-api";
 import { AdminShell } from "@/components/admin-shell";
+import { AdminPagination } from "@/components/admin-pagination";
 import { reviewStorySubmission, deleteStorySubmission } from "./actions";
 
 // See admin/events/page.tsx for why this must be force-dynamic.
 export const dynamic = "force-dynamic";
+
+const PAGE_SIZE = 50;
 
 type StorySubmission = {
   id: string;
@@ -22,10 +25,15 @@ async function getStorySubmissions(): Promise<StorySubmission[]> {
   return data.submissions ?? [];
 }
 
-export default async function AdminStoriesPage() {
+export default async function AdminStoriesPage({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
+  const { page: pageParam } = await searchParams;
   const submissions = await getStorySubmissions();
   const pending = submissions.filter((s) => s.status === "pending");
-  const reviewed = submissions.filter((s) => s.status !== "pending");
+  const allReviewed = submissions.filter((s) => s.status !== "pending");
+
+  const totalPages = Math.max(1, Math.ceil(allReviewed.length / PAGE_SIZE));
+  const page = Math.min(Math.max(1, Number(pageParam) || 1), totalPages);
+  const reviewed = allReviewed.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
     <AdminShell title={`Story moderation (${pending.length} pending)`}>
@@ -85,12 +93,12 @@ export default async function AdminStoriesPage() {
         {pending.length === 0 && <p className="text-sm text-[color:var(--muted)]">No pending submissions.</p>}
       </div>
 
-      {reviewed.length > 0 && (
+      {allReviewed.length > 0 && (
         <div className="mt-10">
-          <h2 className="font-display mb-3 text-lg text-[color:var(--foreground)]">Reviewed</h2>
-          <div className="flex flex-col gap-2">
+          <h2 className="font-display mb-3 text-lg text-[color:var(--foreground)]">Reviewed ({allReviewed.length})</h2>
+          <div className="section-card flex flex-col gap-2 p-2">
             {reviewed.map((s) => (
-              <div key={s.id} className="flex items-center justify-between text-sm text-[color:var(--muted)]">
+              <div key={s.id} className="flex items-center justify-between px-3 py-2 text-sm text-[color:var(--muted)]">
                 <p>
                   {s.title} — <span className="font-semibold">{s.status}</span>
                 </p>
@@ -102,6 +110,7 @@ export default async function AdminStoriesPage() {
                 </form>
               </div>
             ))}
+            <AdminPagination page={page} totalPages={totalPages} baseHref="/admin/stories" />
           </div>
         </div>
       )}

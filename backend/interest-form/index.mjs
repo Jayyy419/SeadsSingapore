@@ -8,6 +8,21 @@ const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 const ses = new SESClient({});
 const secretsManager = new SecretsManagerClient({});
 
+// A plain ScanCommand caps out at ~1MB per call and silently returns only a partial result
+// past that — no error, just missing rows. Every table here is small enough that looping
+// through LastEvaluatedKey until it's exhausted costs one extra round-trip at worst, and
+// guarantees callers always see the complete table rather than a size-dependent truncation.
+async function scanAll(tableName) {
+  const items = [];
+  let ExclusiveStartKey;
+  do {
+    const result = await ddb.send(new ScanCommand({ TableName: tableName, ExclusiveStartKey }));
+    items.push(...(result.Items || []));
+    ExclusiveStartKey = result.LastEvaluatedKey;
+  } while (ExclusiveStartKey);
+  return items;
+}
+
 const TABLE_NAME = process.env.TABLE_NAME;
 const IMPACT_METRICS_TABLE = process.env.IMPACT_METRICS_TABLE;
 const STORY_SUBMISSIONS_TABLE = process.env.STORY_SUBMISSIONS_TABLE;
@@ -350,8 +365,7 @@ async function handleVerifySession(event, headers) {
 }
 
 async function handleGetImpactMetrics(headers) {
-  const result = await ddb.send(new ScanCommand({ TableName: IMPACT_METRICS_TABLE }));
-  const items = (result.Items || []).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  const items = (await scanAll(IMPACT_METRICS_TABLE)).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   return json(200, headers, { metrics: items });
 }
 
@@ -425,8 +439,8 @@ async function handleCreateImpactMetric(event, headers) {
     return json(409, headers, { error: "A metric with that label already exists" });
   }
 
-  const all = await ddb.send(new ScanCommand({ TableName: IMPACT_METRICS_TABLE }));
-  const nextOrder = Math.max(0, ...(all.Items || []).map((m) => m.order ?? 0)) + 1;
+  const all = await scanAll(IMPACT_METRICS_TABLE);
+  const nextOrder = Math.max(0, ...all.map((m) => m.order ?? 0)) + 1;
 
   const label = Object.fromEntries(LOCALES.map((l) => [l, labelEn]));
   const note = Object.fromEntries(LOCALES.map((l) => [l, noteEn]));
@@ -447,8 +461,7 @@ async function handleDeleteImpactMetric(headers, metricId) {
 }
 
 async function handleGetSubmissions(headers) {
-  const result = await ddb.send(new ScanCommand({ TableName: TABLE_NAME }));
-  const items = (result.Items || [])
+  const items = (await scanAll(TABLE_NAME))
     .filter((item) => !String(item.id).startsWith("ratelimit#"))
     .sort((a, b) => (b.submittedAt || "").localeCompare(a.submittedAt || ""));
   return json(200, headers, { submissions: items });
@@ -460,9 +473,8 @@ async function handleDeleteSubmission(headers, id) {
 }
 
 async function handleGetEventRsvpCounts(headers) {
-  const result = await ddb.send(new ScanCommand({ TableName: TABLE_NAME }));
   const counts = {};
-  for (const item of result.Items || []) {
+  for (const item of await scanAll(TABLE_NAME)) {
     if (item.interestType !== "event" || !item.eventSlug) continue;
     counts[item.eventSlug] = (counts[item.eventSlug] || 0) + 1;
   }
@@ -470,8 +482,7 @@ async function handleGetEventRsvpCounts(headers) {
 }
 
 async function handleGetStorySubmissions(headers) {
-  const result = await ddb.send(new ScanCommand({ TableName: STORY_SUBMISSIONS_TABLE }));
-  const items = (result.Items || []).sort((a, b) => (b.submittedAt || "").localeCompare(a.submittedAt || ""));
+  const items = (await scanAll(STORY_SUBMISSIONS_TABLE)).sort((a, b) => (b.submittedAt || "").localeCompare(a.submittedAt || ""));
   return json(200, headers, { submissions: items });
 }
 
@@ -507,8 +518,7 @@ async function handleDeleteStorySubmission(headers, id) {
 }
 
 async function handleGetApprovedStories(headers) {
-  const result = await ddb.send(new ScanCommand({ TableName: STORY_SUBMISSIONS_TABLE }));
-  const items = (result.Items || [])
+  const items = (await scanAll(STORY_SUBMISSIONS_TABLE))
     .filter((item) => item.status === "approved")
     .sort((a, b) => (b.submittedAt || "").localeCompare(a.submittedAt || ""))
     .map((item) => ({ id: item.id, authorName: item.authorName, title: item.title, body: item.body, submittedAt: item.submittedAt }));
@@ -516,8 +526,7 @@ async function handleGetApprovedStories(headers) {
 }
 
 async function handleGetEvents(headers) {
-  const result = await ddb.send(new ScanCommand({ TableName: EVENTS_TABLE }));
-  const items = (result.Items || []).sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+  const items = (await scanAll(EVENTS_TABLE)).sort((a, b) => (a.date || "").localeCompare(b.date || ""));
   return json(200, headers, { events: items });
 }
 
