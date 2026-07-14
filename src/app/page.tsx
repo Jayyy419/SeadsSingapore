@@ -1,21 +1,60 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { SiteHeader } from "@/components/site-header";
 import { MediaMasonry } from "@/components/media-masonry";
 import { InterestForm } from "@/components/interest-form";
 import { useLocale } from "@/lib/locale-context";
 import {
   events,
-  impactMetrics,
+  impactMetrics as staticImpactMetrics,
   programs,
   stories,
   teamMembers,
   testimonials,
+  type ImpactMetric,
 } from "@/content/siteContent";
+
+// Renders the static, hardcoded numbers immediately (no loading flash), then swaps in the
+// admin-editable live values from DynamoDB (via the interest-form Lambda's public
+// /impact-metrics endpoint) once they arrive — falls back to the static ones silently on
+// any fetch error, since stale-but-real numbers beat a broken homepage.
+function useImpactMetrics(): ImpactMetric[] {
+  const [metrics, setMetrics] = useState<ImpactMetric[]>(staticImpactMetrics);
+
+  useEffect(() => {
+    const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+    if (!baseUrl) return;
+
+    let cancelled = false;
+    fetch(`${baseUrl}/impact-metrics`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (cancelled || !data?.metrics?.length) return;
+        setMetrics(
+          data.metrics.map((m: { value: string; label: Record<string, string>; note: Record<string, string> }) => ({
+            value: m.value,
+            label: m.label,
+            note: m.note,
+          }))
+        );
+      })
+      .catch(() => {
+        // Fetch failed — the static fallback set above stays in place.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return metrics;
+}
 
 export default function Home() {
   const { locale, t } = useLocale();
+  const impactMetrics = useImpactMetrics();
 
   return (
     <div className="min-h-screen">

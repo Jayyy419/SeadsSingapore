@@ -24,6 +24,8 @@ type InterestFormProps = {
   prefillInterest?: string;
   /** Pre-selects the structured interest-type dropdown to match where someone arrived from. */
   prefillInterestType?: InterestType;
+  /** Tags the submission to a specific event so its RSVP count can be computed live. */
+  eventSlug?: string;
 };
 
 export function InterestForm({
@@ -36,6 +38,7 @@ export function InterestForm({
   submitLabel,
   prefillInterest,
   prefillInterestType,
+  eventSlug,
 }: InterestFormProps) {
   const { t } = useLocale();
   const [submitStatus, setSubmitStatus] = useState<"idle" | "loading" | "done" | "error" | "unconfigured" | "rateLimited">("idle");
@@ -64,6 +67,7 @@ export function InterestForm({
         email: formData.get("email"),
         interest: formData.get("interest"),
         interestType: formData.get("interestType"),
+        eventSlug,
         turnstileToken: formData.get("cf-turnstile-response"),
       };
 

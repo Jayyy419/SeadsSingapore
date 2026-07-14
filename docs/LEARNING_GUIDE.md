@@ -22,7 +22,8 @@ defined in the context of this project specifically.
 9. [Part 9: Monitoring, Bot Protection, and Accessibility](#part-9-monitoring-bot-protection-and-accessibility)
 10. [Part 10: Dynamic Routes and Fixing a "Told You To, But Couldn't" Bug](#part-10-dynamic-routes-and-fixing-a-told-you-to-but-couldnt-bug)
 11. [Part 11: Making the Whole Site Actually Multi-Language](#part-11-making-the-whole-site-actually-multi-language)
-12. [Glossary](#glossary)
+12. [Part 12: Building an Admin Panel Without Giving the Website Its Own AWS Permissions](#part-12-building-an-admin-panel-without-giving-the-website-its-own-aws-permissions)
+13. [Glossary](#glossary)
 
 ---
 
@@ -1440,6 +1441,113 @@ This is a small example of a broader habit worth having on any translation/local
 after translating, re-check for anything in the *original* markup that wasn't plain text —
 links, bold spans, inline icons — since a straightforward string-for-string translation
 naturally flattens all of that into plain text unless it's deliberately preserved.
+
+---
+
+## Part 12: Building an Admin Panel Without Giving the Website Its Own AWS Permissions
+
+### The gap
+
+Every piece of content on this site — programs, events, stories, team bios, even the
+homepage's "40K+ youths reached" stat tiles — lived in one hardcoded TypeScript file
+(`siteContent.ts`), edited by hand and shipped through a normal git commit + redeploy. That's
+fine for a handful of pages that rarely change, but it meant there was no way for anyone to
+update an impact number, moderate a community-submitted story, or check RSVP counts without
+touching code. The site needed a real `/admin` section.
+
+### The auth decision: shared password, not per-user accounts
+
+The site has one operator, not a team with different roles, so a full user-account system
+(Cognito, NextAuth with a database, etc.) would be solving a problem that doesn't exist yet.
+Instead: one password, stored as an Amplify environment variable (`ADMIN_PASSWORD`, never
+`NEXT_PUBLIC_`, so it never reaches the browser bundle), checked in a Route Handler
+(`src/app/admin/api/login/route.ts`). On success it sets an HttpOnly/Secure/SameSite=Strict
+cookie containing a signed, expiring token — not the password itself, so the cookie is safe
+to have sitting in the browser for its 8-hour lifetime even if it leaked.
+
+**Why no rate limiting on the login endpoint**, unlike every other public-facing endpoint in
+this project: rate limiting defends against brute-forcing a *guessable* secret (a memorable
+password, a 6-digit code). `ADMIN_PASSWORD` here is a randomly generated ~120-bit string —
+brute-forcing that is computationally infeasible regardless of how many attempts per second
+you allow. Adding a rate limiter here would be effort spent on a threat model that doesn't
+apply, at the cost of extra code to maintain. The lesson generalizes: match the defense to
+the actual secret, don't reach for the same mitigation everywhere out of habit.
+
+### Signing the session cookie: Web Crypto, not node:crypto
+
+The auth check has to run in `src/proxy.ts` (Next.js's current name for what used to be
+`middleware.ts` — same purpose, renamed convention as of this Next.js version), which executes
+on the **Edge runtime**, not Node.js. `node:crypto`'s `createHmac`/`timingSafeEqual` don't
+exist there. The fix (`src/lib/admin-session.ts`) uses the **Web Crypto API**
+(`crypto.subtle`), which is available in both the Edge runtime and Node.js — one
+implementation works everywhere the code needs to run, instead of maintaining two.
+
+A related, easy-to-miss bug caught while wiring this up: `Response.redirect()`'s returned
+headers are immutable in this runtime, so calling `.headers.append("Set-Cookie", ...)` on it
+throws `TypeError: immutable` — a real error that only shows up when you actually exercise the
+code path (a build/typecheck can't catch it, since `Response.redirect()` is a valid, correctly-
+typed call). Fixed by using `NextResponse.redirect()` from `next/server` instead, which has a
+proper `.cookies.set()` API. Discovered by testing the actual login flow with curl, not by
+reading the code — a reminder that "it compiles and types check" and "it works" are different
+claims.
+
+### Where does the data live, if the website itself can't touch AWS?
+
+This is the interesting architectural constraint. Checking `aws amplify get-app` for this
+project's `computeRoleArn` shows it's unset — the Next.js SSR compute that Amplify runs has
+**no IAM role at all**. It can serve pages and run Route Handlers, but it cannot call
+DynamoDB, Secrets Manager, or anything else in AWS directly. Attaching one would mean
+provisioning a new IAM role and wiring it into Amplify's compute settings — real infra work
+requiring account-admin access this session's scoped-down IAM user intentionally doesn't have
+(the same reasoning as Part 6's ops hardening: least privilege).
+
+Rather than requesting broader access just to unblock this, the admin panel's own Route
+Handlers and Server Actions **proxy to the interest-form Lambda** instead
+(`src/lib/internal-api.ts` calling new `/internal/*` routes added to
+`backend/interest-form/index.mjs`). That Lambda already has exactly the DynamoDB permissions
+it needs (and only those), and already has its own deploy pipeline via GitHub Actions OIDC —
+extending it with a few more routes needed no new infrastructure, just new IAM policy
+statements for the two new tables (`seads-impact-metrics`, `seads-story-submissions`), applied
+once via `iam:PutRolePolicy` by someone with admin credentials.
+
+The `/internal/*` prefix is gated by a *different* shared secret (`INTERNAL_API_KEY`) than the
+admin session cookie — this one is server-to-server only (Amplify's Route Handlers hold it as
+an env var, never sent to the browser), so even if someone had a valid admin session, they
+couldn't call `/internal/*` directly from the browser; only the Next.js server can.
+
+Reads that aren't actually sensitive (the homepage's impact numbers, approved community
+stories, live event RSVP counts) were moved to separate, unauthenticated routes
+(`GET /impact-metrics`, `GET /community-stories`, `GET /event-rsvp-counts`) instead of living
+behind `/internal/`. There's no reason to gate read access to numbers that are already public
+on the homepage — only the *write* path (editing a metric, approving a story) needs the
+internal key.
+
+### Two bugs a real browser caught that curl and `tsc` couldn't
+
+**The CSP was silently blocking the interest-form API the whole time.** `next.config.ts`'s
+`connect-src` directive listed Vercel, Cloudflare Turnstile, and Sentry — but never the
+interest-form API Gateway's own origin. `curl` against that origin works fine, because CSP is
+a *browser* enforcement mechanism; it doesn't exist at the HTTP-request level, so no
+server-side test or `curl` check will ever catch a CSP misconfiguration. It took an actual
+headless-Chromium run (Playwright) to see the "Refused to connect" console error and catch
+that this had likely been silently breaking the original "Get Involved" form's real submission
+in production all along. Fixed by adding the API's origin to `connect-src`.
+
+**Admin pages that fetch live data broke the CI build.** The four data-driven admin pages
+(`/admin/impact-metrics`, `/admin/events`, `/admin/submissions`, `/admin/stories`) have no
+dynamic route segments (no `[slug]`), so Next.js's default behavior is to try to statically
+prerender them once at build time. That means `npm run build` itself called the internal API
+— and failed, because `INTERNAL_API_KEY` correctly isn't set in the CI environment. The fix is
+one line per page: `export const dynamic = "force-dynamic"`, telling Next.js this page's
+content depends on the request, not just static content, and must never be pre-rendered.
+Verified by re-running `npm run build` with the *exact* environment variables CI uses (no
+server secrets at all) before pushing, rather than trusting that a build that worked with
+secrets present would also work without them.
+
+The general lesson from both: a passing `tsc --noEmit` and a passing `npm run build` with your
+own local secrets tell you the code is *type-correct*, not that it *works in the environment
+it'll actually run in*. Testing against the real CI environment and a real browser surfaced two
+bugs that would otherwise have shipped silently.
 
 ---
 

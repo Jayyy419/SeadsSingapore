@@ -95,6 +95,16 @@ export type Translation = {
   blogPageSubtitle: string;
   readStory: string;
   backToStories: string;
+  communityStoryBadge: string;
+  submitYourStory: string;
+  submitStoryPageTitle: string;
+  submitStoryPageSubtitle: string;
+  yourNamePh: string;
+  yourEmailPh: string;
+  storyTitlePh: string;
+  storyBodyPh: string;
+  submitForReview: string;
+  submitStoryStatusDone: string;
   joinPageTitle: string;
   joinPageSubtitle: string;
   howItWorks: string;
@@ -224,6 +234,16 @@ export const translations: Record<Locale, Translation> = {
     blogPageSubtitle: "Fresh stories from Seads programs, events, and community outcomes across Southeast Asia.",
     readStory: "Read story",
     backToStories: "Back to all stories",
+    communityStoryBadge: "Community story",
+    submitYourStory: "Submit your story",
+    submitStoryPageTitle: "Share your story",
+    submitStoryPageSubtitle: "Tell us about your experience with Seads — approved stories get published here in English.",
+    yourNamePh: "Your name",
+    yourEmailPh: "Your email",
+    storyTitlePh: "Story title",
+    storyBodyPh: "Tell your story...",
+    submitForReview: "Submit for review",
+    submitStoryStatusDone: "Thanks — your story is in review and we'll be in touch if it's published.",
     joinPageTitle: "Join Seads",
     joinPageSubtitle: "Start your journey as a participant, volunteer, contributor, or community partner.",
     howItWorks: "How it works",
@@ -347,6 +367,16 @@ export const translations: Record<Locale, Translation> = {
     blogPageSubtitle: "来自 Seads 项目、活动和东南亚社区成果的最新故事。",
     readStory: "阅读故事",
     backToStories: "返回所有故事",
+    communityStoryBadge: "社区故事",
+    submitYourStory: "分享您的故事",
+    submitStoryPageTitle: "分享您的故事",
+    submitStoryPageSubtitle: "告诉我们您与 Seads 的经历——审核通过的故事将以英文发布于此。",
+    yourNamePh: "您的姓名",
+    yourEmailPh: "您的电子邮箱",
+    storyTitlePh: "故事标题",
+    storyBodyPh: "讲述您的故事……",
+    submitForReview: "提交审核",
+    submitStoryStatusDone: "谢谢——您的故事正在审核中，如获发布我们会通知您。",
     joinPageTitle: "加入 Seads",
     joinPageSubtitle: "以参与者、志愿者、贡献者或社区合作伙伴的身份开启您的旅程。",
     howItWorks: "运作方式",
@@ -470,6 +500,16 @@ export const translations: Record<Locale, Translation> = {
     blogPageSubtitle: "Kisah terbaharu daripada program, acara, dan hasil komuniti Seads di seluruh Asia Tenggara.",
     readStory: "Baca kisah",
     backToStories: "Kembali ke semua kisah",
+    communityStoryBadge: "Kisah komuniti",
+    submitYourStory: "Kongsi kisah anda",
+    submitStoryPageTitle: "Kongsi kisah anda",
+    submitStoryPageSubtitle: "Beritahu kami pengalaman anda bersama Seads — kisah yang diluluskan akan diterbitkan di sini dalam bahasa Inggeris.",
+    yourNamePh: "Nama anda",
+    yourEmailPh: "E-mel anda",
+    storyTitlePh: "Tajuk kisah",
+    storyBodyPh: "Ceritakan kisah anda...",
+    submitForReview: "Hantar untuk semakan",
+    submitStoryStatusDone: "Terima kasih — kisah anda sedang disemak dan kami akan hubungi anda jika ia diterbitkan.",
     joinPageTitle: "Sertai Seads",
     joinPageSubtitle: "Mulakan perjalanan anda sebagai peserta, sukarelawan, penyumbang, atau rakan kongsi komuniti.",
     howItWorks: "Cara ia berfungsi",
@@ -593,6 +633,16 @@ export const translations: Record<Locale, Translation> = {
     blogPageSubtitle: "सीड्स के कार्यक्रमों, इवेंट्स और दक्षिण-पूर्व एशिया भर के सामुदायिक परिणामों की ताज़ा कहानियाँ।",
     readStory: "कहानी पढ़ें",
     backToStories: "सभी कहानियों पर वापस जाएं",
+    communityStoryBadge: "सामुदायिक कहानी",
+    submitYourStory: "अपनी कहानी साझा करें",
+    submitStoryPageTitle: "अपनी कहानी साझा करें",
+    submitStoryPageSubtitle: "हमें Seads के साथ अपने अनुभव के बारे में बताएं — स्वीकृत कहानियां यहां अंग्रेज़ी में प्रकाशित की जाती हैं।",
+    yourNamePh: "आपका नाम",
+    yourEmailPh: "आपका ईमेल",
+    storyTitlePh: "कहानी का शीर्षक",
+    storyBodyPh: "अपनी कहानी बताएं...",
+    submitForReview: "समीक्षा के लिए सबमिट करें",
+    submitStoryStatusDone: "धन्यवाद — आपकी कहानी समीक्षा में है और प्रकाशित होने पर हम आपसे संपर्क करेंगे।",
     joinPageTitle: "सीड्स से जुड़ें",
     joinPageSubtitle: "एक प्रतिभागी, स्वयंसेवक, योगदानकर्ता, या सामुदायिक साझेदार के रूप में अपनी यात्रा शुरू करें।",
     howItWorks: "यह कैसे काम करता है",

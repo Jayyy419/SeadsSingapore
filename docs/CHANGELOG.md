@@ -4,6 +4,56 @@ All notable changes to this project should be documented in this file.
 
 This format is inspired by Keep a Changelog and uses a date-based release style.
 
+## [2026-07-14] (16)
+
+### Added — custom admin panel
+
+The site had no way to manage content short of editing `siteContent.ts` and redeploying.
+Added a password-gated `/admin` section:
+
+- **Auth**: a single shared password (`ADMIN_PASSWORD`, an Amplify env var) checked in
+  `src/app/admin/api/login/route.ts`, which sets an HttpOnly/Secure/SameSite=Strict cookie
+  containing an HMAC-signed, expiring session token (`src/lib/admin-session.ts`).
+  `src/proxy.ts` (Next.js's renamed `middleware.ts` convention) gates every `/admin/*` route
+  except the login/logout endpoints themselves. Deliberately no rate limiting on login — the
+  password is a ~120-bit random value, not a memorable phrase, so brute force isn't a
+  realistic concern; a memorable password would need one.
+- **Data layer**: since Amplify's Next.js SSR compute has no IAM role of its own
+  (`computeRoleArn` is unset — confirmed via `aws amplify get-app`), the admin panel's own
+  Route Handlers/Server Actions proxy to the *interest-form Lambda* instead of talking to
+  DynamoDB directly (`src/lib/internal-api.ts`, `backend/interest-form/index.mjs`'s new
+  `/internal/*` routes, gated by a separate server-to-server `INTERNAL_API_KEY`, distinct from
+  the admin's own session). Two new DynamoDB tables: `seads-impact-metrics`,
+  `seads-story-submissions` (both PITR-enabled).
+- **Impact metrics**: homepage's 4 stat tiles are now admin-editable and read live from
+  DynamoDB via a public `GET /impact-metrics` (read-only, no key needed — same reasoning as
+  the community-stories endpoint below) with a static-fallback client hook so the homepage
+  never shows nothing while the fetch is in flight.
+- **Live event RSVP counts**: interest-form submissions can now carry an `eventSlug`; a
+  public `GET /event-rsvp-counts` computes real per-event counts, replacing the
+  manually-maintained `spotsFilled` field added earlier today (kept as a fallback value only).
+- **Submissions viewer** and **story moderation queue** (approve/reject community-submitted
+  stories via `/blog/submit`, itself Turnstile+rate-limited like the interest form) round out
+  the admin dashboard.
+
+### Fixed — CSP never allowed the interest-form API origin
+
+A real-browser Playwright check (not just curl) caught that `next.config.ts`'s
+`connect-src` never included the interest-form API Gateway's origin — every fetch to it,
+including the original "Get Involved" form submission itself, was likely being silently
+blocked by the browser's own CSP enforcement in production this whole time. Fixed by adding
+the origin (derived from `NEXT_PUBLIC_API_BASE_URL`) to `connect-src`. A reminder that
+`curl`/server-side testing can't catch CSP violations — only a real browser can.
+
+### Fixed — admin pages could break the CI build entirely
+
+The 4 admin pages that fetch live data (`/admin/impact-metrics`, `/admin/events`,
+`/admin/submissions`, `/admin/stories`) have no dynamic route segments, so Next.js tried to
+statically prerender them at build time by default — which called `internalApiFetch()`
+during `npm run build`, throwing because `INTERNAL_API_KEY` isn't (and shouldn't be) set in
+CI. Added `export const dynamic = "force-dynamic"` to each; verified by rebuilding with the
+exact CI environment (no server secrets) locally before pushing.
+
 ## [2026-07-14] (15)
 
 ### Security

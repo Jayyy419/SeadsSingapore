@@ -8,10 +8,22 @@
       "Resource": "arn:aws:logs:ap-southeast-1:140023398409:*"
     },
     {
-      "Sid": "DynamoWrite",
+      "Sid": "DynamoSubmissions",
       "Effect": "Allow",
-      "Action": ["dynamodb:PutItem", "dynamodb:UpdateItem"],
+      "Action": ["dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:GetItem", "dynamodb:Scan"],
       "Resource": "arn:aws:dynamodb:ap-southeast-1:140023398409:table/seads-interest-submissions"
+    },
+    {
+      "Sid": "DynamoImpactMetrics",
+      "Effect": "Allow",
+      "Action": ["dynamodb:PutItem", "dynamodb:GetItem", "dynamodb:Scan"],
+      "Resource": "arn:aws:dynamodb:ap-southeast-1:140023398409:table/seads-impact-metrics"
+    },
+    {
+      "Sid": "DynamoStorySubmissions",
+      "Effect": "Allow",
+      "Action": ["dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:Scan"],
+      "Resource": "arn:aws:dynamodb:ap-southeast-1:140023398409:table/seads-story-submissions"
     },
     {
       "Sid": "SesSend",

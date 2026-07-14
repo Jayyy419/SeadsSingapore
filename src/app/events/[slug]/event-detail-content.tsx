@@ -9,10 +9,12 @@ import { events } from "@/content/siteContent";
 import { buildEventIcsDataUrl } from "@/lib/ics";
 import { eventCapacityLabel, isEventFull } from "@/lib/event-capacity";
 import { buildWhatsAppLink } from "@/lib/whatsapp";
+import { useEventRsvpCounts } from "@/lib/use-event-rsvp-counts";
 
 export function EventDetailContent({ slug }: { slug: string }) {
   const { locale, t } = useLocale();
   const event = events.find((e) => e.slug === slug);
+  const rsvpCounts = useEventRsvpCounts();
   if (!event) notFound();
 
   const icsUrl = buildEventIcsDataUrl({
@@ -21,8 +23,8 @@ export function EventDetailContent({ slug }: { slug: string }) {
     location: event.location[locale],
     date: event.date,
   });
-  const capacityLabel = eventCapacityLabel(event, t);
-  const full = isEventFull(event);
+  const capacityLabel = eventCapacityLabel(event, t, rsvpCounts[event.slug]);
+  const full = isEventFull(event, rsvpCounts[event.slug]);
 
   return (
     <SiteShell title={event.title[locale]} subtitle={`${event.type[locale]} · ${event.date} · ${event.location[locale]}`}>
@@ -74,6 +76,7 @@ export function EventDetailContent({ slug }: { slug: string }) {
           submitLabel={full ? t.joinWaitlist : t.rsvpLabel}
           prefillInterest={`${full ? t.joinWaitlist : t.rsvpLabel}: ${event.title[locale]} (${event.date})`}
           prefillInterestType="event"
+          eventSlug={event.slug}
         />
 
         <Link href="/events" className="inline-block text-sm font-semibold text-[color:var(--foreground)] hover:text-[color:var(--brand)]">

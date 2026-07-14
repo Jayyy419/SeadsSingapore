@@ -5,9 +5,11 @@ import { SiteShell } from "@/components/site-shell";
 import { useLocale } from "@/lib/locale-context";
 import { events } from "@/content/siteContent";
 import { eventCapacityLabel, isEventFull } from "@/lib/event-capacity";
+import { useEventRsvpCounts } from "@/lib/use-event-rsvp-counts";
 
 export function EventsContent() {
   const { locale, t } = useLocale();
+  const rsvpCounts = useEventRsvpCounts();
 
   return (
     <SiteShell title={t.eventsPageTitle} subtitle={t.eventsPageSubtitle}>
@@ -21,8 +23,8 @@ export function EventsContent() {
       </div>
       <section className="grid gap-4 lg:grid-cols-3">
         {events.map((event) => {
-          const capacityLabel = eventCapacityLabel(event, t);
-          const full = isEventFull(event);
+          const capacityLabel = eventCapacityLabel(event, t, rsvpCounts[event.slug]);
+          const full = isEventFull(event, rsvpCounts[event.slug]);
           return (
             <article key={event.slug} className="section-card p-6">
               <p className="text-xs font-bold uppercase tracking-wide text-[color:var(--brand)]">{event.type[locale]}</p>
