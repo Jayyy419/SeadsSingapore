@@ -14,6 +14,11 @@ export type Translation = {
   navPartners: string;
   navContact: string;
   navTeam: string;
+  navMenuToggleOpen: string;
+  navMenuToggleClose: string;
+  themeToggleToDark: string;
+  themeToggleToLight: string;
+  switchLanguageTo: string;
   footerPrivacy: string;
   footerLocation: string;
   heroEyebrow: string;
@@ -147,8 +152,6 @@ export type Translation = {
   whatWeCollect: string;
   collectFormItemLabel: string;
   collectFormItemBody: string;
-  collectAnalyticsItemLabel: string;
-  collectAnalyticsItemBody: string;
   collectBotItemLabel: string;
   collectBotItemBody: string;
   collectErrorItemLabel: string;
@@ -173,6 +176,9 @@ export const translations: Record<Locale, Translation> = {
   en: {
     navHome: "Home", navAbout: "About", navPrograms: "Programs", navEvents: "Events", navStories: "Stories", navMedia: "Media", navDonate: "Donate",
     navGetInvolved: "Get Involved", navNewsroom: "Newsroom", navWhoWeAre: "Who We Are", navPartners: "Partners", navContact: "Contact", navTeam: "Team",
+    navMenuToggleOpen: "Open menu", navMenuToggleClose: "Close menu",
+    themeToggleToDark: "Switch to dark mode", themeToggleToLight: "Switch to light mode",
+    switchLanguageTo: "Switch language to",
     footerPrivacy: "Privacy", footerLocation: "Singapore · est. across SEA",
     heroEyebrow: "Seads Singapore · South East Asia",
     heroPos: "noun & verb · South East Asia + seeds",
@@ -283,8 +289,6 @@ export const translations: Record<Locale, Translation> = {
     whatWeCollect: "What we collect",
     collectFormItemLabel: "If you submit the “Get Involved” form:",
     collectFormItemBody: "your name, email address, and whatever you write in the optional message field.",
-    collectAnalyticsItemLabel: "Site analytics:",
-    collectAnalyticsItemBody: "aggregated, cookieless page-visit data via Vercel Web Analytics — this doesn't identify you individually.",
     collectBotItemLabel: "Bot protection:",
     collectBotItemBody: "when you submit the form, Cloudflare Turnstile processes some technical signals from your browser to confirm you're not an automated bot, governed by Cloudflare's own privacy policy.",
     collectErrorItemLabel: "Error diagnostics:",
@@ -306,6 +310,9 @@ export const translations: Record<Locale, Translation> = {
   zh: {
     navHome: "首页", navAbout: "关于我们", navPrograms: "项目", navEvents: "活动", navStories: "故事", navMedia: "媒体", navDonate: "捐赠",
     navGetInvolved: "参与我们", navNewsroom: "新闻室", navWhoWeAre: "关于我们", navPartners: "合作伙伴", navContact: "联系我们", navTeam: "团队",
+    navMenuToggleOpen: "打开菜单", navMenuToggleClose: "关闭菜单",
+    themeToggleToDark: "切换至深色模式", themeToggleToLight: "切换至浅色模式",
+    switchLanguageTo: "切换语言为",
     footerPrivacy: "隐私政策", footerLocation: "新加坡 · 服务东南亚",
     heroEyebrow: "Seads 新加坡 · 东南亚",
     heroPos: "名词 & 动词 · 东南亚（SEA）+ 种子（seeds）",
@@ -416,8 +423,6 @@ export const translations: Record<Locale, Translation> = {
     whatWeCollect: "我们收集的信息",
     collectFormItemLabel: "如果您提交“参与我们”表单：",
     collectFormItemBody: "我们会收集您的姓名、电子邮箱地址，以及您在可选留言栏中填写的任何内容。",
-    collectAnalyticsItemLabel: "网站分析：",
-    collectAnalyticsItemBody: "通过 Vercel Web Analytics 收集汇总、不使用 Cookie 的页面访问数据——不会识别您的个人身份。",
     collectBotItemLabel: "机器人防护：",
     collectBotItemBody: "当您提交表单时，Cloudflare Turnstile 会处理来自您浏览器的一些技术信号，以确认您不是自动化机器人，这一过程受 Cloudflare 自身隐私政策约束。",
     collectErrorItemLabel: "错误诊断：",
@@ -439,6 +444,9 @@ export const translations: Record<Locale, Translation> = {
   ms: {
     navHome: "Laman Utama", navAbout: "Tentang Kami", navPrograms: "Program", navEvents: "Acara", navStories: "Kisah", navMedia: "Media", navDonate: "Derma",
     navGetInvolved: "Sertai Kami", navNewsroom: "Bilik Berita", navWhoWeAre: "Siapa Kami", navPartners: "Rakan Kongsi", navContact: "Hubungi", navTeam: "Pasukan",
+    navMenuToggleOpen: "Buka menu", navMenuToggleClose: "Tutup menu",
+    themeToggleToDark: "Tukar ke mod gelap", themeToggleToLight: "Tukar ke mod cerah",
+    switchLanguageTo: "Tukar bahasa kepada",
     footerPrivacy: "Privasi", footerLocation: "Singapura · berkhidmat di seluruh Asia Tenggara",
     heroEyebrow: "Seads Singapura · Asia Tenggara",
     heroPos: "kata nama & kata kerja · Asia Tenggara (SEA) + benih (seeds)",
@@ -549,8 +557,6 @@ export const translations: Record<Locale, Translation> = {
     whatWeCollect: "Apa yang kami kumpul",
     collectFormItemLabel: "Jika anda menghantar borang “Sertai Kami”:",
     collectFormItemBody: "nama, alamat e-mel anda, dan apa sahaja yang anda tulis dalam ruangan mesej pilihan.",
-    collectAnalyticsItemLabel: "Analitik laman:",
-    collectAnalyticsItemBody: "data lawatan halaman yang teragregat dan tanpa kuki melalui Vercel Web Analytics — ini tidak mengenal pasti anda secara individu.",
     collectBotItemLabel: "Perlindungan bot:",
     collectBotItemBody: "apabila anda menghantar borang, Cloudflare Turnstile memproses beberapa isyarat teknikal daripada pelayar anda untuk mengesahkan anda bukan bot automatik, tertakluk kepada dasar privasi Cloudflare sendiri.",
     collectErrorItemLabel: "Diagnostik ralat:",
@@ -572,6 +578,9 @@ export const translations: Record<Locale, Translation> = {
   hi: {
     navHome: "होम", navAbout: "हमारे बारे में", navPrograms: "कार्यक्रम", navEvents: "इवेंट्स", navStories: "कहानियाँ", navMedia: "मीडिया", navDonate: "दान करें",
     navGetInvolved: "जुड़ें", navNewsroom: "न्यूज़रूम", navWhoWeAre: "हम कौन हैं", navPartners: "साझेदार", navContact: "संपर्क करें", navTeam: "टीम",
+    navMenuToggleOpen: "मेनू खोलें", navMenuToggleClose: "मेनू बंद करें",
+    themeToggleToDark: "डार्क मोड में बदलें", themeToggleToLight: "लाइट मोड में बदलें",
+    switchLanguageTo: "भाषा बदलकर करें",
     footerPrivacy: "गोपनीयता", footerLocation: "सिंगापुर · दक्षिण-पूर्व एशिया में सेवारत",
     heroEyebrow: "सीड्स सिंगापुर · दक्षिण-पूर्व एशिया",
     heroPos: "संज्ञा और क्रिया · दक्षिण-पूर्व एशिया (SEA) + बीज (seeds)",
@@ -682,8 +691,6 @@ export const translations: Record<Locale, Translation> = {
     whatWeCollect: "हम क्या एकत्र करते हैं",
     collectFormItemLabel: "यदि आप “जुड़ें” फ़ॉर्म सबमिट करते हैं:",
     collectFormItemBody: "आपका नाम, ईमेल पता, और वैकल्पिक संदेश फ़ील्ड में आपके द्वारा लिखी गई कोई भी बात।",
-    collectAnalyticsItemLabel: "साइट एनालिटिक्स:",
-    collectAnalyticsItemBody: "Vercel Web Analytics के माध्यम से एकत्रित, कुकी-रहित पेज-विज़िट डेटा — यह आपकी व्यक्तिगत पहचान नहीं करता।",
     collectBotItemLabel: "बॉट सुरक्षा:",
     collectBotItemBody: "जब आप फ़ॉर्म सबमिट करते हैं, तो Cloudflare Turnstile यह पुष्टि करने के लिए आपके ब्राउज़र से कुछ तकनीकी संकेत प्रोसेस करता है कि आप एक स्वचालित बॉट नहीं हैं, जो Cloudflare की अपनी गोपनीयता नीति द्वारा शासित है।",
     collectErrorItemLabel: "त्रुटि निदान:",

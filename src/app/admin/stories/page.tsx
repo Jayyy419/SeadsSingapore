@@ -35,8 +35,23 @@ export default async function AdminStoriesPage() {
             <p className="text-xs text-[color:var(--muted)]">
               {s.authorName} · {s.authorEmail} · {new Date(s.submittedAt).toLocaleString()}
             </p>
-            <h2 className="font-display mt-2 text-lg text-[color:var(--foreground)]">{s.title}</h2>
-            <p className="mt-2 whitespace-pre-wrap text-sm text-[color:var(--muted)]">{s.body}</p>
+            <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-[color:var(--accent)]">
+              Preview — how this will look on /blog/{"{slug}"}
+            </p>
+            <div className="mt-2 rounded-xl border border-[color:var(--foreground-soft)] p-4 sm:p-5">
+              <h2 className="font-display text-lg text-[color:var(--foreground)]">{s.title}</h2>
+              <div className="mt-3 space-y-3">
+                {s.body
+                  .split(/\n\s*\n/)
+                  .map((p) => p.trim())
+                  .filter(Boolean)
+                  .map((paragraph, i) => (
+                    <p key={i} className="text-sm leading-relaxed text-[color:var(--muted)]">
+                      {paragraph}
+                    </p>
+                  ))}
+              </div>
+            </div>
             <div className="mt-4 flex gap-3">
               <form action={reviewStorySubmission}>
                 <input type="hidden" name="id" value={s.id} />
