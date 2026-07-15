@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 
 export default function AdminLoginPage() {
@@ -61,6 +62,12 @@ export default function AdminLoginPage() {
             </button>
           </form>
         </div>
+        <Link
+          href="/"
+          className="mt-6 block text-center text-sm font-semibold text-[color:var(--muted)] hover:text-[color:var(--brand)]"
+        >
+          &larr; Back to seads.sg
+        </Link>
       </div>
     </div>
   );
