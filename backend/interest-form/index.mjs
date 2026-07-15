@@ -32,6 +32,7 @@ const STORY_SUBMISSIONS_TABLE = process.env.STORY_SUBMISSIONS_TABLE;
 const ADMIN_CONFIG_TABLE = process.env.ADMIN_CONFIG_TABLE;
 const EVENTS_TABLE = process.env.EVENTS_TABLE;
 const AUDIT_LOG_TABLE = process.env.AUDIT_LOG_TABLE;
+const TEAM_TABLE = process.env.TEAM_TABLE;
 const MEDIA_BUCKET = process.env.MEDIA_BUCKET;
 const MEDIA_BUCKET_REGION = process.env.AWS_REGION || "ap-southeast-1";
 const NOTIFY_EMAIL = process.env.NOTIFY_EMAIL;
@@ -693,6 +694,85 @@ async function handleDeleteEvent(headers, slug) {
   return json(200, headers, { ok: true });
 }
 
+async function handleGetTeam(headers) {
+  const items = (await scanAll(TEAM_TABLE)).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  return json(200, headers, { team: items });
+}
+
+// Same "English editable, other locales default to English on create / preserved on update"
+// convention as impact metrics and events — see handleCreateImpactMetric above.
+async function handleCreateTeamMember(event, headers) {
+  let payload;
+  try {
+    payload = JSON.parse(event.body || "{}");
+  } catch {
+    return json(400, headers, { error: "Invalid JSON body" });
+  }
+
+  const name = typeof payload.name === "string" ? payload.name.trim().slice(0, 100) : "";
+  const roleEn = typeof payload.roleEn === "string" ? payload.roleEn.trim().slice(0, 100) : "";
+  const bioEn = typeof payload.bioEn === "string" ? payload.bioEn.trim().slice(0, 1000) : "";
+  const photo = typeof payload.photo === "string" ? payload.photo.trim().slice(0, 500) : "";
+
+  if (!name || !roleEn || !bioEn) {
+    return json(400, headers, { error: "name, roleEn, and bioEn are required" });
+  }
+
+  const slug = slugify(name);
+  if (!slug) {
+    return json(400, headers, { error: "Could not derive a slug from name" });
+  }
+  const existing = await ddb.send(new GetCommand({ TableName: TEAM_TABLE, Key: { slug } }));
+  if (existing.Item) {
+    return json(409, headers, { error: "A team member with that name already exists" });
+  }
+
+  const all = await scanAll(TEAM_TABLE);
+  const nextOrder = Math.max(0, ...all.map((m) => m.order ?? 0)) + 1;
+
+  const item = {
+    slug,
+    name,
+    role: Object.fromEntries(LOCALES.map((l) => [l, roleEn])),
+    bio: Object.fromEntries(LOCALES.map((l) => [l, bioEn])),
+    photo,
+    order: nextOrder,
+    updatedAt: new Date().toISOString(),
+  };
+
+  await ddb.send(new PutCommand({ TableName: TEAM_TABLE, Item: item }));
+  return json(200, headers, { ok: true, slug });
+}
+
+async function handleUpdateTeamMember(event, headers, slug) {
+  let payload;
+  try {
+    payload = JSON.parse(event.body || "{}");
+  } catch {
+    return json(400, headers, { error: "Invalid JSON body" });
+  }
+
+  const existing = await ddb.send(new GetCommand({ TableName: TEAM_TABLE, Key: { slug } }));
+  if (!existing.Item) {
+    return json(404, headers, { error: "Team member not found" });
+  }
+
+  const item = { ...existing.Item };
+  if (typeof payload.name === "string" && payload.name.trim()) item.name = payload.name.trim().slice(0, 100);
+  if (typeof payload.roleEn === "string") item.role = { ...item.role, en: payload.roleEn.trim().slice(0, 100) };
+  if (typeof payload.bioEn === "string") item.bio = { ...item.bio, en: payload.bioEn.trim().slice(0, 1000) };
+  if (typeof payload.photo === "string") item.photo = payload.photo.trim().slice(0, 500);
+  item.updatedAt = new Date().toISOString();
+
+  await ddb.send(new PutCommand({ TableName: TEAM_TABLE, Item: item }));
+  return json(200, headers, { ok: true });
+}
+
+async function handleDeleteTeamMember(headers, slug) {
+  await ddb.send(new DeleteCommand({ TableName: TEAM_TABLE, Key: { slug } }));
+  return json(200, headers, { ok: true });
+}
+
 export const handler = async (event) => {
   const origin = event.headers?.origin || event.headers?.Origin || "";
   const headers = { "Content-Type": "application/json", ...corsHeaders(origin) };
@@ -738,6 +818,11 @@ export const handler = async (event) => {
   // to DynamoDB so admins can create/edit/delete events without a code change + deploy.
   if (method === "GET" && path === "/events") {
     return handleGetEvents(headers);
+  }
+
+  // Same reasoning as /events above.
+  if (method === "GET" && path === "/team") {
+    return handleGetTeam(headers);
   }
 
   // Public: the password check itself obviously can't require already being authenticated.
@@ -844,6 +929,27 @@ export const handler = async (event) => {
     }
     if (method === "POST" && path === "/internal/uploads") {
       return handleCreateUploadUrl(event, headers);
+    }
+    if (method === "GET" && path === "/internal/team") {
+      return handleGetTeam(headers);
+    }
+    if (method === "POST" && path === "/internal/team") {
+      const res = await handleCreateTeamMember(event, headers);
+      if (res.statusCode < 300) await logAudit(event, "create", "team-member", JSON.parse(res.body).slug);
+      return res;
+    }
+    const teamMatch = path.match(/^\/internal\/team\/([^/]+)$/);
+    if (method === "PUT" && teamMatch) {
+      const slug = decodeURIComponent(teamMatch[1]);
+      const res = await handleUpdateTeamMember(event, headers, slug);
+      if (res.statusCode < 300) await logAudit(event, "update", "team-member", slug);
+      return res;
+    }
+    if (method === "DELETE" && teamMatch) {
+      const slug = decodeURIComponent(teamMatch[1]);
+      const res = await handleDeleteTeamMember(headers, slug);
+      if (res.statusCode < 300) await logAudit(event, "delete", "team-member", slug);
+      return res;
     }
 
     return json(404, headers, { error: "Not found" });

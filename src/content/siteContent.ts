@@ -45,9 +45,11 @@ export type Testimonial = {
 };
 
 export type TeamMember = {
+  slug: string;
   name: string;
   role: LocalizedString;
   bio: LocalizedString;
+  photo?: string;
 };
 
 export const impactMetrics: ImpactMetric[] = [
@@ -623,6 +625,7 @@ export const testimonials: Testimonial[] = [
 
 export const teamMembers: TeamMember[] = [
   {
+    slug: "ariya-goh",
     name: "Ariya Goh",
     role: { en: "Executive Director", zh: "执行董事", ms: "Pengarah Eksekutif", hi: "कार्यकारी निदेशक" },
     bio: {
@@ -633,6 +636,7 @@ export const teamMembers: TeamMember[] = [
     },
   },
   {
+    slug: "daniel-ho",
     name: "Daniel Ho",
     role: { en: "Programs Lead", zh: "项目负责人", ms: "Ketua Program", hi: "प्रोग्राम्स लीड" },
     bio: {
@@ -643,6 +647,7 @@ export const teamMembers: TeamMember[] = [
     },
   },
   {
+    slug: "farah-nordin",
     name: "Farah Nordin",
     role: { en: "Community Partnerships", zh: "社区合作伙伴关系", ms: "Perkongsian Komuniti", hi: "कम्युनिटी पार्टनरशिप्स" },
     bio: {
@@ -653,6 +658,7 @@ export const teamMembers: TeamMember[] = [
     },
   },
   {
+    slug: "kavin-prakash",
     name: "Kavin Prakash",
     role: { en: "Media and Storytelling", zh: "媒体与叙事", ms: "Media dan Bercerita", hi: "मीडिया और स्टोरीटेलिंग" },
     bio: {
