@@ -34,6 +34,7 @@ const EVENTS_TABLE = process.env.EVENTS_TABLE;
 const AUDIT_LOG_TABLE = process.env.AUDIT_LOG_TABLE;
 const TEAM_TABLE = process.env.TEAM_TABLE;
 const PARTNERS_TABLE = process.env.PARTNERS_TABLE;
+const PROGRAMS_TABLE = process.env.PROGRAMS_TABLE;
 const MEDIA_BUCKET = process.env.MEDIA_BUCKET;
 const MEDIA_BUCKET_REGION = process.env.AWS_REGION || "ap-southeast-1";
 const NOTIFY_EMAIL = process.env.NOTIFY_EMAIL;
@@ -842,6 +843,94 @@ async function handleDeletePartner(headers, slug) {
   return json(200, headers, { ok: true });
 }
 
+async function handleGetPrograms(headers) {
+  const items = (await scanAll(PROGRAMS_TABLE)).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  return json(200, headers, { programs: items });
+}
+
+// Same "English editable, other locales default to English on create / preserved on update"
+// convention as events — see handleCreateEvent above.
+async function handleCreateProgram(event, headers) {
+  let payload;
+  try {
+    payload = JSON.parse(event.body || "{}");
+  } catch {
+    return json(400, headers, { error: "Invalid JSON body" });
+  }
+
+  const tagEn = typeof payload.tagEn === "string" ? payload.tagEn.trim().slice(0, 60) : "";
+  const nameEn = typeof payload.nameEn === "string" ? payload.nameEn.trim().slice(0, 100) : "";
+  const descriptionEn = typeof payload.descriptionEn === "string" ? payload.descriptionEn.trim().slice(0, 300) : "";
+  const whoEn = typeof payload.whoEn === "string" ? payload.whoEn.trim().slice(0, 300) : "";
+  const bodyEn = typeof payload.bodyEn === "string" ? payload.bodyEn.trim().slice(0, 5000) : "";
+  const photo = typeof payload.photo === "string" ? payload.photo.trim().slice(0, 500) : "";
+
+  if (!tagEn || !nameEn || !descriptionEn || !whoEn || !bodyEn) {
+    return json(400, headers, { error: "tagEn, nameEn, descriptionEn, whoEn, and bodyEn are required" });
+  }
+
+  const slug = slugify(nameEn);
+  if (!slug) {
+    return json(400, headers, { error: "Could not derive a slug from nameEn" });
+  }
+  const existing = await ddb.send(new GetCommand({ TableName: PROGRAMS_TABLE, Key: { slug } }));
+  if (existing.Item) {
+    return json(409, headers, { error: "A program with that name already exists" });
+  }
+
+  const all = await scanAll(PROGRAMS_TABLE);
+  const nextOrder = Math.max(0, ...all.map((p) => p.order ?? 0)) + 1;
+
+  const bodyParagraphs = bodyEn.split(/\n+/).filter(Boolean);
+  const item = {
+    slug,
+    tag: Object.fromEntries(LOCALES.map((l) => [l, tagEn])),
+    name: Object.fromEntries(LOCALES.map((l) => [l, nameEn])),
+    description: Object.fromEntries(LOCALES.map((l) => [l, descriptionEn])),
+    who: Object.fromEntries(LOCALES.map((l) => [l, whoEn])),
+    body: Object.fromEntries(LOCALES.map((l) => [l, bodyParagraphs])),
+    photo,
+    order: nextOrder,
+    updatedAt: new Date().toISOString(),
+  };
+
+  await ddb.send(new PutCommand({ TableName: PROGRAMS_TABLE, Item: item }));
+  return json(200, headers, { ok: true, slug });
+}
+
+async function handleUpdateProgram(event, headers, slug) {
+  let payload;
+  try {
+    payload = JSON.parse(event.body || "{}");
+  } catch {
+    return json(400, headers, { error: "Invalid JSON body" });
+  }
+
+  const existing = await ddb.send(new GetCommand({ TableName: PROGRAMS_TABLE, Key: { slug } }));
+  if (!existing.Item) {
+    return json(404, headers, { error: "Program not found" });
+  }
+
+  const item = { ...existing.Item };
+  if (typeof payload.tagEn === "string") item.tag = { ...item.tag, en: payload.tagEn.trim().slice(0, 60) };
+  if (typeof payload.nameEn === "string") item.name = { ...item.name, en: payload.nameEn.trim().slice(0, 100) };
+  if (typeof payload.descriptionEn === "string") item.description = { ...item.description, en: payload.descriptionEn.trim().slice(0, 300) };
+  if (typeof payload.whoEn === "string") item.who = { ...item.who, en: payload.whoEn.trim().slice(0, 300) };
+  if (typeof payload.bodyEn === "string") {
+    item.body = { ...item.body, en: payload.bodyEn.trim().slice(0, 5000).split(/\n+/).filter(Boolean) };
+  }
+  if (typeof payload.photo === "string") item.photo = payload.photo.trim().slice(0, 500);
+  item.updatedAt = new Date().toISOString();
+
+  await ddb.send(new PutCommand({ TableName: PROGRAMS_TABLE, Item: item }));
+  return json(200, headers, { ok: true });
+}
+
+async function handleDeleteProgram(headers, slug) {
+  await ddb.send(new DeleteCommand({ TableName: PROGRAMS_TABLE, Key: { slug } }));
+  return json(200, headers, { ok: true });
+}
+
 export const handler = async (event) => {
   const origin = event.headers?.origin || event.headers?.Origin || "";
   const headers = { "Content-Type": "application/json", ...corsHeaders(origin) };
@@ -897,6 +986,11 @@ export const handler = async (event) => {
   // Same reasoning as /events above.
   if (method === "GET" && path === "/partners") {
     return handleGetPartners(headers);
+  }
+
+  // Same reasoning as /events above.
+  if (method === "GET" && path === "/programs") {
+    return handleGetPrograms(headers);
   }
 
   // Public: the password check itself obviously can't require already being authenticated.
@@ -1044,6 +1138,27 @@ export const handler = async (event) => {
       const slug = decodeURIComponent(partnerMatch[1]);
       const res = await handleDeletePartner(headers, slug);
       if (res.statusCode < 300) await logAudit(event, "delete", "partner", slug);
+      return res;
+    }
+    if (method === "GET" && path === "/internal/programs") {
+      return handleGetPrograms(headers);
+    }
+    if (method === "POST" && path === "/internal/programs") {
+      const res = await handleCreateProgram(event, headers);
+      if (res.statusCode < 300) await logAudit(event, "create", "program", JSON.parse(res.body).slug);
+      return res;
+    }
+    const programMatch = path.match(/^\/internal\/programs\/([^/]+)$/);
+    if (method === "PUT" && programMatch) {
+      const slug = decodeURIComponent(programMatch[1]);
+      const res = await handleUpdateProgram(event, headers, slug);
+      if (res.statusCode < 300) await logAudit(event, "update", "program", slug);
+      return res;
+    }
+    if (method === "DELETE" && programMatch) {
+      const slug = decodeURIComponent(programMatch[1]);
+      const res = await handleDeleteProgram(headers, slug);
+      if (res.statusCode < 300) await logAudit(event, "delete", "program", slug);
       return res;
     }
 

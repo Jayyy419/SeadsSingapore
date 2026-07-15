@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { programs, stories } from "@/content/siteContent";
+import { stories } from "@/content/siteContent";
 
 // Falls back to the current Amplify-assigned URL until a custom domain is set — update
 // NEXT_PUBLIC_SITE_URL (or just this fallback) once that happens.
@@ -22,11 +22,23 @@ async function getEventSlugs(): Promise<string[]> {
   }
 }
 
+// Same reasoning as getEventSlugs above.
+async function getProgramSlugs(): Promise<string[]> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/programs`, { next: { revalidate: 300 } });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return (data.programs ?? []).map((program: { slug: string }) => program.slug);
+  } catch {
+    return [];
+  }
+}
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const eventSlugs = await getEventSlugs();
+  const [eventSlugs, programSlugs] = await Promise.all([getEventSlugs(), getProgramSlugs()]);
 
   const detailRoutes = [
-    ...programs.map((p) => `/programs/${p.slug}`),
+    ...programSlugs.map((slug) => `/programs/${slug}`),
     ...eventSlugs.map((slug) => `/events/${slug}`),
     ...stories.map((s) => `/blog/${s.slug}`),
   ];

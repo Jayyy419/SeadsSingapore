@@ -15,6 +15,7 @@ export type Program = {
   description: LocalizedString;
   body: Record<Locale, string[]>;
   who: LocalizedString;
+  photo?: string;
 };
 
 export type EventItem = {
