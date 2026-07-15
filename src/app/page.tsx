@@ -264,7 +264,7 @@ export default function Home() {
               >
                 {member.photo ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={member.photo} alt="" className="h-[140px] w-full rounded-2xl object-cover" />
+                  <img src={member.photo} alt={member.name} className="h-[140px] w-full rounded-2xl object-cover" />
                 ) : (
                   <div className="stripe-ph flex h-[140px] items-center justify-center rounded-2xl">
                     <span className="text-[11px] text-[color:var(--brand-deep)]" style={{ fontFamily: "ui-monospace,monospace" }}>

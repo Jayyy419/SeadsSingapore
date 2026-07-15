@@ -18,7 +18,10 @@ export async function POST(request: Request) {
   });
 
   if (!lambdaRes.ok) {
-    return NextResponse.json({ ok: false, error: "Incorrect password" }, { status: 401 });
+    // Forward the Lambda's actual status/message instead of collapsing everything to 401 —
+    // a rate-limited (429) attempt reads very differently from a genuinely wrong password.
+    const errBody = await lambdaRes.json().catch(() => null);
+    return NextResponse.json({ ok: false, error: errBody?.error ?? "Incorrect password" }, { status: lambdaRes.status });
   }
 
   const { token } = await lambdaRes.json();

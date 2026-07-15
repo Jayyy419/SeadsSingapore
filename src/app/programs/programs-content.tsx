@@ -20,7 +20,7 @@ export function ProgramsContent() {
           >
             {program.photo && (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={program.photo} alt="" className="mb-3 h-32 w-full rounded-lg object-cover" />
+              <img src={program.photo} alt={program.name[locale]} className="mb-3 h-32 w-full rounded-lg object-cover" />
             )}
             <p className="text-xs font-bold uppercase tracking-wide text-[color:var(--brand)]">{program.tag[locale]}</p>
             <h2 className="font-display mt-2 text-xl">{program.name[locale]}</h2>

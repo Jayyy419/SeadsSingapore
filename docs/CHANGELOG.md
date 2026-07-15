@@ -4,6 +4,46 @@ All notable changes to this project should be documented in this file.
 
 This format is inspired by Keep a Changelog and uses a date-based release style.
 
+## [2026-07-15] (30)
+
+### Added — dependency updates, admin dashboard links, S3 cleanup, login rate limiting
+
+- Merged 3 Dependabot PRs: `actions/setup-node` 6→7, `react-dom` 19.2.4→19.2.7,
+  `eslint-config-next` 16.2.6→16.2.10. Left the `eslint` 9→10 bump open — reproduced its CI
+  failure locally: `eslint-config-next`'s bundled `eslint-plugin-react@7.37.5` calls
+  `context.getFilename()`, an API ESLint 10 removed, so it crashes on every lint run. Upstream
+  issue, not fixable here; commented on the PR explaining why and left it for Dependabot to
+  keep current until `eslint-config-next` ships a compatible version.
+- **Admin dashboard was missing links** to Team, Partners, Programs, Blog, and Audit log —
+  all real pages, only reachable via the nav bar or a guessed URL. Added cards for all five to
+  `/admin`'s `SECTIONS` array.
+- **S3 orphan cleanup**: replacing or removing a photo/logo (Team, Partners, Programs, Stories)
+  now deletes the old S3 object via a new `deleteMediaObjectIfOwned()` helper, and deleting an
+  entity outright now deletes its photo too. Previously every replaced photo sat in the bucket
+  forever, unreferenced. Added `s3:DeleteObject` to the Lambda's IAM policy for
+  `seads-media/uploads/*`. Verified end-to-end with Playwright: uploaded photo A, replaced it
+  with photo B (confirmed A was deleted from S3, B exists), then removed B via "Remove image"
+  (confirmed B was also deleted).
+- **Admin login rate limiting**: `handleAdminLogin` had no throttling at all, unlike the
+  public interest-form/story-submission endpoints, which both rate-limit by IP/email via the
+  existing `checkRateLimit()` helper. Added the same by-IP limiting (10 attempts / 10-minute
+  window) to the shared admin password login. The Next.js proxy route
+  (`/admin/api/login/route.ts`) previously collapsed every non-OK Lambda response into a
+  hardcoded 401 "Incorrect password" — fixed to forward the real status/message so a 429 reads
+  as "Too many attempts" instead of a misleading wrong-password message.
+- **Community story submissions now notify admins by email** via the existing
+  `NOTIFY_EMAIL`/SES setup — previously only the original interest-form submissions triggered
+  a notification, so a new story sat in the moderation queue with nothing telling anyone to go
+  look. Same best-effort, non-blocking send pattern as the existing notification.
+- **Alt text**: team portraits, story photos, and program photos now use descriptive alt text
+  (name/title) instead of `alt=""`. Partner logos and the admin upload widget's own preview
+  already had appropriate alt text and were left as-is.
+
+Confirmed unchanged and still not actionable: `npm audit`'s 3 moderate findings are the same
+Next.js-internal-bundled `postcss@8.4.31` issue documented in an earlier entry — checked, and
+even the latest Next.js 16.3.0 previews still bundle the same version, so there's no available
+upgrade path yet.
+
 ## [2026-07-15] (29)
 
 ### Added — Stories (the staff-authored blog) made admin-editable

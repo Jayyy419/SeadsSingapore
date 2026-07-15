@@ -4,6 +4,7 @@ import { useState } from "react";
 
 export default function AdminLoginPage() {
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
+  const [errorMessage, setErrorMessage] = useState("Incorrect password.");
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -19,6 +20,8 @@ export default function AdminLoginPage() {
       });
 
       if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        setErrorMessage(body?.error ? `${body.error}${body.error.endsWith(".") ? "" : "."}` : "Incorrect password.");
         setStatus("error");
         return;
       }
@@ -27,6 +30,7 @@ export default function AdminLoginPage() {
       // cookie the browser just received.
       window.location.href = "/admin";
     } catch {
+      setErrorMessage("Incorrect password.");
       setStatus("error");
     }
   }
@@ -47,7 +51,7 @@ export default function AdminLoginPage() {
               autoFocus
               className="rounded-xl border border-[color:var(--foreground-soft)] bg-[color:var(--surface)] px-4 py-3 text-sm text-[color:var(--foreground)]"
             />
-            {status === "error" && <p className="text-xs font-semibold text-[#e2965f]">Incorrect password.</p>}
+            {status === "error" && <p className="text-xs font-semibold text-[#e2965f]">{errorMessage}</p>}
             <button
               type="submit"
               disabled={status === "loading"}
