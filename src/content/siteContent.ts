@@ -38,6 +38,7 @@ export type Story = {
   title: LocalizedString;
   excerpt: LocalizedString;
   body: Record<Locale, string[]>;
+  photo?: string;
 };
 
 export type Testimonial = {

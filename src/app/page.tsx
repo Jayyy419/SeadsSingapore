@@ -6,15 +6,11 @@ import { SiteHeader } from "@/components/site-header";
 import { MediaMasonry } from "@/components/media-masonry";
 import { InterestForm } from "@/components/interest-form";
 import { useLocale } from "@/lib/locale-context";
-import {
-  events,
-  impactMetrics as staticImpactMetrics,
-  programs,
-  stories,
-  teamMembers,
-  testimonials,
-  type ImpactMetric,
-} from "@/content/siteContent";
+import { useEvents } from "@/lib/use-events";
+import { usePrograms } from "@/lib/use-programs";
+import { useStories } from "@/lib/use-stories";
+import { useTeam } from "@/lib/use-team";
+import { impactMetrics as staticImpactMetrics, testimonials, type ImpactMetric } from "@/content/siteContent";
 
 // Renders the static, hardcoded numbers immediately (no loading flash), then swaps in the
 // admin-editable live values from DynamoDB (via the interest-form Lambda's public
@@ -52,9 +48,20 @@ function useImpactMetrics(): ImpactMetric[] {
   return metrics;
 }
 
+// The homepage only teases a handful of items per section (full lists live on their own
+// pages) — caps preserve that "preview" layout even as admins add more entries over time.
+const HOME_EVENTS_LIMIT = 3;
+const HOME_PROGRAMS_LIMIT = 6;
+const HOME_STORIES_LIMIT = 4;
+const HOME_TEAM_LIMIT = 4;
+
 export default function Home() {
   const { locale, t } = useLocale();
   const impactMetrics = useImpactMetrics();
+  const { events } = useEvents();
+  const { programs } = usePrograms();
+  const { stories } = useStories();
+  const { team } = useTeam();
 
   return (
     <div className="min-h-screen">
@@ -162,7 +169,7 @@ export default function Home() {
             </Link>
           </div>
           <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-            {programs.map((program, i) => (
+            {programs.slice(0, HOME_PROGRAMS_LIMIT).map((program, i) => (
               <Link
                 key={program.slug}
                 href={`/programs/${program.slug}`}
@@ -190,7 +197,7 @@ export default function Home() {
             </Link>
           </div>
           <div className="grid gap-5 lg:grid-cols-3">
-            {events.map((event) => (
+            {events.slice(0, HOME_EVENTS_LIMIT).map((event) => (
               <article key={event.slug} className="rounded-[20px] border border-[color:var(--foreground-soft)] bg-[color:var(--surface)] p-6.5">
                 <p className="mb-2.5 text-xs font-bold uppercase tracking-wide text-[color:var(--brand)]">{event.type[locale]}</p>
                 <h3 className="font-display mb-3 text-xl text-[color:var(--foreground)]">{event.title[locale]}</h3>
@@ -219,7 +226,7 @@ export default function Home() {
               </Link>
             </div>
             <div className="flex flex-col gap-3.5">
-              {stories.map((story) => (
+              {stories.slice(0, HOME_STORIES_LIMIT).map((story) => (
                 <Link
                   key={story.slug}
                   href={`/blog/${story.slug}`}
@@ -249,17 +256,22 @@ export default function Home() {
         <div className="mx-auto max-w-6xl">
           <h2 className="font-display mb-8 text-[38px]">{t.teamTitle}</h2>
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {teamMembers.map((member) => (
+            {team.slice(0, HOME_TEAM_LIMIT).map((member) => (
               <Link
-                key={member.name}
+                key={member.slug}
                 href="/team"
                 className="block rounded-[20px] bg-[color:var(--surface)] p-5 text-inherit transition-[transform,box-shadow] hover:-translate-y-1 hover:shadow-[0_14px_34px_rgba(31,41,55,.1)]"
               >
-                <div className="stripe-ph flex h-[140px] items-center justify-center rounded-2xl">
-                  <span className="text-[11px] text-[color:var(--brand-deep)]" style={{ fontFamily: "ui-monospace,monospace" }}>
-                    portrait photo
-                  </span>
-                </div>
+                {member.photo ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={member.photo} alt="" className="h-[140px] w-full rounded-2xl object-cover" />
+                ) : (
+                  <div className="stripe-ph flex h-[140px] items-center justify-center rounded-2xl">
+                    <span className="text-[11px] text-[color:var(--brand-deep)]" style={{ fontFamily: "ui-monospace,monospace" }}>
+                      portrait photo
+                    </span>
+                  </div>
+                )}
                 <h3 className="font-display mb-0.5 mt-4 text-lg text-[color:var(--foreground)]">{member.name}</h3>
                 <p className="text-sm font-semibold text-[color:var(--brand)]">{member.role[locale]}</p>
               </Link>

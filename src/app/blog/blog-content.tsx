@@ -4,13 +4,13 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { SiteShell } from "@/components/site-shell";
 import { useLocale } from "@/lib/locale-context";
-import { stories } from "@/content/siteContent";
+import { useStories } from "@/lib/use-stories";
 
 type CommunityStory = { id: string; authorName: string; title: string; body: string; submittedAt: string };
 
 // English-only by design — community submitters aren't asked to provide 4-language
-// translations, unlike the staff-authored stories in siteContent.ts. Shown inline (no
-// separate detail page) since there's no slug/route for these, just a DynamoDB id.
+// translations, unlike the fully-localized admin-authored stories from useStories(). Shown
+// inline (no separate detail page) since there's no slug/route for these, just a DynamoDB id.
 function useCommunityStories(): CommunityStory[] {
   const [communityStories, setCommunityStories] = useState<CommunityStory[]>([]);
 
@@ -36,6 +36,7 @@ function useCommunityStories(): CommunityStory[] {
 
 export function BlogContent() {
   const { locale, t } = useLocale();
+  const { stories } = useStories();
   const communityStories = useCommunityStories();
 
   return (
@@ -55,6 +56,10 @@ export function BlogContent() {
             href={`/blog/${story.slug}`}
             className="section-card block p-6 text-inherit transition-[transform,box-shadow,border-color] hover:-translate-y-0.5 hover:border-[color:var(--brand)] hover:shadow-[0_10px_26px_rgba(31,41,55,.08)]"
           >
+            {story.photo && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={story.photo} alt="" className="mb-3 h-32 w-full rounded-lg object-cover" />
+            )}
             <p className="text-xs font-semibold uppercase tracking-wide text-[color:var(--accent)]">{story.category[locale]}</p>
             <h2 className="font-display mt-2 text-2xl">{story.title[locale]}</h2>
             <p className="mt-3 text-sm text-[color:var(--muted)]">{story.excerpt[locale]}</p>

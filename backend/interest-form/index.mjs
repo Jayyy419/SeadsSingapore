@@ -35,6 +35,7 @@ const AUDIT_LOG_TABLE = process.env.AUDIT_LOG_TABLE;
 const TEAM_TABLE = process.env.TEAM_TABLE;
 const PARTNERS_TABLE = process.env.PARTNERS_TABLE;
 const PROGRAMS_TABLE = process.env.PROGRAMS_TABLE;
+const STORIES_TABLE = process.env.STORIES_TABLE;
 const MEDIA_BUCKET = process.env.MEDIA_BUCKET;
 const MEDIA_BUCKET_REGION = process.env.AWS_REGION || "ap-southeast-1";
 const NOTIFY_EMAIL = process.env.NOTIFY_EMAIL;
@@ -931,6 +932,91 @@ async function handleDeleteProgram(headers, slug) {
   return json(200, headers, { ok: true });
 }
 
+// "Official" staff-authored blog posts — deliberately a separate table from
+// STORY_SUBMISSIONS_TABLE (the community-submission moderation queue). Community stories are
+// English-only, have no slug/detail page, and go through an approve/reject workflow; these are
+// fully localized, slugged, admin-authored directly (no moderation step), and get their own
+// /blog/[slug] page — different enough shapes and workflows that merging them into one table
+// would need a "kind" discriminator complicating both, for no real benefit at this scale.
+async function handleGetStories(headers) {
+  const items = (await scanAll(STORIES_TABLE)).sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""));
+  return json(200, headers, { stories: items });
+}
+
+async function handleCreateStory(event, headers) {
+  let payload;
+  try {
+    payload = JSON.parse(event.body || "{}");
+  } catch {
+    return json(400, headers, { error: "Invalid JSON body" });
+  }
+
+  const categoryEn = typeof payload.categoryEn === "string" ? payload.categoryEn.trim().slice(0, 60) : "";
+  const titleEn = typeof payload.titleEn === "string" ? payload.titleEn.trim().slice(0, 200) : "";
+  const excerptEn = typeof payload.excerptEn === "string" ? payload.excerptEn.trim().slice(0, 300) : "";
+  const bodyEn = typeof payload.bodyEn === "string" ? payload.bodyEn.trim().slice(0, 5000) : "";
+  const photo = typeof payload.photo === "string" ? payload.photo.trim().slice(0, 500) : "";
+
+  if (!categoryEn || !titleEn || !excerptEn || !bodyEn) {
+    return json(400, headers, { error: "categoryEn, titleEn, excerptEn, and bodyEn are required" });
+  }
+
+  const slug = slugify(titleEn);
+  if (!slug) {
+    return json(400, headers, { error: "Could not derive a slug from titleEn" });
+  }
+  const existing = await ddb.send(new GetCommand({ TableName: STORIES_TABLE, Key: { slug } }));
+  if (existing.Item) {
+    return json(409, headers, { error: "A story with that title already exists" });
+  }
+
+  const bodyParagraphs = bodyEn.split(/\n+/).filter(Boolean);
+  const item = {
+    slug,
+    category: Object.fromEntries(LOCALES.map((l) => [l, categoryEn])),
+    title: Object.fromEntries(LOCALES.map((l) => [l, titleEn])),
+    excerpt: Object.fromEntries(LOCALES.map((l) => [l, excerptEn])),
+    body: Object.fromEntries(LOCALES.map((l) => [l, bodyParagraphs])),
+    photo,
+    updatedAt: new Date().toISOString(),
+  };
+
+  await ddb.send(new PutCommand({ TableName: STORIES_TABLE, Item: item }));
+  return json(200, headers, { ok: true, slug });
+}
+
+async function handleUpdateStory(event, headers, slug) {
+  let payload;
+  try {
+    payload = JSON.parse(event.body || "{}");
+  } catch {
+    return json(400, headers, { error: "Invalid JSON body" });
+  }
+
+  const existing = await ddb.send(new GetCommand({ TableName: STORIES_TABLE, Key: { slug } }));
+  if (!existing.Item) {
+    return json(404, headers, { error: "Story not found" });
+  }
+
+  const item = { ...existing.Item };
+  if (typeof payload.categoryEn === "string") item.category = { ...item.category, en: payload.categoryEn.trim().slice(0, 60) };
+  if (typeof payload.titleEn === "string") item.title = { ...item.title, en: payload.titleEn.trim().slice(0, 200) };
+  if (typeof payload.excerptEn === "string") item.excerpt = { ...item.excerpt, en: payload.excerptEn.trim().slice(0, 300) };
+  if (typeof payload.bodyEn === "string") {
+    item.body = { ...item.body, en: payload.bodyEn.trim().slice(0, 5000).split(/\n+/).filter(Boolean) };
+  }
+  if (typeof payload.photo === "string") item.photo = payload.photo.trim().slice(0, 500);
+  item.updatedAt = new Date().toISOString();
+
+  await ddb.send(new PutCommand({ TableName: STORIES_TABLE, Item: item }));
+  return json(200, headers, { ok: true });
+}
+
+async function handleDeleteStory(headers, slug) {
+  await ddb.send(new DeleteCommand({ TableName: STORIES_TABLE, Key: { slug } }));
+  return json(200, headers, { ok: true });
+}
+
 export const handler = async (event) => {
   const origin = event.headers?.origin || event.headers?.Origin || "";
   const headers = { "Content-Type": "application/json", ...corsHeaders(origin) };
@@ -991,6 +1077,11 @@ export const handler = async (event) => {
   // Same reasoning as /events above.
   if (method === "GET" && path === "/programs") {
     return handleGetPrograms(headers);
+  }
+
+  // Same reasoning as /events above.
+  if (method === "GET" && path === "/stories") {
+    return handleGetStories(headers);
   }
 
   // Public: the password check itself obviously can't require already being authenticated.
@@ -1159,6 +1250,27 @@ export const handler = async (event) => {
       const slug = decodeURIComponent(programMatch[1]);
       const res = await handleDeleteProgram(headers, slug);
       if (res.statusCode < 300) await logAudit(event, "delete", "program", slug);
+      return res;
+    }
+    if (method === "GET" && path === "/internal/stories") {
+      return handleGetStories(headers);
+    }
+    if (method === "POST" && path === "/internal/stories") {
+      const res = await handleCreateStory(event, headers);
+      if (res.statusCode < 300) await logAudit(event, "create", "story", JSON.parse(res.body).slug);
+      return res;
+    }
+    const blogStoryMatch = path.match(/^\/internal\/stories\/([^/]+)$/);
+    if (method === "PUT" && blogStoryMatch) {
+      const slug = decodeURIComponent(blogStoryMatch[1]);
+      const res = await handleUpdateStory(event, headers, slug);
+      if (res.statusCode < 300) await logAudit(event, "update", "story", slug);
+      return res;
+    }
+    if (method === "DELETE" && blogStoryMatch) {
+      const slug = decodeURIComponent(blogStoryMatch[1]);
+      const res = await handleDeleteStory(headers, slug);
+      if (res.statusCode < 300) await logAudit(event, "delete", "story", slug);
       return res;
     }
 
