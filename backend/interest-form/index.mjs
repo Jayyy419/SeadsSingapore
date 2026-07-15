@@ -34,6 +34,23 @@ function diffFields(oldItem, newItem, fields) {
   return fields.filter((f) => JSON.stringify(oldItem[f]) !== JSON.stringify(newItem[f]));
 }
 
+// Used by every slugified entity's create handler (events/team/partners/programs/stories) in
+// place of a bare PutCommand. The preceding GetCommand-then-check in each handler is only
+// advisory — two concurrent creates deriving the same slug could both pass that check before
+// either writes. This condition makes the write itself atomic, so the second one fails
+// cleanly with 409 instead of silently overwriting the first.
+async function putIfSlugAvailable(tableName, item, conflictMessage, headers) {
+  try {
+    await ddb.send(new PutCommand({ TableName: tableName, Item: item, ConditionExpression: "attribute_not_exists(slug)" }));
+    return null;
+  } catch (err) {
+    if (err.name === "ConditionalCheckFailedException") {
+      return json(409, headers, { error: conflictMessage });
+    }
+    throw err;
+  }
+}
+
 const TABLE_NAME = process.env.TABLE_NAME;
 const IMPACT_METRICS_TABLE = process.env.IMPACT_METRICS_TABLE;
 const STORY_SUBMISSIONS_TABLE = process.env.STORY_SUBMISSIONS_TABLE;
@@ -229,10 +246,47 @@ async function handleSubmitInterest(event, headers) {
   const submittedAt = new Date().toISOString();
   const id = randomUUID();
 
+  // Atomically claims one of the event's capacity slots — the increment and the capacity
+  // check happen as a single conditional DynamoDB write, so two simultaneous RSVPs can't both
+  // read "1 spot left" and both succeed (a plain read-count-then-write would allow that). A
+  // full event still accepts the submission (matching the existing "Join Waitlist" UX, which
+  // resubmits through this same endpoint) — it's just recorded as waitlisted instead of
+  // confirmed, rather than rejected outright.
+  let rsvpStatus;
+  if (eventSlug) {
+    try {
+      await ddb.send(
+        new UpdateCommand({
+          TableName: EVENTS_TABLE,
+          Key: { slug: eventSlug },
+          UpdateExpression: "SET rsvpCount = if_not_exists(rsvpCount, :zero) + :incr",
+          ConditionExpression: "attribute_exists(slug) AND (attribute_not_exists(capacity) OR if_not_exists(rsvpCount, :zero) < capacity)",
+          ExpressionAttributeValues: { ":zero": 0, ":incr": 1 },
+        })
+      );
+      rsvpStatus = "confirmed";
+    } catch (err) {
+      if (err.name === "ConditionalCheckFailedException") {
+        rsvpStatus = "waitlisted";
+      } else {
+        console.error("RSVP capacity check failed:", err);
+      }
+    }
+  }
+
   await ddb.send(
     new PutCommand({
       TableName: TABLE_NAME,
-      Item: { id, name, email, interest, interestType, submittedAt, ...(eventSlug ? { eventSlug } : {}) },
+      Item: {
+        id,
+        name,
+        email,
+        interest,
+        interestType,
+        submittedAt,
+        ...(eventSlug ? { eventSlug } : {}),
+        ...(rsvpStatus ? { rsvpStatus } : {}),
+      },
     })
   );
 
@@ -536,12 +590,23 @@ async function handleCreateImpactMetric(event, headers) {
   const label = Object.fromEntries(LOCALES.map((l) => [l, labelEn]));
   const note = Object.fromEntries(LOCALES.map((l) => [l, noteEn]));
 
-  await ddb.send(
-    new PutCommand({
-      TableName: IMPACT_METRICS_TABLE,
-      Item: { metricId, value, label, note, order: nextOrder, updatedAt: new Date().toISOString() },
-    })
-  );
+  // The GetCommand check above is only advisory — two concurrent creates deriving the same
+  // metricId could both pass it before either writes. This condition makes the actual write
+  // atomic: it fails instead of silently overwriting if something else won the race.
+  try {
+    await ddb.send(
+      new PutCommand({
+        TableName: IMPACT_METRICS_TABLE,
+        Item: { metricId, value, label, note, order: nextOrder, updatedAt: new Date().toISOString() },
+        ConditionExpression: "attribute_not_exists(metricId)",
+      })
+    );
+  } catch (err) {
+    if (err.name === "ConditionalCheckFailedException") {
+      return json(409, headers, { error: "A metric with that label already exists" });
+    }
+    throw err;
+  }
 
   return json(200, headers, { ok: true, metricId });
 }
@@ -727,7 +792,8 @@ async function handleCreateEvent(event, headers) {
     updatedAt: new Date().toISOString(),
   };
 
-  await ddb.send(new PutCommand({ TableName: EVENTS_TABLE, Item: item }));
+  const conflict = await putIfSlugAvailable(EVENTS_TABLE, item, "An event with that title/slug already exists", headers);
+  if (conflict) return conflict;
   return json(200, headers, { ok: true, slug });
 }
 
@@ -815,7 +881,8 @@ async function handleCreateTeamMember(event, headers) {
     updatedAt: new Date().toISOString(),
   };
 
-  await ddb.send(new PutCommand({ TableName: TEAM_TABLE, Item: item }));
+  const conflict = await putIfSlugAvailable(TEAM_TABLE, item, "A team member with that name already exists", headers);
+  if (conflict) return conflict;
   return json(200, headers, { ok: true, slug });
 }
 
@@ -892,7 +959,8 @@ async function handleCreatePartner(event, headers) {
   const nextOrder = Math.max(0, ...all.map((p) => p.order ?? 0)) + 1;
 
   const item = { slug, name, logo, website, order: nextOrder, updatedAt: new Date().toISOString() };
-  await ddb.send(new PutCommand({ TableName: PARTNERS_TABLE, Item: item }));
+  const conflict = await putIfSlugAvailable(PARTNERS_TABLE, item, "A partner with that name already exists", headers);
+  if (conflict) return conflict;
   return json(200, headers, { ok: true, slug });
 }
 
@@ -983,7 +1051,8 @@ async function handleCreateProgram(event, headers) {
     updatedAt: new Date().toISOString(),
   };
 
-  await ddb.send(new PutCommand({ TableName: PROGRAMS_TABLE, Item: item }));
+  const conflict = await putIfSlugAvailable(PROGRAMS_TABLE, item, "A program with that name already exists", headers);
+  if (conflict) return conflict;
   return json(200, headers, { ok: true, slug });
 }
 
@@ -1077,7 +1146,8 @@ async function handleCreateStory(event, headers) {
     updatedAt: new Date().toISOString(),
   };
 
-  await ddb.send(new PutCommand({ TableName: STORIES_TABLE, Item: item }));
+  const conflict = await putIfSlugAvailable(STORIES_TABLE, item, "A story with that title already exists", headers);
+  if (conflict) return conflict;
   return json(200, headers, { ok: true, slug });
 }
 

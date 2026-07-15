@@ -27,9 +27,15 @@ export function SiteShell({ children, title, subtitle }: SiteShellProps) {
 
   return (
     <div className="min-h-screen">
+      <a
+        href="#main-content"
+        className="sr-only rounded-full bg-[color:var(--brand)] px-4 py-2 text-sm font-semibold text-white focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100]"
+      >
+        {t.skipToContent}
+      </a>
       <SiteHeader />
 
-      <main className="mx-auto w-full max-w-6xl px-4 pb-16 pt-14 sm:px-6 lg:px-8">
+      <main id="main-content" className="mx-auto w-full max-w-6xl px-4 pb-16 pt-14 sm:px-6 lg:px-8">
         {title && (
           <section className="mb-12">
             <p className="mb-3 text-xs font-semibold uppercase tracking-[0.14em] text-[color:var(--accent)]">Seads</p>

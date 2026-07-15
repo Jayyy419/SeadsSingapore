@@ -2,9 +2,9 @@
 
 ## Core Runtime
 
-- Next.js 16.2.6
-- React 19.2.4
-- React DOM 19.2.4
+- Next.js 16.2.10
+- React 19.2.7
+- React DOM 19.2.7
 - TypeScript 5
 
 ## Styling and UI
@@ -17,24 +17,26 @@
 
 ## Content and Data
 
-- Local typed content source:
+- Local typed content source (testimonials + static seed/fallback data, plus all UI copy):
   - `src/content/siteContent.ts` (programs, events, stories, team, testimonials, impact metrics)
   - `src/content/media.ts` (gallery items)
-  - `src/content/i18n.ts` (EN/MN/BM/HI translations)
-- No CMS — a Sanity integration was scaffolded early on but never actually used by any
-  route, and was removed (it pulled in ~800 transitive packages and accounted for nearly
-  all of this project's `npm audit` findings).
+  - `src/content/i18n.ts` (EN/ZH/MS/HI translations)
+- Everything admin-editable (team, partners, programs, stories, events, impact metrics,
+  submissions, story-submission moderation queue) is DynamoDB-backed, managed through a
+  self-built admin panel (`/admin/*`) — see `docs/ARCHITECTURE.md`'s "Admin Panel" section.
+  No third-party CMS is used; a Sanity integration was scaffolded early on but never actually
+  used by any route, and was removed (it pulled in ~800 transitive packages and accounted for
+  nearly all of this project's `npm audit` findings at the time).
 
 ## Backend (AWS)
 
-- API Gateway (HTTP API) + Lambda (Node.js 20.x) + DynamoDB + SES behind the "Get Involved"
-  form — see `docs/ARCHITECTURE.md` (Backend Architecture) and `backend/interest-form/`
-- No auth, database beyond DynamoDB, or CMS yet — see Architecture doc's "Not doing yet" list
+- API Gateway (HTTP API) + Lambda (Node.js 20.x) + 10 DynamoDB tables + S3 + SES — see
+  `docs/ARCHITECTURE.md` (Backend Architecture) and `backend/interest-form/`
+- **Auth**: single shared admin password (no per-user accounts), hashed (scrypt) and stored
+  in DynamoDB, session cookie signed with an HMAC secret — see `backend/interest-form/README.md`
 
 ## Analytics, Monitoring, and Hosting
 
-- Vercel Analytics (`@vercel/analytics`) — kept even after moving hosting off Vercel; it's
-  just a client-side script, doesn't require Vercel hosting
 - Sentry (`@sentry/nextjs`) — client/server/edge error tracking, wired up but inactive until
   `NEXT_PUBLIC_SENTRY_DSN`/`SENTRY_DSN` are set (`.env.example`, Amplify env vars); no-ops
   entirely if unset. Config: `sentry.client.config.ts`, `sentry.server.config.ts`,
