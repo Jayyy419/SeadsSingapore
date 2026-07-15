@@ -171,6 +171,12 @@ export type Translation = {
   tryNavBody: string;
   backToHomepage: string;
   contactUsLink: string;
+  portraitPhotoLabel: string;
+  mediaFilterAll: string;
+  adminLoginPasswordPlaceholder: string;
+  adminLoginButton: string;
+  adminLoginIncorrectPassword: string;
+  adminLoginBackToSite: string;
 };
 
 export const translations: Record<Locale, Translation> = {
@@ -308,6 +314,9 @@ export const translations: Record<Locale, Translation> = {
     notFoundSubtitle: "This one didn't take root — the page you're looking for doesn't exist or has moved.",
     tryNavBody: "Try the navigation above, or jump back to one of these:",
     backToHomepage: "Back to homepage", contactUsLink: "Contact us",
+    portraitPhotoLabel: "portrait photo", mediaFilterAll: "All",
+    adminLoginPasswordPlaceholder: "Password", adminLoginButton: "Log in",
+    adminLoginIncorrectPassword: "Incorrect password.", adminLoginBackToSite: "Back to seads.sg",
   },
   zh: {
     navHome: "首页", navAbout: "关于我们", navPrograms: "项目", navEvents: "活动", navStories: "故事", navMedia: "媒体", navDonate: "捐赠",
@@ -443,6 +452,9 @@ export const translations: Record<Locale, Translation> = {
     notFoundSubtitle: "这颗种子还未生根——您要找的页面不存在或已被移动。",
     tryNavBody: "请尝试使用上方的导航菜单，或返回以下页面：",
     backToHomepage: "返回首页", contactUsLink: "联系我们",
+    portraitPhotoLabel: "肖像照片", mediaFilterAll: "全部",
+    adminLoginPasswordPlaceholder: "密码", adminLoginButton: "登录",
+    adminLoginIncorrectPassword: "密码错误。", adminLoginBackToSite: "返回 seads.sg",
   },
   ms: {
     navHome: "Laman Utama", navAbout: "Tentang Kami", navPrograms: "Program", navEvents: "Acara", navStories: "Kisah", navMedia: "Media", navDonate: "Derma",
@@ -578,6 +590,9 @@ export const translations: Record<Locale, Translation> = {
     notFoundSubtitle: "Yang ini tidak berakar — halaman yang anda cari tidak wujud atau telah dipindahkan.",
     tryNavBody: "Cuba navigasi di atas, atau kembali ke salah satu daripada ini:",
     backToHomepage: "Kembali ke laman utama", contactUsLink: "Hubungi kami",
+    portraitPhotoLabel: "foto potret", mediaFilterAll: "Semua",
+    adminLoginPasswordPlaceholder: "Kata laluan", adminLoginButton: "Log masuk",
+    adminLoginIncorrectPassword: "Kata laluan salah.", adminLoginBackToSite: "Kembali ke seads.sg",
   },
   hi: {
     navHome: "होम", navAbout: "हमारे बारे में", navPrograms: "कार्यक्रम", navEvents: "इवेंट्स", navStories: "कहानियाँ", navMedia: "मीडिया", navDonate: "दान करें",
@@ -713,5 +728,8 @@ export const translations: Record<Locale, Translation> = {
     notFoundSubtitle: "यह जड़ नहीं पकड़ सका — जिस पृष्ठ को आप खोज रहे हैं वह मौजूद नहीं है या स्थानांतरित हो गया है।",
     tryNavBody: "ऊपर दिए गए नेविगेशन का प्रयास करें, या इनमें से किसी एक पर वापस जाएं:",
     backToHomepage: "होमपेज पर वापस जाएं", contactUsLink: "हमसे संपर्क करें",
+    portraitPhotoLabel: "पोर्ट्रेट फोटो", mediaFilterAll: "सभी",
+    adminLoginPasswordPlaceholder: "पासवर्ड", adminLoginButton: "लॉग इन करें",
+    adminLoginIncorrectPassword: "गलत पासवर्ड।", adminLoginBackToSite: "seads.sg पर वापस जाएं",
   },
 };

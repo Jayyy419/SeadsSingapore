@@ -1,6 +1,8 @@
 import { internalApiFetch } from "@/lib/internal-api";
 import { AdminShell } from "@/components/admin-shell";
 import { AdminPagination } from "@/components/admin-pagination";
+import { AdminFetchError } from "@/components/admin-fetch-error";
+import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { reviewStorySubmission, deleteStorySubmission } from "./actions";
 
 // See admin/events/page.tsx for why this must be force-dynamic.
@@ -18,16 +20,16 @@ type StorySubmission = {
   submittedAt: string;
 };
 
-async function getStorySubmissions(): Promise<StorySubmission[]> {
+async function getStorySubmissions(): Promise<{ submissions: StorySubmission[]; error: boolean }> {
   const res = await internalApiFetch("/internal/story-submissions");
-  if (!res.ok) return [];
+  if (!res.ok) return { submissions: [], error: true };
   const data = await res.json();
-  return data.submissions ?? [];
+  return { submissions: data.submissions ?? [], error: false };
 }
 
 export default async function AdminStoriesPage({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
   const { page: pageParam } = await searchParams;
-  const submissions = await getStorySubmissions();
+  const { submissions, error } = await getStorySubmissions();
   const pending = submissions.filter((s) => s.status === "pending");
   const allReviewed = submissions.filter((s) => s.status !== "pending");
 
@@ -83,14 +85,18 @@ export default async function AdminStoriesPage({ searchParams }: { searchParams:
               </form>
               <form action={deleteStorySubmission}>
                 <input type="hidden" name="id" value={s.id} />
-                <button type="submit" className="rounded-full px-4 py-2 text-xs font-semibold text-[color:var(--muted)] hover:text-[#e2965f]">
+                <ConfirmSubmitButton
+                  confirmMessage={`Delete the submission "${s.title}"? This can't be undone.`}
+                  className="rounded-full px-4 py-2 text-xs font-semibold text-[color:var(--muted)] hover:text-[#e2965f]"
+                >
                   Delete
-                </button>
+                </ConfirmSubmitButton>
               </form>
             </div>
           </article>
         ))}
-        {pending.length === 0 && <p className="text-sm text-[color:var(--muted)]">No pending submissions.</p>}
+        {error && <AdminFetchError />}
+        {!error && pending.length === 0 && <p className="text-sm text-[color:var(--muted)]">No pending submissions.</p>}
       </div>
 
       {allReviewed.length > 0 && (
@@ -104,9 +110,12 @@ export default async function AdminStoriesPage({ searchParams }: { searchParams:
                 </p>
                 <form action={deleteStorySubmission}>
                   <input type="hidden" name="id" value={s.id} />
-                  <button type="submit" className="text-xs font-semibold text-[color:var(--muted)] hover:text-[#e2965f]">
+                  <ConfirmSubmitButton
+                    confirmMessage={`Delete the submission "${s.title}"? This can't be undone.`}
+                    className="text-xs font-semibold text-[color:var(--muted)] hover:text-[#e2965f]"
+                  >
                     Delete
-                  </button>
+                  </ConfirmSubmitButton>
                 </form>
               </div>
             ))}

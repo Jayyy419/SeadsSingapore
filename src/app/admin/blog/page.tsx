@@ -1,6 +1,8 @@
 import { internalApiFetch } from "@/lib/internal-api";
 import { AdminShell } from "@/components/admin-shell";
 import { AdminImageUpload } from "@/components/admin-image-upload";
+import { AdminFetchError } from "@/components/admin-fetch-error";
+import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { updateStory, createStory, deleteStory } from "./actions";
 
 // See admin/events/page.tsx for why this must be force-dynamic.
@@ -15,15 +17,15 @@ type Story = {
   photo?: string;
 };
 
-async function getStories(): Promise<Story[]> {
+async function getStories(): Promise<{ stories: Story[]; error: boolean }> {
   const res = await internalApiFetch("/internal/stories");
-  if (!res.ok) return [];
+  if (!res.ok) return { stories: [], error: true };
   const data = await res.json();
-  return data.stories ?? [];
+  return { stories: data.stories ?? [], error: false };
 }
 
 export default async function AdminBlogPage() {
-  const stories = await getStories();
+  const { stories, error } = await getStories();
 
   return (
     <AdminShell
@@ -78,17 +80,18 @@ export default async function AdminBlogPage() {
               >
                 Save
               </button>
-              <button
-                type="submit"
+              <ConfirmSubmitButton
                 formAction={deleteStory}
+                confirmMessage={`Delete ${story.title?.en}? This can't be undone.`}
                 className="rounded-full border border-[color:var(--foreground-soft)] px-4 py-2 text-xs font-semibold text-[color:var(--foreground)] hover:border-[#e2965f] hover:text-[#e2965f]"
               >
                 Delete
-              </button>
+              </ConfirmSubmitButton>
             </div>
           </form>
         ))}
-        {stories.length === 0 && <p className="text-sm text-[color:var(--muted)]">No stories yet.</p>}
+        {error && <AdminFetchError />}
+        {!error && stories.length === 0 && <p className="text-sm text-[color:var(--muted)]">No stories yet.</p>}
       </div>
 
       <div className="mt-10">

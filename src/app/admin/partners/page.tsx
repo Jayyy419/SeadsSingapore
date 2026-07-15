@@ -1,6 +1,8 @@
 import { internalApiFetch } from "@/lib/internal-api";
 import { AdminShell } from "@/components/admin-shell";
 import { AdminImageUpload } from "@/components/admin-image-upload";
+import { AdminFetchError } from "@/components/admin-fetch-error";
+import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { updatePartner, createPartner, deletePartner } from "./actions";
 
 // See admin/events/page.tsx for why this must be force-dynamic.
@@ -11,17 +13,18 @@ type Partner = {
   name: string;
   logo?: string;
   website?: string;
+  order?: number;
 };
 
-async function getPartners(): Promise<Partner[]> {
+async function getPartners(): Promise<{ partners: Partner[]; error: boolean }> {
   const res = await internalApiFetch("/internal/partners");
-  if (!res.ok) return [];
+  if (!res.ok) return { partners: [], error: true };
   const data = await res.json();
-  return data.partners ?? [];
+  return { partners: data.partners ?? [], error: false };
 }
 
 export default async function AdminPartnersPage() {
-  const partners = await getPartners();
+  const { partners, error } = await getPartners();
 
   return (
     <AdminShell title="Partners" subtitle="Partner organizations shown on the /partners page. Names aren't localized — they're proper nouns.">
@@ -34,6 +37,15 @@ export default async function AdminPartnersPage() {
               <input
                 name="name"
                 defaultValue={partner.name}
+                className="mt-1 w-full rounded-lg border border-[color:var(--foreground-soft)] bg-[color:var(--surface)] px-3 py-2 text-sm"
+              />
+            </label>
+            <label className="text-sm text-[color:var(--foreground)]">
+              Order (lower shows first)
+              <input
+                type="number"
+                name="order"
+                defaultValue={partner.order ?? 0}
                 className="mt-1 w-full rounded-lg border border-[color:var(--foreground-soft)] bg-[color:var(--surface)] px-3 py-2 text-sm"
               />
             </label>
@@ -57,17 +69,18 @@ export default async function AdminPartnersPage() {
               >
                 Save
               </button>
-              <button
-                type="submit"
+              <ConfirmSubmitButton
                 formAction={deletePartner}
+                confirmMessage={`Delete ${partner.name}? This can't be undone.`}
                 className="rounded-full border border-[color:var(--foreground-soft)] px-4 py-2 text-xs font-semibold text-[color:var(--foreground)] hover:border-[#e2965f] hover:text-[#e2965f]"
               >
                 Delete
-              </button>
+              </ConfirmSubmitButton>
             </div>
           </form>
         ))}
-        {partners.length === 0 && <p className="text-sm text-[color:var(--muted)]">No partners yet.</p>}
+        {error && <AdminFetchError />}
+        {!error && partners.length === 0 && <p className="text-sm text-[color:var(--muted)]">No partners yet.</p>}
       </div>
 
       <div className="mt-10">

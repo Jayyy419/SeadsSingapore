@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { mediaItems, type MediaItem } from "@/content/media";
+import { useLocale } from "@/lib/locale-context";
 
 type MediaMasonryProps = {
   limit?: number;
@@ -41,6 +42,7 @@ function prefersReducedMotion() {
 }
 
 export function MediaMasonry({ limit, showFilter = true }: MediaMasonryProps) {
+  const { t } = useLocale();
   const [activeCategory, setActiveCategory] = useState<Category>(allCategory);
   const [lightboxId, setLightboxId] = useState<number | null>(null);
   const [containerWidth, setContainerWidth] = useState(1200);
@@ -147,7 +149,7 @@ export function MediaMasonry({ limit, showFilter = true }: MediaMasonryProps) {
                     : "border-[color:var(--foreground-soft)] bg-[color:var(--surface)] text-[color:var(--muted)] hover:bg-[color:var(--surface-2)] hover:border-[color:var(--brand)]"
                 }`}
               >
-                {category}
+                {category === allCategory ? t.mediaFilterAll : category}
               </button>
             );
           })}

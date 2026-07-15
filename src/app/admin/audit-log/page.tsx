@@ -1,6 +1,7 @@
 import { internalApiFetch } from "@/lib/internal-api";
 import { AdminShell } from "@/components/admin-shell";
 import { AdminPagination } from "@/components/admin-pagination";
+import { AdminFetchError } from "@/components/admin-fetch-error";
 
 // See admin/events/page.tsx for why this must be force-dynamic.
 export const dynamic = "force-dynamic";
@@ -16,16 +17,16 @@ type AuditEntry = {
   sourceIp?: string;
 };
 
-async function getAuditLog(): Promise<AuditEntry[]> {
+async function getAuditLog(): Promise<{ entries: AuditEntry[]; error: boolean }> {
   const res = await internalApiFetch("/internal/audit-log");
-  if (!res.ok) return [];
+  if (!res.ok) return { entries: [], error: true };
   const data = await res.json();
-  return data.entries ?? [];
+  return { entries: data.entries ?? [], error: false };
 }
 
 export default async function AdminAuditLogPage({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
   const { page: pageParam } = await searchParams;
-  const allEntries = await getAuditLog();
+  const { entries: allEntries, error } = await getAuditLog();
 
   const totalPages = Math.max(1, Math.ceil(allEntries.length / PAGE_SIZE));
   const page = Math.min(Math.max(1, Number(pageParam) || 1), totalPages);
@@ -59,7 +60,12 @@ export default async function AdminAuditLogPage({ searchParams }: { searchParams
             ))}
           </tbody>
         </table>
-        {allEntries.length === 0 && <p className="p-4 text-sm text-[color:var(--muted)]">No admin actions logged yet.</p>}
+        {error && (
+          <div className="p-4">
+            <AdminFetchError />
+          </div>
+        )}
+        {!error && allEntries.length === 0 && <p className="p-4 text-sm text-[color:var(--muted)]">No admin actions logged yet.</p>}
         <AdminPagination page={page} totalPages={totalPages} baseHref="/admin/audit-log" />
       </div>
     </AdminShell>

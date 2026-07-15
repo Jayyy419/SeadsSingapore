@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { EventDetailContent } from "./event-detail-content";
+import { safeJsonLdString } from "@/lib/json-ld";
 
 // Events moved from siteContent.ts (static) to DynamoDB so admins can create them without a
 // code change + deploy — that means generateStaticParams can no longer enumerate them at
@@ -20,6 +21,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   return {
     title: event.title.en,
     description: `${event.type.en} · ${event.date} · ${event.location.en}`,
+    alternates: { canonical: `/events/${slug}` },
   };
 }
 
@@ -44,7 +46,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ sl
   return (
     <>
       {event && (
-        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(buildEventJsonLd(event)) }} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLdString(buildEventJsonLd(event)) }} />
       )}
       <EventDetailContent slug={slug} />
     </>

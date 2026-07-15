@@ -5,6 +5,7 @@ export const metadata: Metadata = {
   title: "About",
   description:
     "Seads is a youth-led non-profit cultivating sustainability, mental health awareness, and personal growth across Southeast Asia.",
+  alternates: { canonical: "/about" },
 };
 
 export default function AboutPage() {

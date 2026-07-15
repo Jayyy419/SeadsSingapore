@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { notFound } from "next/navigation";
 import { SiteShell } from "@/components/site-shell";
 import { InterestForm } from "@/components/interest-form";
@@ -21,8 +22,9 @@ export function ProgramDetailContent({ slug }: { slug: string }) {
       <div className="space-y-10">
         <article className="section-card space-y-4 p-6 sm:p-8">
           {program.photo && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={program.photo} alt={program.name[locale]} className="h-48 w-full rounded-xl object-cover" />
+            <div className="relative h-48 w-full overflow-hidden rounded-xl">
+              <Image src={program.photo} alt={program.name[locale]} fill sizes="(min-width: 640px) 640px, 100vw" className="object-cover" priority />
+            </div>
           )}
           <p className="text-xs font-bold uppercase tracking-wide text-[color:var(--brand)]">{program.tag[locale]}</p>
           {program.body[locale].map((paragraph, i) => (

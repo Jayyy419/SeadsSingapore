@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { notFound } from "next/navigation";
 import { SiteShell } from "@/components/site-shell";
 import { useLocale } from "@/lib/locale-context";
@@ -18,8 +19,9 @@ export function StoryDetailContent({ slug }: { slug: string }) {
     <SiteShell title={story.title[locale]} subtitle={story.excerpt[locale]}>
       <article className="section-card space-y-4 p-6 sm:p-8">
         {story.photo && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={story.photo} alt={story.title[locale]} className="h-48 w-full rounded-xl object-cover" />
+          <div className="relative h-48 w-full overflow-hidden rounded-xl">
+            <Image src={story.photo} alt={story.title[locale]} fill sizes="(min-width: 640px) 640px, 100vw" className="object-cover" priority />
+          </div>
         )}
         <p className="text-xs font-semibold uppercase tracking-wide text-[color:var(--accent)]">{story.category[locale]}</p>
         {story.body[locale].map((paragraph, i) => (

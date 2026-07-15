@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Manrope, Source_Serif_4 } from "next/font/google";
 import { ScrollProgress } from "@/components/scroll-progress";
 import { LocaleProvider } from "@/lib/locale-context";
+import { safeJsonLdString } from "@/lib/json-ld";
 import "./globals.css";
 
 const manrope = Manrope({
@@ -40,6 +41,9 @@ export const metadata: Metadata = {
     template: "%s | Seads Singapore",
   },
   description,
+  // The site-wide default (effectively the homepage's canonical, since every other route sets
+  // its own `alternates.canonical` in its page-level metadata, which overrides this).
+  alternates: { canonical: "/" },
   openGraph: {
     siteName,
     title: siteName,
@@ -67,7 +71,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
+          dangerouslySetInnerHTML={{ __html: safeJsonLdString(organizationJsonLd) }}
         />
         <ScrollProgress />
         <LocaleProvider>{children}</LocaleProvider>

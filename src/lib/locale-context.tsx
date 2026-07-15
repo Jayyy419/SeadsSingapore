@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useLayoutEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useLayoutEffect, useState, type ReactNode } from "react";
 import { translations, type Locale, type Translation } from "@/content/i18n";
 
 const LOCALE_KEY = "seads-locale";
@@ -39,6 +39,14 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- correcting from the SSR-safe default, not derived state
     setLocaleState(resolved);
   }, []);
+
+  // Keeps the <html lang> attribute (set statically to "en" in layout.tsx, since the server
+  // has no way to know a client's stored preference before first paint) in sync with the
+  // active locale for assistive tech and search engines — every one of our locale codes
+  // (en/zh/ms/hi) is already a valid standalone BCP 47 language tag, so no mapping is needed.
+  useEffect(() => {
+    document.documentElement.lang = locale;
+  }, [locale]);
 
   const setLocale = (next: Locale) => {
     setLocaleState(next);

@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { useLocale } from "@/lib/locale-context";
 
 export default function AdminLoginPage() {
+  const { t } = useLocale();
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
-  const [errorMessage, setErrorMessage] = useState("Incorrect password.");
+  const [errorMessage, setErrorMessage] = useState(t.adminLoginIncorrectPassword);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -21,8 +23,11 @@ export default function AdminLoginPage() {
       });
 
       if (!res.ok) {
+        // The Lambda's error text (e.g. the rate-limit message) is only ever in English —
+        // it comes from the API, not this page's i18n dictionary — so only the generic
+        // fallback below is localized.
         const body = await res.json().catch(() => null);
-        setErrorMessage(body?.error ? `${body.error}${body.error.endsWith(".") ? "" : "."}` : "Incorrect password.");
+        setErrorMessage(body?.error ? `${body.error}${body.error.endsWith(".") ? "" : "."}` : t.adminLoginIncorrectPassword);
         setStatus("error");
         return;
       }
@@ -31,7 +36,7 @@ export default function AdminLoginPage() {
       // cookie the browser just received.
       window.location.href = "/admin";
     } catch {
-      setErrorMessage("Incorrect password.");
+      setErrorMessage(t.adminLoginIncorrectPassword);
       setStatus("error");
     }
   }
@@ -47,7 +52,7 @@ export default function AdminLoginPage() {
             <input
               type="password"
               name="password"
-              placeholder="Password"
+              placeholder={t.adminLoginPasswordPlaceholder}
               required
               autoFocus
               className="rounded-xl border border-[color:var(--foreground-soft)] bg-[color:var(--surface)] px-4 py-3 text-sm text-[color:var(--foreground)]"
@@ -58,7 +63,7 @@ export default function AdminLoginPage() {
               disabled={status === "loading"}
               className="rounded-full bg-[color:var(--brand)] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[color:var(--brand-deep)] disabled:opacity-60"
             >
-              {status === "loading" ? "..." : "Log in"}
+              {status === "loading" ? "..." : t.adminLoginButton}
             </button>
           </form>
         </div>
@@ -66,7 +71,7 @@ export default function AdminLoginPage() {
           href="/"
           className="mt-6 block text-center text-sm font-semibold text-[color:var(--muted)] hover:text-[color:var(--brand)]"
         >
-          &larr; Back to seads.sg
+          &larr; {t.adminLoginBackToSite}
         </Link>
       </div>
     </div>

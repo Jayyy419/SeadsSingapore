@@ -1,5 +1,7 @@
 import { internalApiFetch } from "@/lib/internal-api";
 import { AdminShell } from "@/components/admin-shell";
+import { AdminFetchError } from "@/components/admin-fetch-error";
+import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { createEvent, updateEvent, deleteEvent } from "./actions";
 
 // Fetches live protected data on every request via internalApiFetch(), which reads the
@@ -17,11 +19,11 @@ type Event = {
   capacity?: number;
 };
 
-async function getEvents(): Promise<Event[]> {
+async function getEvents(): Promise<{ events: Event[]; error: boolean }> {
   const res = await internalApiFetch("/internal/events");
-  if (!res.ok) return [];
+  if (!res.ok) return { events: [], error: true };
   const data = await res.json();
-  return data.events ?? [];
+  return { events: data.events ?? [], error: false };
 }
 
 async function getRsvpCounts(): Promise<Record<string, number>> {
@@ -32,7 +34,7 @@ async function getRsvpCounts(): Promise<Record<string, number>> {
 }
 
 export default async function AdminEventsPage() {
-  const [events, counts] = await Promise.all([getEvents(), getRsvpCounts()]);
+  const [{ events, error }, counts] = await Promise.all([getEvents(), getRsvpCounts()]);
 
   return (
     <AdminShell
@@ -107,17 +109,18 @@ export default async function AdminEventsPage() {
               >
                 Save
               </button>
-              <button
-                type="submit"
+              <ConfirmSubmitButton
                 formAction={deleteEvent}
+                confirmMessage={`Delete ${event.title?.en}? This can't be undone.`}
                 className="rounded-full border border-[color:var(--foreground-soft)] px-4 py-2 text-xs font-semibold text-[color:var(--foreground)] hover:border-[#e2965f] hover:text-[#e2965f]"
               >
                 Delete
-              </button>
+              </ConfirmSubmitButton>
             </div>
           </form>
         ))}
-        {events.length === 0 && <p className="text-sm text-[color:var(--muted)]">No events yet.</p>}
+        {error && <AdminFetchError />}
+        {!error && events.length === 0 && <p className="text-sm text-[color:var(--muted)]">No events yet.</p>}
       </div>
 
       <div className="mt-10">
