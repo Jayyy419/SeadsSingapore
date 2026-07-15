@@ -44,6 +44,12 @@
       "Resource": "arn:aws:dynamodb:ap-southeast-1:140023398409:table/seads-admin-audit-log"
     },
     {
+      "Sid": "MediaUploads",
+      "Effect": "Allow",
+      "Action": "s3:PutObject",
+      "Resource": "arn:aws:s3:::seads-media/uploads/*"
+    },
+    {
       "Sid": "SesSend",
       "Effect": "Allow",
       "Action": "ses:SendEmail",
