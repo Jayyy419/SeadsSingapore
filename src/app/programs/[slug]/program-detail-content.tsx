@@ -5,18 +5,25 @@ import { notFound } from "next/navigation";
 import { SiteShell } from "@/components/site-shell";
 import { InterestForm } from "@/components/interest-form";
 import { useLocale } from "@/lib/locale-context";
-import { programs } from "@/content/siteContent";
+import { usePrograms } from "@/lib/use-programs";
 import { buildWhatsAppLink } from "@/lib/whatsapp";
 
 export function ProgramDetailContent({ slug }: { slug: string }) {
   const { locale, t } = useLocale();
+  const { programs, loaded } = usePrograms();
   const program = programs.find((p) => p.slug === slug);
-  if (!program) notFound();
+  // Wait for the live fetch before 404ing — see event-detail-content.tsx for why.
+  if (!program && loaded) notFound();
+  if (!program) return null;
 
   return (
     <SiteShell title={program.name[locale]} subtitle={program.description[locale]}>
       <div className="space-y-10">
         <article className="section-card space-y-4 p-6 sm:p-8">
+          {program.photo && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={program.photo} alt="" className="h-48 w-full rounded-xl object-cover" />
+          )}
           <p className="text-xs font-bold uppercase tracking-wide text-[color:var(--brand)]">{program.tag[locale]}</p>
           {program.body[locale].map((paragraph, i) => (
             <p key={i} className="text-sm text-[color:var(--muted)]">
