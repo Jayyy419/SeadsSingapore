@@ -33,7 +33,12 @@ export function AdminShell({ children, title, subtitle }: { children: ReactNode;
               ))}
             </nav>
           </div>
-          <AdminLogoutButton />
+          <div className="flex items-center gap-4">
+            <Link href="/" prefetch={false} className="text-sm font-semibold text-[color:var(--muted)] hover:text-[color:var(--brand)]">
+              View site
+            </Link>
+            <AdminLogoutButton />
+          </div>
         </div>
       </header>
 
