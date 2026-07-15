@@ -132,6 +132,7 @@ export type Translation = {
   partnerTrack2Detail: string;
   partnerTrack3Title: string;
   partnerTrack3Detail: string;
+  ourPartnersHeading: string;
   readyToPartner: string;
   readyToPartnerBody: string;
   becomePartner: string;
@@ -270,6 +271,7 @@ export const translations: Record<Locale, Translation> = {
     partnerTrack2Detail: "Scale volunteer delivery and co-create neighborhood impact programs.",
     partnerTrack3Title: "Corporate and sponsors",
     partnerTrack3Detail: "Support high-impact youth projects with resources, mentoring, and expertise.",
+    ourPartnersHeading: "Our Partners",
     readyToPartner: "Ready to partner with us?",
     readyToPartnerBody: "Tell us about your organization and what you're looking to do together — we'll follow up to discuss the right fit.",
     becomePartner: "Become a partner",
@@ -404,6 +406,7 @@ export const translations: Record<Locale, Translation> = {
     partnerTrack2Detail: "扩大志愿服务规模，共同打造社区影响力项目。",
     partnerTrack3Title: "企业与赞助商",
     partnerTrack3Detail: "以资源、指导和专业知识支持高影响力的青年项目。",
+    ourPartnersHeading: "我们的合作伙伴",
     readyToPartner: "准备好与我们合作了吗？",
     readyToPartnerBody: "告诉我们您所在的组织以及您希望共同开展的合作内容——我们会跟进讨论合适的合作方式。",
     becomePartner: "成为合作伙伴",
@@ -538,6 +541,7 @@ export const translations: Record<Locale, Translation> = {
     partnerTrack2Detail: "Memperluas penyampaian sukarelawan dan mencipta bersama program impak kejiranan.",
     partnerTrack3Title: "Korporat dan penaja",
     partnerTrack3Detail: "Menyokong projek belia berimpak tinggi dengan sumber, bimbingan, dan kepakaran.",
+    ourPartnersHeading: "Rakan Kongsi Kami",
     readyToPartner: "Bersedia untuk bekerjasama dengan kami?",
     readyToPartnerBody: "Beritahu kami tentang organisasi anda dan apa yang anda ingin lakukan bersama — kami akan hubungi anda semula untuk membincangkan kesesuaian.",
     becomePartner: "Jadi rakan kongsi",
@@ -672,6 +676,7 @@ export const translations: Record<Locale, Translation> = {
     partnerTrack2Detail: "स्वयंसेवी वितरण को बढ़ाएं और पड़ोस प्रभाव कार्यक्रमों का सह-निर्माण करें।",
     partnerTrack3Title: "कॉर्पोरेट और प्रायोजक",
     partnerTrack3Detail: "संसाधनों, मेंटरशिप और विशेषज्ञता के साथ उच्च-प्रभाव वाली युवा परियोजनाओं का समर्थन करें।",
+    ourPartnersHeading: "हमारे साझेदार",
     readyToPartner: "हमारे साथ साझेदारी के लिए तैयार हैं?",
     readyToPartnerBody: "हमें अपने संगठन के बारे में बताएं और आप साथ मिलकर क्या करना चाहते हैं — हम सही तालमेल पर चर्चा करने के लिए संपर्क करेंगे।",
     becomePartner: "साझेदार बनें",

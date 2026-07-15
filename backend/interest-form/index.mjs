@@ -33,6 +33,7 @@ const ADMIN_CONFIG_TABLE = process.env.ADMIN_CONFIG_TABLE;
 const EVENTS_TABLE = process.env.EVENTS_TABLE;
 const AUDIT_LOG_TABLE = process.env.AUDIT_LOG_TABLE;
 const TEAM_TABLE = process.env.TEAM_TABLE;
+const PARTNERS_TABLE = process.env.PARTNERS_TABLE;
 const MEDIA_BUCKET = process.env.MEDIA_BUCKET;
 const MEDIA_BUCKET_REGION = process.env.AWS_REGION || "ap-southeast-1";
 const NOTIFY_EMAIL = process.env.NOTIFY_EMAIL;
@@ -773,6 +774,74 @@ async function handleDeleteTeamMember(headers, slug) {
   return json(200, headers, { ok: true });
 }
 
+async function handleGetPartners(headers) {
+  const items = (await scanAll(PARTNERS_TABLE)).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  return json(200, headers, { partners: items });
+}
+
+// Partner names are proper nouns, not translated — no per-locale fields needed here, unlike
+// team/events/impact-metrics.
+async function handleCreatePartner(event, headers) {
+  let payload;
+  try {
+    payload = JSON.parse(event.body || "{}");
+  } catch {
+    return json(400, headers, { error: "Invalid JSON body" });
+  }
+
+  const name = typeof payload.name === "string" ? payload.name.trim().slice(0, 100) : "";
+  const logo = typeof payload.logo === "string" ? payload.logo.trim().slice(0, 500) : "";
+  const website = typeof payload.website === "string" ? payload.website.trim().slice(0, 300) : "";
+
+  if (!name) {
+    return json(400, headers, { error: "name is required" });
+  }
+
+  const slug = slugify(name);
+  if (!slug) {
+    return json(400, headers, { error: "Could not derive a slug from name" });
+  }
+  const existing = await ddb.send(new GetCommand({ TableName: PARTNERS_TABLE, Key: { slug } }));
+  if (existing.Item) {
+    return json(409, headers, { error: "A partner with that name already exists" });
+  }
+
+  const all = await scanAll(PARTNERS_TABLE);
+  const nextOrder = Math.max(0, ...all.map((p) => p.order ?? 0)) + 1;
+
+  const item = { slug, name, logo, website, order: nextOrder, updatedAt: new Date().toISOString() };
+  await ddb.send(new PutCommand({ TableName: PARTNERS_TABLE, Item: item }));
+  return json(200, headers, { ok: true, slug });
+}
+
+async function handleUpdatePartner(event, headers, slug) {
+  let payload;
+  try {
+    payload = JSON.parse(event.body || "{}");
+  } catch {
+    return json(400, headers, { error: "Invalid JSON body" });
+  }
+
+  const existing = await ddb.send(new GetCommand({ TableName: PARTNERS_TABLE, Key: { slug } }));
+  if (!existing.Item) {
+    return json(404, headers, { error: "Partner not found" });
+  }
+
+  const item = { ...existing.Item };
+  if (typeof payload.name === "string" && payload.name.trim()) item.name = payload.name.trim().slice(0, 100);
+  if (typeof payload.logo === "string") item.logo = payload.logo.trim().slice(0, 500);
+  if (typeof payload.website === "string") item.website = payload.website.trim().slice(0, 300);
+  item.updatedAt = new Date().toISOString();
+
+  await ddb.send(new PutCommand({ TableName: PARTNERS_TABLE, Item: item }));
+  return json(200, headers, { ok: true });
+}
+
+async function handleDeletePartner(headers, slug) {
+  await ddb.send(new DeleteCommand({ TableName: PARTNERS_TABLE, Key: { slug } }));
+  return json(200, headers, { ok: true });
+}
+
 export const handler = async (event) => {
   const origin = event.headers?.origin || event.headers?.Origin || "";
   const headers = { "Content-Type": "application/json", ...corsHeaders(origin) };
@@ -823,6 +892,11 @@ export const handler = async (event) => {
   // Same reasoning as /events above.
   if (method === "GET" && path === "/team") {
     return handleGetTeam(headers);
+  }
+
+  // Same reasoning as /events above.
+  if (method === "GET" && path === "/partners") {
+    return handleGetPartners(headers);
   }
 
   // Public: the password check itself obviously can't require already being authenticated.
@@ -949,6 +1023,27 @@ export const handler = async (event) => {
       const slug = decodeURIComponent(teamMatch[1]);
       const res = await handleDeleteTeamMember(headers, slug);
       if (res.statusCode < 300) await logAudit(event, "delete", "team-member", slug);
+      return res;
+    }
+    if (method === "GET" && path === "/internal/partners") {
+      return handleGetPartners(headers);
+    }
+    if (method === "POST" && path === "/internal/partners") {
+      const res = await handleCreatePartner(event, headers);
+      if (res.statusCode < 300) await logAudit(event, "create", "partner", JSON.parse(res.body).slug);
+      return res;
+    }
+    const partnerMatch = path.match(/^\/internal\/partners\/([^/]+)$/);
+    if (method === "PUT" && partnerMatch) {
+      const slug = decodeURIComponent(partnerMatch[1]);
+      const res = await handleUpdatePartner(event, headers, slug);
+      if (res.statusCode < 300) await logAudit(event, "update", "partner", slug);
+      return res;
+    }
+    if (method === "DELETE" && partnerMatch) {
+      const slug = decodeURIComponent(partnerMatch[1]);
+      const res = await handleDeletePartner(headers, slug);
+      if (res.statusCode < 300) await logAudit(event, "delete", "partner", slug);
       return res;
     }
 
