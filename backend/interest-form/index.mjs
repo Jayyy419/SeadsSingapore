@@ -2,11 +2,14 @@ import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, PutCommand, UpdateCommand, GetCommand, ScanCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
 import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
 import { SecretsManagerClient, GetSecretValueCommand } from "@aws-sdk/client-secrets-manager";
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { randomUUID, createHmac, timingSafeEqual, scryptSync, randomBytes } from "node:crypto";
 
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 const ses = new SESClient({});
 const secretsManager = new SecretsManagerClient({});
+const s3 = new S3Client({});
 
 // A plain ScanCommand caps out at ~1MB per call and silently returns only a partial result
 // past that — no error, just missing rows. Every table here is small enough that looping
@@ -29,6 +32,8 @@ const STORY_SUBMISSIONS_TABLE = process.env.STORY_SUBMISSIONS_TABLE;
 const ADMIN_CONFIG_TABLE = process.env.ADMIN_CONFIG_TABLE;
 const EVENTS_TABLE = process.env.EVENTS_TABLE;
 const AUDIT_LOG_TABLE = process.env.AUDIT_LOG_TABLE;
+const MEDIA_BUCKET = process.env.MEDIA_BUCKET;
+const MEDIA_BUCKET_REGION = process.env.AWS_REGION || "ap-southeast-1";
 const NOTIFY_EMAIL = process.env.NOTIFY_EMAIL;
 // Admin auth lives here, not on the Amplify/Next.js side — Amplify Hosting's environment
 // variables for this app never reliably reach the deployed SSR compute's process.env at
@@ -565,6 +570,46 @@ async function handleGetAuditLog(headers) {
   return json(200, headers, { entries: items });
 }
 
+const ALLOWED_UPLOAD_CONTENT_TYPES = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "image/gif": "gif",
+};
+const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
+
+// The admin's browser uploads the actual file bytes directly to S3 using this presigned URL —
+// never through this Lambda/API Gateway, which have their own request-body size limits far
+// below what a photo needs. This endpoint only ever hands out permission to PUT one specific
+// new object; it can't be used to read, overwrite, or delete anything else in the bucket.
+async function handleCreateUploadUrl(event, headers) {
+  let payload;
+  try {
+    payload = JSON.parse(event.body || "{}");
+  } catch {
+    return json(400, headers, { error: "Invalid JSON body" });
+  }
+
+  const contentType = payload.contentType;
+  const extension = ALLOWED_UPLOAD_CONTENT_TYPES[contentType];
+  if (!extension) {
+    return json(400, headers, { error: "contentType must be one of: " + Object.keys(ALLOWED_UPLOAD_CONTENT_TYPES).join(", ") });
+  }
+
+  const key = `uploads/${randomUUID()}.${extension}`;
+  // Max file size is enforced client-side only (via the maxBytes hint below) — a presigned PUT
+  // URL can't itself cap the object size the way a presigned POST policy can. Acceptable here
+  // since this endpoint is admin-only, not public.
+  const uploadUrl = await getSignedUrl(
+    s3,
+    new PutObjectCommand({ Bucket: MEDIA_BUCKET, Key: key, ContentType: contentType }),
+    { expiresIn: 300 }
+  );
+  const publicUrl = `https://${MEDIA_BUCKET}.s3.${MEDIA_BUCKET_REGION}.amazonaws.com/${key}`;
+
+  return json(200, headers, { uploadUrl, publicUrl, maxBytes: MAX_UPLOAD_BYTES });
+}
+
 // Same "other locales default to English on create, preserved on update" convention as
 // impact metrics — see handleCreateImpactMetric / handleUpdateImpactMetric above.
 async function handleCreateEvent(event, headers) {
@@ -796,6 +841,9 @@ export const handler = async (event) => {
     }
     if (method === "GET" && path === "/internal/audit-log") {
       return handleGetAuditLog(headers);
+    }
+    if (method === "POST" && path === "/internal/uploads") {
+      return handleCreateUploadUrl(event, headers);
     }
 
     return json(404, headers, { error: "Not found" });
