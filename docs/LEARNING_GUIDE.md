@@ -2051,6 +2051,52 @@ all four homepage sections onto their respective hooks, with a `slice(0, N)` cap
 growing an arbitrarily long grid as admins add more content over time — the full lists still
 live on their own dedicated pages.
 
+### A dependency bump that broke the linter for a reason with nothing to do with this repo
+
+Dependabot opened a PR bumping `eslint` from 9 to 10. Its CI check failed; reproducing it
+locally (`npm install` on that branch, then `npx eslint .`) turned up:
+
+```
+TypeError: Error while loading rule 'react/display-name': contextOrFilename.getFilename is not a function
+    at .../eslint-config-next/node_modules/eslint-plugin-react/lib/util/version.js:31:100
+```
+
+The cause has nothing to do with any code in this repo: `eslint-config-next` (Next.js's own
+official lint config, a dependency this project doesn't control the internals of) bundles its
+own copy of `eslint-plugin-react`, and that plugin's code calls `context.getFilename()` — a
+method on ESLint's rule-context object that ESLint 10 removed in favor of a `context.filename`
+property. Every major version bump of a foundational tool like ESLint can break plugins built
+against its old API, and a plugin author needs to explicitly publish an update before it works
+with the new major version — Dependabot bumping the version number doesn't mean the rest of the
+ecosystem has caught up yet. The right response to "a dependency bump fails CI" is to actually
+reproduce the failure locally rather than guess, since the fix (or the decision *not* to fix it
+yet) depends entirely on whose code the error is actually in. Here the fix is simply "wait" —
+left the PR open with an explanation, to be revisited once `eslint-config-next` ships a version
+bundling an ESLint-10-compatible `eslint-plugin-react`.
+
+### Testing a per-IP rate limit from an environment whose own IP rotates
+
+Adding rate limiting to the admin login (mirroring the existing per-IP limiter on the public
+interest-form endpoint) needed verification: send enough failed attempts to trigger a 429.
+The first test — 12 rapid `curl` calls with a wrong password — got 12 `401`s, no `429`, even
+though the limit was set to 10. The instinctive read is "the rate limiter doesn't work." The
+actual cause, found by directly inspecting the DynamoDB items the limiter writes (each one
+keyed `ratelimit#ip#adminlogin#<ip>#<window>`), was that the 12 requests had come from *four
+different source IPs* — this sandboxed environment's own outbound traffic goes through a
+rotating NAT/proxy pool, so consecutive requests aren't guaranteed to share an IP the way a
+real user's browser traffic would. The counting logic was working correctly the whole time;
+the test just never produced enough hits on any single IP to cross the threshold.
+
+The fix wasn't to change the code — it was to make the test deterministic despite the
+environment: manually `UpdateItem` one of the already-observed IP's counters to sit right at
+the limit, then send a few more requests hoping to land on that same IP again. One did, and
+returned the expected `429` with the right error body. The general lesson: when verifying
+per-identity behavior (per-IP, per-user, per-session) from an automated or sandboxed
+environment, check what identity your own requests are actually presenting *before* concluding
+the code is wrong — the test harness's own infrastructure can be the confounding variable, and
+inspecting the system's own state (here, the DynamoDB rate-limit items) reveals that much
+faster than guessing from HTTP status codes alone.
+
 ## Glossary
 
 - **Accessible name**: the text assistive technology (screen readers) announces for an

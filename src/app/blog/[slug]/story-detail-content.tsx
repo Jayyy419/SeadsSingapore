@@ -19,7 +19,7 @@ export function StoryDetailContent({ slug }: { slug: string }) {
       <article className="section-card space-y-4 p-6 sm:p-8">
         {story.photo && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={story.photo} alt="" className="h-48 w-full rounded-xl object-cover" />
+          <img src={story.photo} alt={story.title[locale]} className="h-48 w-full rounded-xl object-cover" />
         )}
         <p className="text-xs font-semibold uppercase tracking-wide text-[color:var(--accent)]">{story.category[locale]}</p>
         {story.body[locale].map((paragraph, i) => (

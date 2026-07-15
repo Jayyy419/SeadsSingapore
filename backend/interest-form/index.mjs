@@ -2,7 +2,7 @@ import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, PutCommand, UpdateCommand, GetCommand, ScanCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
 import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
 import { SecretsManagerClient, GetSecretValueCommand } from "@aws-sdk/client-secrets-manager";
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { randomUUID, createHmac, timingSafeEqual, scryptSync, randomBytes } from "node:crypto";
 
@@ -284,6 +284,30 @@ async function handleSubmitStory(event, headers) {
     })
   );
 
+  // Same "notify but never fail the request over it" policy as handleSubmitInterest above —
+  // without this, a new submission sat in the moderation queue with nothing telling an admin
+  // to go look.
+  if (NOTIFY_EMAIL) {
+    try {
+      await ses.send(
+        new SendEmailCommand({
+          Source: NOTIFY_EMAIL,
+          Destination: { ToAddresses: [NOTIFY_EMAIL] },
+          Message: {
+            Subject: { Data: `New Seads story submission from ${authorName}` },
+            Body: {
+              Text: {
+                Data: `Author: ${authorName}\nEmail: ${authorEmail}\nTitle: ${title}\nSubmitted: ${submittedAt}\n\nReview at /admin/stories`,
+              },
+            },
+          },
+        })
+      );
+    } catch (err) {
+      console.error("SES send failed:", err);
+    }
+  }
+
   return json(200, headers, { ok: true });
 }
 
@@ -354,7 +378,17 @@ async function checkPassword(password) {
   return false;
 }
 
+// Unlike the public interest-form/story endpoints, there's only one shared password and no
+// per-user identity to rate-limit by — IP is the only signal available, same weak-but-better-
+// than-nothing caveat as the audit log's sourceIp. 10 attempts per 10-minute window is loose
+// enough that a legitimate admin mistyping the password a few times (or several people behind
+// the same office/NAT IP) won't get locked out, but rules out realistic brute-forcing.
 async function handleAdminLogin(event, headers) {
+  const remoteIp = event.requestContext?.http?.sourceIp;
+  if (remoteIp && !(await checkRateLimit(`ip#adminlogin#${remoteIp}`, 10))) {
+    return json(429, headers, { ok: false, error: "Too many attempts — please try again in a few minutes." });
+  }
+
   let payload;
   try {
     payload = JSON.parse(event.body || "{}");
@@ -614,6 +648,25 @@ async function handleCreateUploadUrl(event, headers) {
   return json(200, headers, { uploadUrl, publicUrl, maxBytes: MAX_UPLOAD_BYTES });
 }
 
+const MEDIA_BUCKET_ORIGIN = `https://${MEDIA_BUCKET}.s3.${MEDIA_BUCKET_REGION}.amazonaws.com/`;
+
+// Best-effort cleanup for the common "admin replaces or removes a photo" case, called from
+// every entity's update/delete handler below — without this, every replaced or removed photo
+// would sit in S3 unreferenced forever. Only ever touches URLs actually inside our own
+// uploads/ prefix (never a hardcoded/external URL slipped into a photo field), and never
+// blocks or fails the request it's called from if the delete itself fails — the DynamoDB
+// write it's cleaning up after already succeeded by the time this runs.
+async function deleteMediaObjectIfOwned(url) {
+  if (!url || !url.startsWith(MEDIA_BUCKET_ORIGIN)) return;
+  const key = url.slice(MEDIA_BUCKET_ORIGIN.length);
+  if (!key.startsWith("uploads/")) return;
+  try {
+    await s3.send(new DeleteObjectCommand({ Bucket: MEDIA_BUCKET, Key: key }));
+  } catch (err) {
+    console.error("Failed to delete old media object:", err);
+  }
+}
+
 // Same "other locales default to English on create, preserved on update" convention as
 // impact metrics — see handleCreateImpactMetric / handleUpdateImpactMetric above.
 async function handleCreateEvent(event, headers) {
@@ -764,7 +817,11 @@ async function handleUpdateTeamMember(event, headers, slug) {
   if (typeof payload.name === "string" && payload.name.trim()) item.name = payload.name.trim().slice(0, 100);
   if (typeof payload.roleEn === "string") item.role = { ...item.role, en: payload.roleEn.trim().slice(0, 100) };
   if (typeof payload.bioEn === "string") item.bio = { ...item.bio, en: payload.bioEn.trim().slice(0, 1000) };
-  if (typeof payload.photo === "string") item.photo = payload.photo.trim().slice(0, 500);
+  if (typeof payload.photo === "string") {
+    const newPhoto = payload.photo.trim().slice(0, 500);
+    if (existing.Item.photo && existing.Item.photo !== newPhoto) await deleteMediaObjectIfOwned(existing.Item.photo);
+    item.photo = newPhoto;
+  }
   item.updatedAt = new Date().toISOString();
 
   await ddb.send(new PutCommand({ TableName: TEAM_TABLE, Item: item }));
@@ -772,6 +829,8 @@ async function handleUpdateTeamMember(event, headers, slug) {
 }
 
 async function handleDeleteTeamMember(headers, slug) {
+  const existing = await ddb.send(new GetCommand({ TableName: TEAM_TABLE, Key: { slug } }));
+  if (existing.Item?.photo) await deleteMediaObjectIfOwned(existing.Item.photo);
   await ddb.send(new DeleteCommand({ TableName: TEAM_TABLE, Key: { slug } }));
   return json(200, headers, { ok: true });
 }
@@ -831,7 +890,11 @@ async function handleUpdatePartner(event, headers, slug) {
 
   const item = { ...existing.Item };
   if (typeof payload.name === "string" && payload.name.trim()) item.name = payload.name.trim().slice(0, 100);
-  if (typeof payload.logo === "string") item.logo = payload.logo.trim().slice(0, 500);
+  if (typeof payload.logo === "string") {
+    const newLogo = payload.logo.trim().slice(0, 500);
+    if (existing.Item.logo && existing.Item.logo !== newLogo) await deleteMediaObjectIfOwned(existing.Item.logo);
+    item.logo = newLogo;
+  }
   if (typeof payload.website === "string") item.website = payload.website.trim().slice(0, 300);
   item.updatedAt = new Date().toISOString();
 
@@ -840,6 +903,8 @@ async function handleUpdatePartner(event, headers, slug) {
 }
 
 async function handleDeletePartner(headers, slug) {
+  const existing = await ddb.send(new GetCommand({ TableName: PARTNERS_TABLE, Key: { slug } }));
+  if (existing.Item?.logo) await deleteMediaObjectIfOwned(existing.Item.logo);
   await ddb.send(new DeleteCommand({ TableName: PARTNERS_TABLE, Key: { slug } }));
   return json(200, headers, { ok: true });
 }
@@ -920,7 +985,11 @@ async function handleUpdateProgram(event, headers, slug) {
   if (typeof payload.bodyEn === "string") {
     item.body = { ...item.body, en: payload.bodyEn.trim().slice(0, 5000).split(/\n+/).filter(Boolean) };
   }
-  if (typeof payload.photo === "string") item.photo = payload.photo.trim().slice(0, 500);
+  if (typeof payload.photo === "string") {
+    const newPhoto = payload.photo.trim().slice(0, 500);
+    if (existing.Item.photo && existing.Item.photo !== newPhoto) await deleteMediaObjectIfOwned(existing.Item.photo);
+    item.photo = newPhoto;
+  }
   item.updatedAt = new Date().toISOString();
 
   await ddb.send(new PutCommand({ TableName: PROGRAMS_TABLE, Item: item }));
@@ -928,6 +997,8 @@ async function handleUpdateProgram(event, headers, slug) {
 }
 
 async function handleDeleteProgram(headers, slug) {
+  const existing = await ddb.send(new GetCommand({ TableName: PROGRAMS_TABLE, Key: { slug } }));
+  if (existing.Item?.photo) await deleteMediaObjectIfOwned(existing.Item.photo);
   await ddb.send(new DeleteCommand({ TableName: PROGRAMS_TABLE, Key: { slug } }));
   return json(200, headers, { ok: true });
 }
@@ -1005,7 +1076,11 @@ async function handleUpdateStory(event, headers, slug) {
   if (typeof payload.bodyEn === "string") {
     item.body = { ...item.body, en: payload.bodyEn.trim().slice(0, 5000).split(/\n+/).filter(Boolean) };
   }
-  if (typeof payload.photo === "string") item.photo = payload.photo.trim().slice(0, 500);
+  if (typeof payload.photo === "string") {
+    const newPhoto = payload.photo.trim().slice(0, 500);
+    if (existing.Item.photo && existing.Item.photo !== newPhoto) await deleteMediaObjectIfOwned(existing.Item.photo);
+    item.photo = newPhoto;
+  }
   item.updatedAt = new Date().toISOString();
 
   await ddb.send(new PutCommand({ TableName: STORIES_TABLE, Item: item }));
@@ -1013,6 +1088,8 @@ async function handleUpdateStory(event, headers, slug) {
 }
 
 async function handleDeleteStory(headers, slug) {
+  const existing = await ddb.send(new GetCommand({ TableName: STORIES_TABLE, Key: { slug } }));
+  if (existing.Item?.photo) await deleteMediaObjectIfOwned(existing.Item.photo);
   await ddb.send(new DeleteCommand({ TableName: STORIES_TABLE, Key: { slug } }));
   return json(200, headers, { ok: true });
 }

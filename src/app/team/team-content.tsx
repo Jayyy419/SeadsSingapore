@@ -15,7 +15,7 @@ export function TeamContent() {
           <article key={member.slug} className="section-card p-5">
             {member.photo ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={member.photo} alt="" className="h-24 w-full rounded-xl object-cover" />
+              <img src={member.photo} alt={member.name} className="h-24 w-full rounded-xl object-cover" />
             ) : (
               <div className="stripe-ph flex h-24 items-center justify-center rounded-xl">
                 <span className="text-[11px] text-[color:var(--brand-deep)]" style={{ fontFamily: "ui-monospace,monospace" }}>

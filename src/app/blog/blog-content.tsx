@@ -58,7 +58,7 @@ export function BlogContent() {
           >
             {story.photo && (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={story.photo} alt="" className="mb-3 h-32 w-full rounded-lg object-cover" />
+              <img src={story.photo} alt={story.title[locale]} className="mb-3 h-32 w-full rounded-lg object-cover" />
             )}
             <p className="text-xs font-semibold uppercase tracking-wide text-[color:var(--accent)]">{story.category[locale]}</p>
             <h2 className="font-display mt-2 text-2xl">{story.title[locale]}</h2>

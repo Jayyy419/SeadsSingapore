@@ -22,7 +22,7 @@ export function ProgramDetailContent({ slug }: { slug: string }) {
         <article className="section-card space-y-4 p-6 sm:p-8">
           {program.photo && (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={program.photo} alt="" className="h-48 w-full rounded-xl object-cover" />
+            <img src={program.photo} alt={program.name[locale]} className="h-48 w-full rounded-xl object-cover" />
           )}
           <p className="text-xs font-bold uppercase tracking-wide text-[color:var(--brand)]">{program.tag[locale]}</p>
           {program.body[locale].map((paragraph, i) => (
