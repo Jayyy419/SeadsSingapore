@@ -4,6 +4,95 @@ All notable changes to this project should be documented in this file.
 
 This format is inspired by Keep a Changelog and uses a date-based release style.
 
+## [2026-07-15] (29)
+
+### Added — Stories (the staff-authored blog) made admin-editable
+
+The last item from the feature/QOL review: the 4 stories on `/blog` were still hardcoded in
+`siteContent.ts`. Added a new `seads-stories` DynamoDB table (deliberately separate from the
+existing `seads-story-submissions` community-moderation queue — different shapes and
+workflows, see `docs/LEARNING_GUIDE.md` Part 15), full CRUD (`GET/POST /internal/stories`,
+`PUT/DELETE /internal/stories/{slug}`, public `GET /stories`), and a new `/admin/blog` admin
+page (distinct from the existing `/admin/stories` moderation queue — the nav now labels that
+one "Story submissions" to disambiguate). Existing story content was migrated into DynamoDB
+via the same temporary-debug-route extraction technique used for Programs, preserving all 4
+locales exactly.
+
+Every public consumer that used to import the static `stories` array now fetches live via a
+new `useStories()` hook (same static-fallback-then-live-swap pattern as the other entities):
+`blog-content.tsx`, `blog/[slug]/story-detail-content.tsx` (with a `loaded`-gated `notFound()`,
+same reasoning as the other detail pages), `blog/[slug]/page.tsx` (metadata + JSON-LD, dropped
+`generateStaticParams`), `blog/[slug]/opengraph-image.tsx`, `blog/rss.xml/route.ts`, and
+`sitemap.ts`. Stories also gained an optional `photo` field, editable via the shared
+`AdminImageUpload` component, rendered on `/blog`, the story detail page, and (see below) the
+homepage teaser.
+
+### Fixed — homepage never used any of the live data hooks
+
+Found while wiring up Stories: `src/app/page.tsx`'s Events/Programs/Stories/Team preview
+sections were still importing the static `siteContent.ts` arrays directly, even though each
+already had a live-fetching hook built for its own full page. An admin edit would show up
+everywhere except the homepage teaser. Swapped all four sections onto their respective hooks
+(`useEvents`/`usePrograms`/`useStories`/`useTeam`), with a fixed `slice(0, N)` cap per section
+so the homepage keeps its "curated preview" layout instead of growing unbounded as admins add
+content — see `docs/LEARNING_GUIDE.md` Part 15 for the full reasoning.
+
+## [2026-07-15] (28)
+
+### Added — Team, Partners, and Programs made admin-editable; audit log; media uploads
+
+A broader feature/QOL review turned up a punch list of gaps. This entry covers the
+infrastructure work; SEO/accessibility/pagination fixes are entry (27).
+
+- **Audit log**: every admin write (create/update/delete across all entity types) now appends
+  to a new `seads-admin-audit-log` DynamoDB table via a best-effort `logAudit()` helper —
+  failures are logged but never block the write itself. Viewable at `/admin/audit-log`. See
+  `docs/LEARNING_GUIDE.md` Part 15 for the "best-effort logging" design reasoning.
+- **Image/media uploads**: a new `seads-media` S3 bucket plus `POST /internal/upload-url`
+  (presigned PUT URLs, 5MB cap, JPEG/PNG/WebP/GIF allowlist) lets admins upload photos
+  directly from the browser to S3, bypassing the Lambda entirely for the actual file bytes. A
+  new `AdminImageUpload` component wraps the flow (validate → request presigned URL → PUT →
+  store the resulting public URL in a hidden form field) and is reused across every admin form
+  that needs a photo/logo. Fixed a CSP bug found only via a real browser: the S3 origin was
+  missing from `connect-src`/`img-src` in `security-headers.ts`.
+- **Team bios, Partners, and Programs are now admin-editable** (`/admin/team`,
+  `/admin/partners`, `/admin/programs`), each backed by its own new DynamoDB table
+  (`seads-team`/`seads-partners`/`seads-programs`) instead of the static `siteContent.ts`
+  arrays, which now serve only as the static fallback for a new `useTeam()`/`usePartners()`/
+  `usePrograms()` hook per entity (same static-fallback-then-live-swap pattern as
+  `useEvents()`). Partners is new content — the site had no partners page before. Existing
+  Programs content was migrated into DynamoDB via a temporary debug route (captured via curl,
+  deleted before commit) rather than hand-retyped, preserving all 4 locales exactly.
+  `/programs/[slug]` dropped `generateStaticParams` (no longer enumerable at build time) in
+  favor of a server-side fetch, mirroring the Events migration.
+
+New tables required IAM policy updates applied by the site owner via CloudShell, same process
+as prior entries.
+
+## [2026-07-15] (27)
+
+### Added — SEO, accessibility, and pagination fixes from a feature/QOL review
+
+- Fixed `sitemap.ts` to fetch live event/program/story slugs instead of only listing static
+  top-level routes for events and programs (it already covered stories via the static array at
+  the time).
+- Disallowed `/admin` in `robots.ts` — the admin panel was previously crawlable.
+- Removed the Vercel Web Analytics script (non-functional since the site moved to Amplify) and
+  corrected the privacy policy's claim about analytics accordingly.
+- Added `aria-label`s to the hamburger menu, theme toggle, and locale switcher.
+- Added a `generateMetadata` export to `/blog/submit`.
+- Added pagination (`AdminPagination` component, `page` search param) to every Lambda `Scan`-
+  backed list endpoint and its corresponding admin UI, to bound response size as tables grow.
+- Added a rendered preview ("how this will look on `/blog/{slug}`") to the story moderation
+  queue, so reviewing a submission doesn't require imagining the final layout.
+- Added per-route Open Graph images (`opengraph-image.tsx`) for program, event, and story
+  detail pages, via a shared `buildOgImage()` helper in `src/lib/og-image.tsx`.
+- Added per-page JSON-LD structured data (`Event`/`Article` schema.org types) to event and
+  story detail pages.
+- `/blog/submit` now reuses the shared `InterestForm` component instead of a hand-rolled form,
+  after fixing the actual gap that had prevented reuse (a missing "unconfigured" state) rather
+  than force-fitting a mismatched component.
+
 ## [2026-07-14] (21)
 
 ### Added — full admin CRUD, in-app password change, visual redesign

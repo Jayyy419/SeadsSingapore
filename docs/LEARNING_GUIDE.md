@@ -1928,6 +1928,129 @@ that exist *nowhere* else, so that check is the whole point, not a formality.
 
 ---
 
+## Part 15: A Second QOL Pass — Audit Logs, Media Uploads, and Turning the Rest of the Site's Content Admin-Editable
+
+After the admin CRUD work in Part 13, a broader feature review turned up a punch list of
+smaller gaps and one big one: Team, Partners, Programs, and the staff-authored blog Stories
+were all still hardcoded in `siteContent.ts`, meaning every content edit needed a code change
+and a redeploy. This part covers the architectural decisions from closing that gap, plus a
+few smaller lessons along the way.
+
+### Why admin actions needed an audit log, and what "best-effort" logging means
+
+With one shared admin password and no per-user accounts, there was no record of *who* deleted
+a submission or edited an event — just that it happened. The fix wasn't user accounts (too
+big a change for the actual risk here) but a `seads-admin-audit-log` DynamoDB table that every
+write handler appends to: `logAudit(event, action, entityType, detail)` records the action,
+the entity type/id, a timestamp, and `sourceIp` pulled from
+`event.requestContext.http.sourceIp` — labeled a "weak" signal in the code, not authoritative,
+since one shared password behind a house/office NAT can't distinguish two different people
+sharing it.
+
+The important design choice is that logging is **best-effort**: `logAudit` is wrapped in its
+own try/catch that only `console.error`s on failure, never throws. An audit log write failing
+must never block or roll back the actual action it's logging — the real operation (deleting a
+submission, say) already succeeded by the time `logAudit` runs, so treating a logging failure
+as fatal would mean a DynamoDB hiccup on the *audit table* breaks unrelated features. This is
+a general pattern for any "nice to have but not load-bearing" side effect: decide up front
+whether its failure should be visible-but-silent (this case) or should actually fail the
+request, and wrap accordingly — don't let it default to "whatever the language does," which
+for an unhandled `await` would be an unrelated 500.
+
+### The S3 presigned-upload pattern, and a CSP bug that only a real browser could catch
+
+Admin-editable content needing photos meant needing image uploads, and the existing
+architecture (Next.js API routes proxy every write to the Lambda) doesn't fit binary file
+uploads well — API Gateway HTTP APIs cap request payloads well below what a photo needs, and
+routing bytes through two extra hops (browser → Next.js → Lambda) for something that could go
+straight to storage is wasted latency. The fix is the standard **presigned URL** pattern:
+
+1. Browser asks the Lambda "I want to upload a JPEG" (`POST /internal/upload-url`).
+2. Lambda validates the content-type/size against an allowlist, generates a random S3 key
+   (`uploads/<uuid>.<ext>`), and returns a **presigned PUT URL** —a normal S3 URL with a
+   signature embedded in the query string proving the Lambda's credentials authorized this
+   specific upload, valid for a short window.
+3. Browser `PUT`s the file bytes directly to that URL — straight to S3, no Lambda involved,
+   no payload-size ceiling from API Gateway.
+4. The bucket has `s3:GetObject` allowed publicly (via bucket policy, not ACLs — Block Public
+   Access stays on) so the resulting URL is directly usable as an `<img src>`.
+
+The Lambda never sees the file's bytes at all, only the metadata needed to authorize where it
+can go — the actual data transfer is between the browser and S3.
+
+This is also where a real bug turned up that no amount of `curl` testing would have caught:
+the Content-Security-Policy headers (`src/lib/security-headers.ts`) restrict which origins the
+page is allowed to `fetch()` from (`connect-src`) and which origins images can load from
+(`img-src`). The S3 bucket's origin wasn't in either list. `curl` doesn't enforce CSP — it's a
+browser-enforced header, invisible to any test that isn't an actual browser — so this shipped
+silently until a Playwright test driving real Chromium browser console output surfaced
+`Refused to connect to 'https://seads-media.s3...' because it violates ... "connect-src"`. This
+is the same class of bug as the interest-form API's CSP gap from earlier in the project:
+**anything that adds a new origin the page talks to needs a corresponding CSP update, and the
+only reliable way to catch a missing one is testing in a real browser, not curl.**
+
+### One table per kind of content, not one shared "content" table
+
+Team, Partners, Programs, and Stories each got their own DynamoDB table
+(`seads-team`/`seads-partners`/`seads-programs`/`seads-stories`) rather than a single generic
+table with a `type` discriminator column. The tradeoff: a shared table means one set of CRUD
+handlers and one IAM permission to manage, at the cost of every item needing to carry fields
+only some types use (a Partner has no bio, a Team member has no logo/website) and every query
+needing to filter by type first. Separate tables mean a little more repetition in the Lambda
+(four near-identical `handleGet<Type>`/`handleCreate<Type>`/etc. handler sets) but each table's
+schema exactly matches what that content actually needs, and adding a field to one doesn't
+risk touching the others. At this project's scale — dozens of items per table, not millions —
+the repetition cost is smaller than the coupling risk, so separate tables won.
+
+The same reasoning applied a second time, more subtly, for Stories specifically: the site
+already had a `seads-story-submissions` table for **community-submitted** stories going
+through an approve/reject moderation queue. The new admin-authored Stories are a genuinely
+different shape (fully localized into 4 languages, slugged, with their own `/blog/[slug]`
+page, no moderation step) from community submissions (English-only, unslugged, shown inline
+on `/blog` with no detail page, gated behind Approve/Reject). Rather than add a `kind` field to
+the existing table and branch on it everywhere, Stories got its own table — same "match the
+schema to the actual shape" logic as above, and it kept the moderation-queue code untouched
+instead of needing to thread a new discriminator through it.
+
+### Extracting hardcoded content into DynamoDB without hand-retyping it
+
+Moving Programs and Stories off `siteContent.ts` meant getting several paragraphs of
+already-translated, already-written content (4 languages each) into DynamoDB without
+introducing typos by hand-copying it. The trick: add a temporary Next.js Route Handler that
+does nothing but `return Response.json(programs)` (or `stories`), build and start the app,
+`curl` that route with an authenticated session cookie, capture the JSON to a file, then
+**delete the route immediately**, before committing anything. That JSON file then feeds a
+small boto3 script that `put_item`s each entry into the new table. The temporary route never
+needs to be secure or good code — it exists for one `curl` call and is gone before the next
+`git status`. This is a reusable technique any time structured data needs to move from
+committed source into a database without manual re-entry.
+
+### The seed/fallback content in `siteContent.ts` still matters after the migration
+
+Even after Team/Partners/Programs/Stories moved to DynamoDB, `siteContent.ts` still exports
+`teamMembers`/`programs`/`stories` arrays — now purely as the **static fallback** for each
+`use<Type>()` hook (`usePrograms()`, `useStories()`, etc.), following the same pattern
+`useEvents()` established earlier: render the bundled static data immediately (no loading
+flash), then swap in the live fetch once it resolves, falling back silently to the static data
+if the fetch fails. Partners is the one exception with no static fallback, since no partner
+data existed before this feature — its hook just starts from an empty list.
+
+### A staleness bug found while wiring up Stories: the homepage never used any of the live hooks
+
+While making Stories admin-editable, a check of `src/app/page.tsx` (the homepage) turned up
+that its Events/Programs/Stories/Team preview sections were *still* importing the static
+`siteContent.ts` arrays directly, even though each of those had already grown a live-fetching
+hook (`useEvents`, `usePrograms`, `useStories`, `useTeam`) for their own full pages. The
+practical effect: an admin editing a program's description would see the change reflected on
+`/programs` and `/programs/[slug]`, but the stale pre-edit text would keep showing on the
+homepage teaser section indefinitely. This wasn't part of the original punch list — it was
+found by tracing "does this content actually appear admin-editable everywhere it's shown," the
+same question the whole batch was trying to answer for Stories specifically. Fixed by swapping
+all four homepage sections onto their respective hooks, with a `slice(0, N)` cap on each
+(`HOME_EVENTS_LIMIT` etc.) so the homepage keeps behaving like a curated preview instead of
+growing an arbitrarily long grid as admins add more content over time — the full lists still
+live on their own dedicated pages.
+
 ## Glossary
 
 - **Accessible name**: the text assistive technology (screen readers) announces for an

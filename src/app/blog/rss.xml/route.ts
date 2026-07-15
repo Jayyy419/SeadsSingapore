@@ -1,5 +1,6 @@
-import { stories } from "@/content/siteContent";
+import type { Story } from "@/content/siteContent";
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://jztkgrm3lh.execute-api.ap-southeast-1.amazonaws.com";
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://main.d2mrph1bcp6pjx.amplifyapp.com";
 
 function escapeXml(text: string): string {
@@ -7,8 +8,13 @@ function escapeXml(text: string): string {
 }
 
 // Feeds have no per-viewer locale — English is canonical here, same reasoning as the
-// events.ics feed and the page metadata elsewhere in the app.
+// events.ics feed and the page metadata elsewhere in the app. Stories moved from
+// siteContent.ts (static) to DynamoDB, so this now fetches the live list on every request.
 export async function GET() {
+  const res = await fetch(`${API_BASE_URL}/stories`, { cache: "no-store" });
+  const data = res.ok ? await res.json() : { stories: [] };
+  const stories: Story[] = data.stories ?? [];
+
   const items = stories
     .map(
       (story) => `
