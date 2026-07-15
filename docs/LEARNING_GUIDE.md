@@ -2097,6 +2097,86 @@ the code is wrong — the test harness's own infrastructure can be the confoundi
 inspecting the system's own state (here, the DynamoDB rate-limit items) reveals that much
 faster than guessing from HTTP status codes alone.
 
+## Part 16: A Parallel Audit, a Real XSS Bug, and a Playwright Testing Gotcha
+
+After the login-rate-limiting fix, a 4-way audit run in parallel (one subagent each on i18n,
+security, performance/SEO, and admin UX) turned up ten findings. This part covers the most
+transferable lessons from fixing them.
+
+### `JSON.stringify` doesn't make data safe to put in a `<script>` tag
+
+Two pages (`blog/[slug]`, `events/[slug]`) build JSON-LD structured data from admin-editable
+fields and inject it via `dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}`. This
+looks safe — it's JSON, not HTML — but `JSON.stringify` only escapes what JSON syntax requires
+(quotes, backslashes, control characters); it does *not* escape `<`. Since the output lands
+inside an actual `<script>` tag, a title field containing the literal string
+`</script><script>alert(1)</script>` closes the JSON-LD script tag early and opens a new one
+that the browser executes as real JavaScript — this is a textbook script-tag-injection
+technique, and admin-editable free-text fields are exactly the kind of input that eventually
+contains something like this by accident (a title genuinely using `<` for "less than", say).
+
+The fix is a one-line, no-behavior-change transform: replace every `<` in the stringified JSON
+with its Unicode escape, `<`. This is always safe to do — `<` inside a JSON string
+parses back to the literal `<` character identically, so no legitimate data is altered — and
+it's exactly what makes this a good default rather than a targeted patch: wrapping the *helper
+function* (`safeJsonLdString()`) rather than fixing the two call sites individually means any
+future JSON-LD addition gets the escaping automatically, including one call site that used
+fully static, trusted data (the root layout's organization JSON-LD) where the bug couldn't
+actually fire — applying the fix there too costs nothing and removes a foot-gun if that JSON-LD
+ever grows a dynamic field later.
+
+### "What changed" requires comparing values, not looking at what was submitted
+
+The audit log recorded every update but only ever showed the entity's slug, not what was
+actually edited. The tempting-but-wrong fix is to log `Object.keys(payload)` from the request
+body — but every admin edit form in this codebase submits *all* its fields on every save
+(there's no dirty-field tracking), so that would report every field as "changed" on every
+single edit, which is no more informative than not logging anything. The correct fix compares
+the *old* stored value against the *new* one per field, after the update logic runs — a small
+`diffFields(oldItem, newItem, fieldNames)` helper using `JSON.stringify` equality (cheap and
+correct for the object/array-shaped fields here, like `Record<Locale, string>` or
+`string[]` paragraph arrays) — and only include a field in the "changed" list if the values
+actually differ. The general principle: "what did the client send" and "what actually changed"
+are different questions, and only one of them is useful for an audit trail.
+
+### `next/image`'s `fill` mode needs a *sized* positioned ancestor — reaching for it from
+### existing fixed-height utility classes is usually a drop-in swap
+
+Every content photo (Team/Partners/Programs/Stories) had a fixed-height Tailwind class already
+(`h-24 w-full object-cover`, etc.) on a raw `<img>`. Converting to `next/image`'s `fill` mode
+just means wrapping that element in a `<div className="relative h-24 w-full overflow-hidden">`
+and moving the height/rounding classes there, then rendering `<Image fill className="object-cover" sizes="..." />`
+inside it — `fill` makes the image absolutely position itself to match its nearest `position:
+relative` ancestor's box, so the sizing that used to live on the `<img>` tag itself just moves
+one level up. The one shape that doesn't fit this pattern is content with a variable aspect
+ratio that shouldn't be cropped — partner logos here, rendered at `h-14 w-auto max-w-[160px]
+object-contain` so each logo keeps its own proportions. `fill` always stretches to its parent's
+box, which is wrong for `object-contain` content of unknown/varying shape; the right mode there
+is passing explicit `width`/`height` props (used only for next/image's optimization math, not
+literal rendered size) and letting the existing `className` override the actual display size,
+exactly as it did on the plain `<img>` — the nominal width/height don't need to match the real
+image's aspect ratio, they just need to be *a* reasonable size for Next's image loader to
+request.
+
+### A Playwright gotcha: `hasText` cannot see inside an `<input>`'s `value`
+
+Verifying the new delete-confirmation flow needed to locate a specific admin form by the
+content an admin had just typed into it. `page.locator("form").filter({ hasText: "some name"
+})` is the natural way to scope a locator to "the form containing this text" — and it worked
+immediately for Team/Programs/Events/Stories, whose admin rows show the name/title as a
+`<p>`/`<h2>` next to the edit fields. It silently matched *zero* forms for Partners, even
+though the page's raw HTML — confirmed via a plain `curl` of the same authenticated page —
+definitely contained the string. The reason: Partners' admin row has no separate display
+element for the name at all, only the `<input name="name" defaultValue={partner.name}>` field
+itself — and `hasText` matches against an element's rendered *text content* (like
+`.textContent` in the DOM), which does not include a form control's `value`. The fix was a
+different locator entirely: `.filter({ has: page.locator('input[name="name"][value="..."]')
+})`, matching on the input's value attribute directly rather than treated-as-text content. The
+transferable lesson: when a locator search comes up empty despite `curl`-confirmed matching
+HTML, check whether the target text lives in an attribute (`value`, `alt`, `title`, `aria-
+label`) rather than as rendered text — `hasText` and similar text-matching APIs only ever see
+the latter.
+
 ## Glossary
 
 - **Accessible name**: the text assistive technology (screen readers) announces for an

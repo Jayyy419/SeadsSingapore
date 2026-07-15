@@ -4,6 +4,70 @@ All notable changes to this project should be documented in this file.
 
 This format is inspired by Keep a Changelog and uses a date-based release style.
 
+## [2026-07-15] (31)
+
+### Fixed — a stored XSS gap in JSON-LD, plus a round of admin UX and SEO/a11y fixes
+
+Found by a 4-way parallel audit (i18n, security, performance/SEO, admin UX) after the
+Team/Partners/Programs/Stories admin-editable batch shipped.
+
+- **Stored XSS via JSON-LD**: `blog/[slug]` and `events/[slug]` inject admin-editable fields
+  into a `<script type="application/ld+json">` tag via `JSON.stringify`, which doesn't escape
+  `<` — a title containing `</script><script>...` could break out and execute. Added a shared
+  `safeJsonLdString()` helper (`src/lib/json-ld.ts`) that escapes `<` to `<` (valid inside
+  a JSON string, parses back identically) and used it everywhere JSON-LD is rendered, including
+  the previously-safe static organization JSON-LD in the root layout, for consistency.
+- **Reordering**: Team, Partners, Programs, and Impact metrics all sort by an `order` field
+  that was previously set once at creation and never editable — the only way to reorder was
+  delete-and-recreate, which also changes the slug. Added an "Order (lower shows first)" input
+  to each entity's edit form, and the Lambda's four `handleUpdate*` handlers now accept and
+  persist it.
+- **Delete confirmation**: no admin delete button anywhere had a confirmation step — one
+  misclick permanently removed a team member, program, story, etc. Added a shared
+  `ConfirmSubmitButton` component (native `confirm()` dialog before the action fires) and used
+  it on all 8 admin pages with a delete action.
+- **Fetch-error vs. empty state**: every admin list page's data-fetch helper collapsed a
+  failed request to the same empty array as "genuinely zero items," which could read to an
+  admin as "all my content got deleted." Added a shared `AdminFetchError` banner and changed
+  all 9 list-page fetchers to report success/failure separately.
+- **`<html lang>` never updated with the selected locale** — always "en" regardless of what a
+  visitor picked, since the server can't know a stored client preference before first paint
+  and nothing corrected it after. `LocaleProvider` now syncs `document.documentElement.lang`
+  whenever the active locale changes.
+- **Canonical URLs**: added `alternates.canonical` to every static page and both dynamic
+  `[slug]` route types — previously unset anywhere, which risks duplicate-content indexing if
+  the site ever moves off its current amplifyapp.com URL.
+- **Remaining hardcoded English strings** localized: the "portrait photo" placeholder, the
+  media gallery's "All" filter label, and the admin login page (previously the one page in the
+  `/admin` tree a logged-out visitor could actually see, and the only one with zero i18n).
+- **Content photos migrated to `next/image`**: Team/Partners/Programs/Stories photos were all
+  raw `<img>` tags with no lazy-loading, responsive sizing, or format optimization. Added
+  `images.remotePatterns` for the S3 media bucket to `next.config.ts` and swapped every
+  content-photo `<img>` to `next/image` (`fill` for fixed-aspect-ratio boxes, explicit
+  `width`/`height` for partner logos' variable aspect ratio). Left the admin upload widget's
+  own preview thumbnail as a raw `<img>` — deliberate, already-documented exception, since it's
+  an admin-only preview of a file just uploaded from the admin's own device.
+- **Audit log now records which fields changed**, not just which entity — added a
+  `diffFields()` helper each `handleUpdate*` handler uses to compare old vs. new values (the
+  admin forms always submit every field regardless of what was touched, so "which keys are in
+  the payload" wouldn't have answered "what changed"; only comparing values does).
+- **S3 media bucket configuration committed as IaC**: `media-bucket-policy.json` and
+  `media-bucket-cors.json` in `backend/interest-form/` now document the bucket policy and CORS
+  rules that were previously only described in prose, with `aws s3api` commands in the
+  Lambda's README to apply/reproduce them. Also fixed a real bug found while writing that
+  documentation: the README's "updating the IAM policy" instructions referenced the wrong
+  policy name (`seads-interest-form-exec-policy`, a smaller pre-existing policy) instead of the
+  one actually kept in sync with `iam-policy.json` (`seads-interest-form-policy`) — following
+  the old instructions literally would have overwritten the wrong policy.
+
+Verified with Playwright against a local production build talking to the live Lambda: team
+member reordering (by slug, since reordering deliberately changes list position — confirmed
+via `order` persisting across a save+reload+revert), partner creation, delete confirmation
+(dialog message, cancel preserves the item, confirm deletes it — confirmed via the public API
+before/after), audit log showing a changed-field list, the canonical tag, and `<html lang>`
+switching from `en` to `zh` when the locale switcher is used. Cleaned up all test data
+(`QOL Verify Test Partner`) from production DynamoDB afterward.
+
 ## [2026-07-15] (30)
 
 ### Added — dependency updates, admin dashboard links, S3 cleanup, login rate limiting

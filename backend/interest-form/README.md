@@ -10,9 +10,14 @@ email.
   `NEXT_PUBLIC_INTEREST_FORM_ENDPOINT`; `GET /health` returns `{"ok":true}` with no DB/SES
   calls, used only by the Route 53 health check
 - Lambda: `seads-interest-form-handler`
-- DynamoDB table: `seads-interest-submissions`
+- DynamoDB tables: `seads-interest-submissions`, `seads-impact-metrics`,
+  `seads-story-submissions`, `seads-admin-config`, `seads-events`, `seads-admin-audit-log`,
+  `seads-team`, `seads-partners`, `seads-programs`, `seads-stories`
+- S3 bucket: `seads-media` — admin-uploaded photos/logos (Team/Partners/Programs/Stories), see
+  "The media bucket" below
 - IAM role: `seads-interest-form-lambda-role-sg` (`iam-policy.json` + `iam-trust-policy.json`
-  in this directory — scoped to just this table + SES + logs + `seads/*` secrets)
+  in this directory — scoped to just these tables + this bucket + SES + logs + `seads/*`
+  secrets)
 
 ## Monitoring
 
@@ -63,12 +68,43 @@ If the Lambda needs a new permission, edit `iam-policy.json` in this directory, 
 ```bash
 aws iam put-role-policy \
   --role-name seads-interest-form-lambda-role-sg \
-  --policy-name seads-interest-form-exec-policy \
+  --policy-name seads-interest-form-policy \
   --policy-document file://iam-policy.json
 ```
 
 Keep the file in this repo as the source of truth — don't edit the policy directly in the
-AWS console without updating this file to match.
+AWS console without updating this file to match. Note the role also carries a second, older
+inline policy, `seads-interest-form-exec-policy` (just `Logs`/`DynamoWrite` on the original
+submissions table/`SesSend`/`SecretsRead`) — not tracked as a file here since
+`iam-policy.json` is a superset of everything it grants; don't confuse the two policy names
+when running the command above.
+
+## The media bucket
+
+`seads-media` (`ap-southeast-1`) stores admin-uploaded photos/logos for Team/Partners/
+Programs/Stories — see `docs/LEARNING_GUIDE.md` Part 15 for the presigned-upload architecture.
+Its configuration lives in three files in this directory, since none of it is expressed
+anywhere else as code:
+
+- `media-bucket-policy.json` — bucket policy granting public `s3:GetObject` on every object
+  (needed so uploaded photos are directly usable as `<img src>`/`next/image` sources).
+  `PutObject`/`DeleteObject` are *not* granted here — those come only from the Lambda's own
+  IAM role (`iam-policy.json`'s `MediaUploads` statement), via presigned URLs it issues.
+- Block Public Access stays on for ACLs (`BlockPublicAcls`/`IgnorePublicAcls: true`) but off
+  for bucket policies (`BlockPublicPolicy`/`RestrictPublicBuckets: false`) — the bucket is
+  public only through the policy above, never through object ACLs.
+- `media-bucket-cors.json` — allows `PUT` (browser → S3 direct upload) and `GET` from the
+  production Amplify origin and both local dev ports used across sessions
+  (`localhost:3000`/`3100`).
+
+Apply/verify with:
+
+```bash
+aws s3api put-bucket-policy --bucket seads-media --policy file://media-bucket-policy.json
+aws s3api put-public-access-block --bucket seads-media --public-access-block-configuration \
+  BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=false,RestrictPublicBuckets=false
+aws s3api put-bucket-cors --bucket seads-media --cors-configuration file://media-bucket-cors.json
+```
 
 ## Deploying a change
 

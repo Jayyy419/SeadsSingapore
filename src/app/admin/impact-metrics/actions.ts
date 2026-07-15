@@ -8,10 +8,11 @@ export async function updateImpactMetric(formData: FormData) {
   const value = String(formData.get("value") ?? "");
   const labelEn = String(formData.get("labelEn") ?? "");
   const noteEn = String(formData.get("noteEn") ?? "");
+  const order = Number(formData.get("order"));
 
   const res = await internalApiFetch(`/internal/impact-metrics/${encodeURIComponent(metricId)}`, {
     method: "PUT",
-    body: JSON.stringify({ value, label: { en: labelEn }, note: { en: noteEn } }),
+    body: JSON.stringify({ value, label: { en: labelEn }, note: { en: noteEn }, order }),
   });
   if (!res.ok) {
     throw new Error(`Failed to update metric ${metricId}: ${res.status}`);

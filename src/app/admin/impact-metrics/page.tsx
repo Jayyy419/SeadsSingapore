@@ -1,5 +1,7 @@
 import { internalApiFetch } from "@/lib/internal-api";
 import { AdminShell } from "@/components/admin-shell";
+import { AdminFetchError } from "@/components/admin-fetch-error";
+import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { updateImpactMetric, createImpactMetric, deleteImpactMetric } from "./actions";
 
 // See admin/events/page.tsx for why this must be force-dynamic.
@@ -10,17 +12,18 @@ type Metric = {
   value: string;
   label: Record<string, string>;
   note: Record<string, string>;
+  order?: number;
 };
 
-async function getMetrics(): Promise<Metric[]> {
+async function getMetrics(): Promise<{ metrics: Metric[]; error: boolean }> {
   const res = await internalApiFetch("/internal/impact-metrics");
-  if (!res.ok) return [];
+  if (!res.ok) return { metrics: [], error: true };
   const data = await res.json();
-  return data.metrics ?? [];
+  return { metrics: data.metrics ?? [], error: false };
 }
 
 export default async function AdminImpactMetricsPage() {
-  const metrics = await getMetrics();
+  const { metrics, error } = await getMetrics();
 
   return (
     <AdminShell
@@ -55,6 +58,15 @@ export default async function AdminImpactMetricsPage() {
                 className="mt-1 w-full rounded-lg border border-[color:var(--foreground-soft)] bg-[color:var(--surface)] px-3 py-2 text-sm"
               />
             </label>
+            <label className="text-sm text-[color:var(--foreground)]">
+              Order (lower shows first)
+              <input
+                type="number"
+                name="order"
+                defaultValue={metric.order ?? 0}
+                className="mt-1 w-full rounded-lg border border-[color:var(--foreground-soft)] bg-[color:var(--surface)] px-3 py-2 text-sm"
+              />
+            </label>
             <div className="flex gap-2 sm:col-span-3">
               <button
                 type="submit"
@@ -62,16 +74,18 @@ export default async function AdminImpactMetricsPage() {
               >
                 Save
               </button>
-              <button
-                type="submit"
+              <ConfirmSubmitButton
                 formAction={deleteImpactMetric}
+                confirmMessage={`Delete the "${metric.label?.en}" metric? This can't be undone.`}
                 className="rounded-full border border-[color:var(--foreground-soft)] px-4 py-2 text-xs font-semibold text-[color:var(--foreground)] hover:border-[#e2965f] hover:text-[#e2965f]"
               >
                 Delete
-              </button>
+              </ConfirmSubmitButton>
             </div>
           </form>
         ))}
+        {error && <AdminFetchError />}
+        {!error && metrics.length === 0 && <p className="text-sm text-[color:var(--muted)]">No metrics yet.</p>}
       </div>
 
       <div className="mt-10">

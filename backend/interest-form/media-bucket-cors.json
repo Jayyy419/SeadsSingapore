@@ -1,0 +1,12 @@
+[
+  {
+    "AllowedHeaders": ["*"],
+    "AllowedMethods": ["PUT", "GET"],
+    "AllowedOrigins": [
+      "https://main.d2mrph1bcp6pjx.amplifyapp.com",
+      "http://localhost:3000",
+      "http://localhost:3100"
+    ],
+    "MaxAgeSeconds": 3000
+  }
+]

@@ -9,10 +9,11 @@ export async function updateTeamMember(formData: FormData) {
   const roleEn = String(formData.get("roleEn") ?? "");
   const bioEn = String(formData.get("bioEn") ?? "");
   const photo = String(formData.get("photo") ?? "");
+  const order = Number(formData.get("order"));
 
   const res = await internalApiFetch(`/internal/team/${encodeURIComponent(slug)}`, {
     method: "PUT",
-    body: JSON.stringify({ name, roleEn, bioEn, photo }),
+    body: JSON.stringify({ name, roleEn, bioEn, photo, order }),
   });
   if (!res.ok) {
     throw new Error(`Failed to update team member ${slug}: ${res.status}`);

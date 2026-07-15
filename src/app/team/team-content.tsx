@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { SiteShell } from "@/components/site-shell";
 import { useLocale } from "@/lib/locale-context";
 import { useTeam } from "@/lib/use-team";
@@ -14,12 +15,13 @@ export function TeamContent() {
         {team.map((member) => (
           <article key={member.slug} className="section-card p-5">
             {member.photo ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={member.photo} alt={member.name} className="h-24 w-full rounded-xl object-cover" />
+              <div className="relative h-24 w-full overflow-hidden rounded-xl">
+                <Image src={member.photo} alt={member.name} fill sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw" className="object-cover" />
+              </div>
             ) : (
               <div className="stripe-ph flex h-24 items-center justify-center rounded-xl">
                 <span className="text-[11px] text-[color:var(--brand-deep)]" style={{ fontFamily: "ui-monospace,monospace" }}>
-                  portrait photo
+                  {t.portraitPhotoLabel}
                 </span>
               </div>
             )}

@@ -8,10 +8,11 @@ export async function updatePartner(formData: FormData) {
   const name = String(formData.get("name") ?? "");
   const logo = String(formData.get("logo") ?? "");
   const website = String(formData.get("website") ?? "");
+  const order = Number(formData.get("order"));
 
   const res = await internalApiFetch(`/internal/partners/${encodeURIComponent(slug)}`, {
     method: "PUT",
-    body: JSON.stringify({ name, logo, website }),
+    body: JSON.stringify({ name, logo, website, order }),
   });
   if (!res.ok) {
     throw new Error(`Failed to update partner ${slug}: ${res.status}`);

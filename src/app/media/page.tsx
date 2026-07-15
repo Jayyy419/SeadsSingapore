@@ -4,6 +4,7 @@ import { MediaContent } from "./media-content";
 export const metadata: Metadata = {
   title: "Media",
   description: "Photos from Seads programs, events, and youth-led community action across Southeast Asia.",
+  alternates: { canonical: "/media" },
 };
 
 export default function MediaPage() {

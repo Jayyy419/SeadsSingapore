@@ -11,6 +11,12 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  images: {
+    // Admin-uploaded Team/Partners/Programs/Stories photos live in this S3 bucket — needed so
+    // next/image is allowed to fetch and optimize them (see src/lib/security-headers.ts for the
+    // matching CSP img-src entry).
+    remotePatterns: [{ protocol: "https", hostname: "seads-media.s3.ap-southeast-1.amazonaws.com" }],
+  },
 };
 
 // withSentryConfig no-ops sensibly if there's no auth token/org/project configured (source

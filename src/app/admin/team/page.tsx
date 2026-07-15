@@ -1,6 +1,8 @@
 import { internalApiFetch } from "@/lib/internal-api";
 import { AdminShell } from "@/components/admin-shell";
 import { AdminImageUpload } from "@/components/admin-image-upload";
+import { AdminFetchError } from "@/components/admin-fetch-error";
+import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { updateTeamMember, createTeamMember, deleteTeamMember } from "./actions";
 
 // See admin/events/page.tsx for why this must be force-dynamic.
@@ -12,17 +14,18 @@ type TeamMember = {
   role: Record<string, string>;
   bio: Record<string, string>;
   photo?: string;
+  order?: number;
 };
 
-async function getTeam(): Promise<TeamMember[]> {
+async function getTeam(): Promise<{ team: TeamMember[]; error: boolean }> {
   const res = await internalApiFetch("/internal/team");
-  if (!res.ok) return [];
+  if (!res.ok) return { team: [], error: true };
   const data = await res.json();
-  return data.team ?? [];
+  return { team: data.team ?? [], error: false };
 }
 
 export default async function AdminTeamPage() {
-  const team = await getTeam();
+  const { team, error } = await getTeam();
 
   return (
     <AdminShell
@@ -38,6 +41,15 @@ export default async function AdminTeamPage() {
               <input
                 name="name"
                 defaultValue={member.name}
+                className="mt-1 w-full rounded-lg border border-[color:var(--foreground-soft)] bg-[color:var(--surface)] px-3 py-2 text-sm"
+              />
+            </label>
+            <label className="text-sm text-[color:var(--foreground)]">
+              Order (lower shows first)
+              <input
+                type="number"
+                name="order"
+                defaultValue={member.order ?? 0}
                 className="mt-1 w-full rounded-lg border border-[color:var(--foreground-soft)] bg-[color:var(--surface)] px-3 py-2 text-sm"
               />
             </label>
@@ -68,17 +80,18 @@ export default async function AdminTeamPage() {
               >
                 Save
               </button>
-              <button
-                type="submit"
+              <ConfirmSubmitButton
                 formAction={deleteTeamMember}
+                confirmMessage={`Delete ${member.name}? This can't be undone.`}
                 className="rounded-full border border-[color:var(--foreground-soft)] px-4 py-2 text-xs font-semibold text-[color:var(--foreground)] hover:border-[#e2965f] hover:text-[#e2965f]"
               >
                 Delete
-              </button>
+              </ConfirmSubmitButton>
             </div>
           </form>
         ))}
-        {team.length === 0 && <p className="text-sm text-[color:var(--muted)]">No team members yet.</p>}
+        {error && <AdminFetchError />}
+        {!error && team.length === 0 && <p className="text-sm text-[color:var(--muted)]">No team members yet.</p>}
       </div>
 
       <div className="mt-10">

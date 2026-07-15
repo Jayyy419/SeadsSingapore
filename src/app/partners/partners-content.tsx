@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { SiteShell } from "@/components/site-shell";
 import { useLocale } from "@/lib/locale-context";
 import { usePartners } from "@/lib/use-partners";
@@ -31,8 +32,16 @@ export function PartnersContent() {
           <div className="flex flex-wrap items-center gap-6">
             {partners.map((partner) => {
               const logo = partner.logo ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={partner.logo} alt={partner.name} className="h-14 w-auto max-w-[160px] object-contain grayscale hover:grayscale-0" />
+                // Fixed nominal width/height (used for next/image's optimization/aspect-ratio
+                // math, not the rendered size) since logos have unknown, varying aspect ratios
+                // — className overrides the actual display size, same as a plain <img>.
+                <Image
+                  src={partner.logo}
+                  alt={partner.name}
+                  width={160}
+                  height={56}
+                  className="h-14 w-auto max-w-[160px] object-contain grayscale hover:grayscale-0"
+                />
               ) : (
                 <span className="text-sm font-semibold text-[color:var(--foreground)]">{partner.name}</span>
               );

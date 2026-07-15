@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { StoryDetailContent } from "./story-detail-content";
+import { safeJsonLdString } from "@/lib/json-ld";
 
 // Stories moved from siteContent.ts (static) to DynamoDB so admins can create/edit/delete
 // them without a code change + deploy — that means generateStaticParams can no longer
@@ -17,7 +18,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const { slug } = await params;
   const story = await getStory(slug);
   if (!story) return {};
-  return { title: story.title.en, description: story.excerpt.en };
+  return { title: story.title.en, description: story.excerpt.en, alternates: { canonical: `/blog/${slug}` } };
 }
 
 // Only fields backed by real story data — no fabricated publish date, since stories don't
@@ -39,7 +40,7 @@ export default async function StoryDetailPage({ params }: { params: Promise<{ sl
   return (
     <>
       {story && (
-        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(buildArticleJsonLd(story)) }} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLdString(buildArticleJsonLd(story)) }} />
       )}
       <StoryDetailContent slug={slug} />
     </>

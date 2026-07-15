@@ -17,7 +17,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const { slug } = await params;
   const program = await getProgram(slug);
   if (!program) return {};
-  return { title: program.name.en, description: program.description.en };
+  return { title: program.name.en, description: program.description.en, alternates: { canonical: `/programs/${slug}` } };
 }
 
 export default async function ProgramDetailPage({ params }: { params: Promise<{ slug: string }> }) {

@@ -1,6 +1,8 @@
 import { internalApiFetch } from "@/lib/internal-api";
 import { AdminShell } from "@/components/admin-shell";
 import { AdminImageUpload } from "@/components/admin-image-upload";
+import { AdminFetchError } from "@/components/admin-fetch-error";
+import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { updateProgram, createProgram, deleteProgram } from "./actions";
 
 // See admin/events/page.tsx for why this must be force-dynamic.
@@ -14,17 +16,18 @@ type Program = {
   who: Record<string, string>;
   body: Record<string, string[]>;
   photo?: string;
+  order?: number;
 };
 
-async function getPrograms(): Promise<Program[]> {
+async function getPrograms(): Promise<{ programs: Program[]; error: boolean }> {
   const res = await internalApiFetch("/internal/programs");
-  if (!res.ok) return [];
+  if (!res.ok) return { programs: [], error: true };
   const data = await res.json();
-  return data.programs ?? [];
+  return { programs: data.programs ?? [], error: false };
 }
 
 export default async function AdminProgramsPage() {
-  const programs = await getPrograms();
+  const { programs, error } = await getPrograms();
 
   return (
     <AdminShell
@@ -49,6 +52,15 @@ export default async function AdminProgramsPage() {
               <input
                 name="tagEn"
                 defaultValue={program.tag?.en}
+                className="mt-1 w-full rounded-lg border border-[color:var(--foreground-soft)] bg-[color:var(--surface)] px-3 py-2 text-sm"
+              />
+            </label>
+            <label className="text-sm text-[color:var(--foreground)]">
+              Order (lower shows first)
+              <input
+                type="number"
+                name="order"
+                defaultValue={program.order ?? 0}
                 className="mt-1 w-full rounded-lg border border-[color:var(--foreground-soft)] bg-[color:var(--surface)] px-3 py-2 text-sm"
               />
             </label>
@@ -87,17 +99,18 @@ export default async function AdminProgramsPage() {
               >
                 Save
               </button>
-              <button
-                type="submit"
+              <ConfirmSubmitButton
                 formAction={deleteProgram}
+                confirmMessage={`Delete ${program.name?.en}? This can't be undone.`}
                 className="rounded-full border border-[color:var(--foreground-soft)] px-4 py-2 text-xs font-semibold text-[color:var(--foreground)] hover:border-[#e2965f] hover:text-[#e2965f]"
               >
                 Delete
-              </button>
+              </ConfirmSubmitButton>
             </div>
           </form>
         ))}
-        {programs.length === 0 && <p className="text-sm text-[color:var(--muted)]">No programs yet.</p>}
+        {error && <AdminFetchError />}
+        {!error && programs.length === 0 && <p className="text-sm text-[color:var(--muted)]">No programs yet.</p>}
       </div>
 
       <div className="mt-10">

@@ -11,10 +11,11 @@ export async function updateProgram(formData: FormData) {
   const whoEn = String(formData.get("whoEn") ?? "");
   const bodyEn = String(formData.get("bodyEn") ?? "");
   const photo = String(formData.get("photo") ?? "");
+  const order = Number(formData.get("order"));
 
   const res = await internalApiFetch(`/internal/programs/${encodeURIComponent(slug)}`, {
     method: "PUT",
-    body: JSON.stringify({ tagEn, nameEn, descriptionEn, whoEn, bodyEn, photo }),
+    body: JSON.stringify({ tagEn, nameEn, descriptionEn, whoEn, bodyEn, photo, order }),
   });
   if (!res.ok) {
     throw new Error(`Failed to update program ${slug}: ${res.status}`);

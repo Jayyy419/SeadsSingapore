@@ -26,6 +26,14 @@ async function scanAll(tableName) {
   return items;
 }
 
+// Used by every handleUpdate* to report which fields an edit actually changed, for the audit
+// log — the create/update Server Actions always submit every field on the form regardless of
+// whether the admin touched it, so "which keys were in the payload" wouldn't answer "what
+// changed"; only comparing old vs. new values does.
+function diffFields(oldItem, newItem, fields) {
+  return fields.filter((f) => JSON.stringify(oldItem[f]) !== JSON.stringify(newItem[f]));
+}
+
 const TABLE_NAME = process.env.TABLE_NAME;
 const IMPACT_METRICS_TABLE = process.env.IMPACT_METRICS_TABLE;
 const STORY_SUBMISSIONS_TABLE = process.env.STORY_SUBMISSIONS_TABLE;
@@ -84,6 +92,18 @@ async function logAudit(event, action, entityType, detail) {
     );
   } catch (err) {
     console.error("Audit log write failed:", err);
+  }
+}
+
+// Builds the audit log's `detail` string for an update: the slug alone, or the slug plus
+// which fields actually changed (from the `changed` array a handleUpdate* response includes)
+// when there's something to show — see diffFields() above for how that array is computed.
+function withChanges(slug, res) {
+  try {
+    const body = JSON.parse(res.body);
+    return body.changed?.length ? `${slug} (${body.changed.join(", ")})` : slug;
+  } catch {
+    return slug;
   }
 }
 
@@ -468,16 +488,14 @@ async function handleUpdateImpactMetric(event, headers, metricId) {
       if (typeof payload.note[locale] === "string") note[locale] = payload.note[locale].trim().slice(0, 200);
     }
   }
+  const order = Number.isFinite(Number(payload.order)) ? Number(payload.order) : existing.Item.order;
 
   const updatedAt = new Date().toISOString();
-  await ddb.send(
-    new PutCommand({
-      TableName: IMPACT_METRICS_TABLE,
-      Item: { ...existing.Item, value, label, note, updatedAt },
-    })
-  );
+  const item = { ...existing.Item, value, label, note, order, updatedAt };
+  const changed = diffFields(existing.Item, item, ["value", "label", "note", "order"]);
+  await ddb.send(new PutCommand({ TableName: IMPACT_METRICS_TABLE, Item: item }));
 
-  return json(200, headers, { ok: true });
+  return json(200, headers, { ok: true, changed });
 }
 
 function slugify(text) {
@@ -740,9 +758,10 @@ async function handleUpdateEvent(event, headers, slug) {
     else if (Number.isFinite(capacity)) item.capacity = capacity;
   }
   item.updatedAt = new Date().toISOString();
+  const changed = diffFields(existing.Item, item, ["title", "type", "location", "date", "body", "capacity"]);
 
   await ddb.send(new PutCommand({ TableName: EVENTS_TABLE, Item: item }));
-  return json(200, headers, { ok: true });
+  return json(200, headers, { ok: true, changed });
 }
 
 async function handleDeleteEvent(headers, slug) {
@@ -822,10 +841,12 @@ async function handleUpdateTeamMember(event, headers, slug) {
     if (existing.Item.photo && existing.Item.photo !== newPhoto) await deleteMediaObjectIfOwned(existing.Item.photo);
     item.photo = newPhoto;
   }
+  if (Number.isFinite(Number(payload.order))) item.order = Number(payload.order);
   item.updatedAt = new Date().toISOString();
+  const changed = diffFields(existing.Item, item, ["name", "role", "bio", "photo", "order"]);
 
   await ddb.send(new PutCommand({ TableName: TEAM_TABLE, Item: item }));
-  return json(200, headers, { ok: true });
+  return json(200, headers, { ok: true, changed });
 }
 
 async function handleDeleteTeamMember(headers, slug) {
@@ -896,10 +917,12 @@ async function handleUpdatePartner(event, headers, slug) {
     item.logo = newLogo;
   }
   if (typeof payload.website === "string") item.website = payload.website.trim().slice(0, 300);
+  if (Number.isFinite(Number(payload.order))) item.order = Number(payload.order);
   item.updatedAt = new Date().toISOString();
+  const changed = diffFields(existing.Item, item, ["name", "logo", "website", "order"]);
 
   await ddb.send(new PutCommand({ TableName: PARTNERS_TABLE, Item: item }));
-  return json(200, headers, { ok: true });
+  return json(200, headers, { ok: true, changed });
 }
 
 async function handleDeletePartner(headers, slug) {
@@ -990,10 +1013,12 @@ async function handleUpdateProgram(event, headers, slug) {
     if (existing.Item.photo && existing.Item.photo !== newPhoto) await deleteMediaObjectIfOwned(existing.Item.photo);
     item.photo = newPhoto;
   }
+  if (Number.isFinite(Number(payload.order))) item.order = Number(payload.order);
   item.updatedAt = new Date().toISOString();
+  const changed = diffFields(existing.Item, item, ["tag", "name", "description", "who", "body", "photo", "order"]);
 
   await ddb.send(new PutCommand({ TableName: PROGRAMS_TABLE, Item: item }));
-  return json(200, headers, { ok: true });
+  return json(200, headers, { ok: true, changed });
 }
 
 async function handleDeleteProgram(headers, slug) {
@@ -1082,9 +1107,10 @@ async function handleUpdateStory(event, headers, slug) {
     item.photo = newPhoto;
   }
   item.updatedAt = new Date().toISOString();
+  const changed = diffFields(existing.Item, item, ["category", "title", "excerpt", "body", "photo"]);
 
   await ddb.send(new PutCommand({ TableName: STORIES_TABLE, Item: item }));
-  return json(200, headers, { ok: true });
+  return json(200, headers, { ok: true, changed });
 }
 
 async function handleDeleteStory(headers, slug) {
@@ -1193,7 +1219,7 @@ export const handler = async (event) => {
     if (method === "PUT" && metricMatch) {
       const metricId = decodeURIComponent(metricMatch[1]);
       const res = await handleUpdateImpactMetric(event, headers, metricId);
-      if (res.statusCode < 300) await logAudit(event, "update", "impact-metric", metricId);
+      if (res.statusCode < 300) await logAudit(event, "update", "impact-metric", withChanges(metricId, res));
       return res;
     }
     if (method === "DELETE" && metricMatch) {
@@ -1246,7 +1272,7 @@ export const handler = async (event) => {
     if (method === "PUT" && eventMatch) {
       const slug = decodeURIComponent(eventMatch[1]);
       const res = await handleUpdateEvent(event, headers, slug);
-      if (res.statusCode < 300) await logAudit(event, "update", "event", slug);
+      if (res.statusCode < 300) await logAudit(event, "update", "event", withChanges(slug, res));
       return res;
     }
     if (method === "DELETE" && eventMatch) {
@@ -1278,7 +1304,7 @@ export const handler = async (event) => {
     if (method === "PUT" && teamMatch) {
       const slug = decodeURIComponent(teamMatch[1]);
       const res = await handleUpdateTeamMember(event, headers, slug);
-      if (res.statusCode < 300) await logAudit(event, "update", "team-member", slug);
+      if (res.statusCode < 300) await logAudit(event, "update", "team-member", withChanges(slug, res));
       return res;
     }
     if (method === "DELETE" && teamMatch) {
@@ -1299,7 +1325,7 @@ export const handler = async (event) => {
     if (method === "PUT" && partnerMatch) {
       const slug = decodeURIComponent(partnerMatch[1]);
       const res = await handleUpdatePartner(event, headers, slug);
-      if (res.statusCode < 300) await logAudit(event, "update", "partner", slug);
+      if (res.statusCode < 300) await logAudit(event, "update", "partner", withChanges(slug, res));
       return res;
     }
     if (method === "DELETE" && partnerMatch) {
@@ -1320,7 +1346,7 @@ export const handler = async (event) => {
     if (method === "PUT" && programMatch) {
       const slug = decodeURIComponent(programMatch[1]);
       const res = await handleUpdateProgram(event, headers, slug);
-      if (res.statusCode < 300) await logAudit(event, "update", "program", slug);
+      if (res.statusCode < 300) await logAudit(event, "update", "program", withChanges(slug, res));
       return res;
     }
     if (method === "DELETE" && programMatch) {
@@ -1341,7 +1367,7 @@ export const handler = async (event) => {
     if (method === "PUT" && blogStoryMatch) {
       const slug = decodeURIComponent(blogStoryMatch[1]);
       const res = await handleUpdateStory(event, headers, slug);
-      if (res.statusCode < 300) await logAudit(event, "update", "story", slug);
+      if (res.statusCode < 300) await logAudit(event, "update", "story", withChanges(slug, res));
       return res;
     }
     if (method === "DELETE" && blogStoryMatch) {

@@ -1,6 +1,8 @@
 import { internalApiFetch } from "@/lib/internal-api";
 import { AdminShell } from "@/components/admin-shell";
 import { AdminPagination } from "@/components/admin-pagination";
+import { AdminFetchError } from "@/components/admin-fetch-error";
+import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { deleteSubmission } from "./actions";
 
 // See admin/events/page.tsx for why this must be force-dynamic.
@@ -18,16 +20,16 @@ type Submission = {
   submittedAt: string;
 };
 
-async function getSubmissions(): Promise<Submission[]> {
+async function getSubmissions(): Promise<{ submissions: Submission[]; error: boolean }> {
   const res = await internalApiFetch("/internal/submissions");
-  if (!res.ok) return [];
+  if (!res.ok) return { submissions: [], error: true };
   const data = await res.json();
-  return data.submissions ?? [];
+  return { submissions: data.submissions ?? [], error: false };
 }
 
 export default async function AdminSubmissionsPage({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
   const { page: pageParam } = await searchParams;
-  const allSubmissions = await getSubmissions();
+  const { submissions: allSubmissions, error } = await getSubmissions();
 
   const totalPages = Math.max(1, Math.ceil(allSubmissions.length / PAGE_SIZE));
   const page = Math.min(Math.max(1, Number(pageParam) || 1), totalPages);
@@ -60,16 +62,24 @@ export default async function AdminSubmissionsPage({ searchParams }: { searchPar
                 <td className="px-3 py-3">
                   <form action={deleteSubmission}>
                     <input type="hidden" name="id" value={s.id} />
-                    <button type="submit" className="text-xs font-semibold text-[color:var(--muted)] hover:text-[#e2965f]">
+                    <ConfirmSubmitButton
+                      confirmMessage={`Delete the submission from ${s.name}? This can't be undone.`}
+                      className="text-xs font-semibold text-[color:var(--muted)] hover:text-[#e2965f]"
+                    >
                       Delete
-                    </button>
+                    </ConfirmSubmitButton>
                   </form>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
-        {allSubmissions.length === 0 && <p className="p-4 text-sm text-[color:var(--muted)]">No submissions yet.</p>}
+        {error && (
+          <div className="p-4">
+            <AdminFetchError />
+          </div>
+        )}
+        {!error && allSubmissions.length === 0 && <p className="p-4 text-sm text-[color:var(--muted)]">No submissions yet.</p>}
         <AdminPagination page={page} totalPages={totalPages} baseHref="/admin/submissions" />
       </div>
     </AdminShell>
