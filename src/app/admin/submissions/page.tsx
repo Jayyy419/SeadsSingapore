@@ -17,6 +17,7 @@ type Submission = {
   interest: string;
   interestType: string;
   eventSlug?: string;
+  rsvpStatus?: "confirmed" | "waitlisted";
   submittedAt: string;
 };
 
@@ -39,6 +40,7 @@ export default async function AdminSubmissionsPage({ searchParams }: { searchPar
     <AdminShell title={`Interest form submissions (${allSubmissions.length})`}>
       <div className="section-card overflow-x-auto p-2">
         <table className="w-full min-w-[780px] text-left text-sm">
+          <caption className="sr-only">Interest form submissions, most recent first</caption>
           <thead>
             <tr className="border-b border-[color:var(--foreground-soft)] text-xs uppercase text-[color:var(--muted)]">
               <th className="px-3 py-3">Submitted</th>
@@ -55,7 +57,14 @@ export default async function AdminSubmissionsPage({ searchParams }: { searchPar
                 <td className="whitespace-nowrap px-3 py-3">{new Date(s.submittedAt).toLocaleString()}</td>
                 <td className="px-3 py-3">{s.name}</td>
                 <td className="px-3 py-3">{s.email}</td>
-                <td className="px-3 py-3">{s.interestType || "—"}</td>
+                <td className="px-3 py-3">
+                  {s.interestType || "—"}
+                  {s.rsvpStatus && (
+                    <span className={`ml-1.5 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${s.rsvpStatus === "confirmed" ? "bg-[color:var(--accent)]/15 text-[color:var(--accent)]" : "bg-[#e2965f]/15 text-[#e2965f]"}`}>
+                      {s.rsvpStatus}
+                    </span>
+                  )}
+                </td>
                 <td className="max-w-[280px] truncate px-3 py-3" title={s.interest}>
                   {s.interest || "—"}
                 </td>

@@ -177,6 +177,7 @@ export type Translation = {
   adminLoginButton: string;
   adminLoginIncorrectPassword: string;
   adminLoginBackToSite: string;
+  skipToContent: string;
 };
 
 export const translations: Record<Locale, Translation> = {
@@ -317,6 +318,7 @@ export const translations: Record<Locale, Translation> = {
     portraitPhotoLabel: "portrait photo", mediaFilterAll: "All",
     adminLoginPasswordPlaceholder: "Password", adminLoginButton: "Log in",
     adminLoginIncorrectPassword: "Incorrect password.", adminLoginBackToSite: "Back to seads.sg",
+    skipToContent: "Skip to main content",
   },
   zh: {
     navHome: "首页", navAbout: "关于我们", navPrograms: "项目", navEvents: "活动", navStories: "故事", navMedia: "媒体", navDonate: "捐赠",
@@ -455,6 +457,7 @@ export const translations: Record<Locale, Translation> = {
     portraitPhotoLabel: "肖像照片", mediaFilterAll: "全部",
     adminLoginPasswordPlaceholder: "密码", adminLoginButton: "登录",
     adminLoginIncorrectPassword: "密码错误。", adminLoginBackToSite: "返回 seads.sg",
+    skipToContent: "跳到主要内容",
   },
   ms: {
     navHome: "Laman Utama", navAbout: "Tentang Kami", navPrograms: "Program", navEvents: "Acara", navStories: "Kisah", navMedia: "Media", navDonate: "Derma",
@@ -593,6 +596,7 @@ export const translations: Record<Locale, Translation> = {
     portraitPhotoLabel: "foto potret", mediaFilterAll: "Semua",
     adminLoginPasswordPlaceholder: "Kata laluan", adminLoginButton: "Log masuk",
     adminLoginIncorrectPassword: "Kata laluan salah.", adminLoginBackToSite: "Kembali ke seads.sg",
+    skipToContent: "Langkau ke kandungan utama",
   },
   hi: {
     navHome: "होम", navAbout: "हमारे बारे में", navPrograms: "कार्यक्रम", navEvents: "इवेंट्स", navStories: "कहानियाँ", navMedia: "मीडिया", navDonate: "दान करें",
@@ -731,5 +735,6 @@ export const translations: Record<Locale, Translation> = {
     portraitPhotoLabel: "पोर्ट्रेट फोटो", mediaFilterAll: "सभी",
     adminLoginPasswordPlaceholder: "पासवर्ड", adminLoginButton: "लॉग इन करें",
     adminLoginIncorrectPassword: "गलत पासवर्ड।", adminLoginBackToSite: "seads.sg पर वापस जाएं",
+    skipToContent: "मुख्य सामग्री पर जाएं",
   },
 };

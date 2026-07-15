@@ -39,6 +39,7 @@ export default async function AdminAuditLogPage({ searchParams }: { searchParams
     >
       <div className="section-card overflow-x-auto p-2">
         <table className="w-full min-w-[680px] text-left text-sm">
+          <caption className="sr-only">Admin action audit log, most recent first</caption>
           <thead>
             <tr className="border-b border-[color:var(--foreground-soft)] text-xs uppercase text-[color:var(--muted)]">
               <th className="px-3 py-3">When</th>

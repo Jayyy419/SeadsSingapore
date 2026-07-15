@@ -53,6 +53,7 @@ export default function AdminLoginPage() {
               type="password"
               name="password"
               placeholder={t.adminLoginPasswordPlaceholder}
+              aria-label={t.adminLoginPasswordPlaceholder}
               required
               autoFocus
               className="rounded-xl border border-[color:var(--foreground-soft)] bg-[color:var(--surface)] px-4 py-3 text-sm text-[color:var(--foreground)]"

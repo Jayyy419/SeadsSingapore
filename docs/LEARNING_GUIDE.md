@@ -2177,6 +2177,86 @@ HTML, check whether the target text lives in an attribute (`value`, `alt`, `titl
 label`) rather than as rendered text — `hasText` and similar text-matching APIs only ever see
 the latter.
 
+## Part 17: Atomic Writes, a Real Test Suite, and Why "It Works" Isn't the Same as "It's Safe"
+
+A fifth audit round (DevOps/infra, docs accuracy, accessibility beyond alt text, public-page
+resilience/business logic, testing/CI coverage) surfaced two genuine race conditions and one
+long-standing structural gap this project had carried since day one. This part covers the
+lessons, not the full list of fixes (see `docs/CHANGELOG.md` (32) for that).
+
+### Check-then-write vs. conditional write: the difference that matters under concurrency
+
+Two separate findings this round turned out to be the same underlying bug shape: "read a
+value, decide based on it, then write" (RSVP capacity: read the current count, check it
+against the cap, then insert; slug creation: `GetCommand` to check if a slug exists, then
+`PutCommand` to create it). Both look completely correct in every manual test, because a
+single person clicking a single button never races against themselves. The bug only exists
+when two requests interleave: both reads happen before either write, so both see the same
+"safe" state and both proceed. This is invisible in the kind of testing this project has
+relied on all session (one person, one browser, one action at a time) and only shows up under
+real concurrent load — which is exactly why it's easy to ship without ever seeing it fail.
+
+DynamoDB's fix for this class of bug is a **conditional write**: instead of "read, decide,
+write" as three separate steps, `ConditionExpression` folds the check into the write itself,
+atomically, as one indivisible operation the database guarantees can't be interleaved with
+another write to the same item. `attribute_not_exists(slug)` on a `PutCommand` means "write
+this item, but only if nothing with this key already exists — fail instead of overwriting."
+`rsvpCount < capacity` combined with `ADD rsvpCount :incr` on an `UpdateCommand` means
+"increment this counter, but only if it's still below the cap — fail instead of overshooting."
+In both cases, the *check* and the *write* happen inside the database, in one atomic
+operation, so there's no window between them for a second request to sneak through. This is a
+strictly better pattern than the check-then-write version for exactly the same effort — once
+you know a field needs a uniqueness or bound guarantee, there's rarely a reason to write it as
+two separate calls instead of one conditional one.
+
+The RSVP fix also had a product-design wrinkle worth naming: the honest fix wasn't "reject
+submissions once an event is full" — the UI already has a deliberate "Join Waitlist" flow that
+resubmits through the exact same endpoint once an event is full, so a hard rejection would
+have broken an existing, intentional feature. The actual fix was to keep accepting every
+submission (preserving that UX) while using the atomic conditional update to determine,
+race-free, whether a given submission earned one of the limited "confirmed" spots or should be
+recorded as waitlisted. The lesson: when a security/correctness finding lands on top of an
+existing product decision, the fix needs to preserve the decision, not just eliminate the
+finding by the most direct-looking route — a hard reject would have "fixed" the audit finding
+while breaking a real feature.
+
+### The test suite that never existed
+
+Every verification this session — dozens of Playwright runs, catching a real double-nav-item
+bug, a real 429-vs-401 test-environment confounder, a real hasText/attribute gotcha (Part
+16 above), and more — was written into a scratchpad file, run once against a local build, and
+thrown away. Individually, each of those verification passes was real and valuable. Cumulatively,
+none of it protected the *next* change, because none of it persisted. A regression in
+`SiteShell`'s skip link introduced next week has zero chance of being caught automatically,
+because the test that would have caught it never existed as a file in the repo — it existed
+for about ten minutes in a terminal, once.
+
+The fix (`playwright.config.ts`, `e2e/*.spec.ts`, a `test` npm script, a step in `ci.yml`) is
+small in absolute size — 19 tests — but the category of gap it closes is different in kind
+from adding more tests to an existing suite: it's the difference between "this project has no
+persistent memory of correct behavior" and "this project has some." The specific tests chosen
+lean toward things this session's manual passes had already proven valuable to check
+mechanically: page rendering across every route, the skip link, the lightbox focus trap, the
+admin auth redirect. A deliberate constraint on the suite: every test either avoids the live
+Lambda entirely or mocks its response (`page.route()` intercepting the browser's own fetch to
+`/admin/api/login`), specifically so the suite is safe to run unattended on every push without
+writing real submissions, tripping the real rate limiter, or depending on network reachability
+to production infrastructure it doesn't own.
+
+### Docs rot is a silent failure mode
+
+The docs-accuracy audit found `ARCHITECTURE.md` still describing a "no backend, single
+DynamoDB table" system that hadn't existed for most of this session — nine tables, an entire
+admin panel, S3, and an audit log had been built and shipped without a single one of those
+docs being updated to match. Nothing about this is unique to this project: documentation has
+no compiler, no CI check, no runtime error when it drifts from reality — code that's wrong
+fails loudly (a build breaks, a test fails), docs that are wrong just sit there looking
+authoritative while quietly misleading whoever reads them next. The practical takeaway carried
+forward from here: treating "update the docs" as part of the same unit of work as the feature
+itself (as this session's CHANGELOG/LEARNING_GUIDE updates already do) is the only mechanism
+that actually prevents this — a *separate* "go audit the docs later" pass will always find
+drift, because later always arrives after several more features have shipped without it.
+
 ## Glossary
 
 - **Accessible name**: the text assistive technology (screen readers) announces for an

@@ -4,6 +4,74 @@ All notable changes to this project should be documented in this file.
 
 This format is inspired by Keep a Changelog and uses a date-based release style.
 
+## [2026-07-15] (32)
+
+### Fixed — race conditions, a resilience gap, CI safety net, and doc rot found by a 5-way parallel audit
+
+Found by a 5-way parallel audit (DevOps/infra, docs accuracy, accessibility beyond alt text,
+public-page resilience/business logic, testing/CI coverage) — the fourth such audit this
+session.
+
+- **Event RSVP capacity had no server-side enforcement at all**: `handleSubmitInterest` wrote
+  every RSVP unconditionally, so a "capacity: 20" event could be overbooked without limit —
+  capacity was purely a UI label. Fixed with an atomic conditional DynamoDB update (`ADD
+  rsvpCount` gated by `attribute_exists(slug) AND (attribute_not_exists(capacity) OR rsvpCount
+  < capacity)`) so the increment-and-check happens as one indivisible write — two simultaneous
+  RSVPs can't both read "1 spot left" and both succeed. A full event still accepts the
+  submission (matching the existing "Join Waitlist" UX, which resubmits through the same
+  endpoint) but is recorded `rsvpStatus: "waitlisted"` instead of `"confirmed"`, surfaced as a
+  badge on `/admin/submissions`.
+- **Slug creation was a TOCTOU race** across all 5 slugified entity types (events/team/
+  partners/programs/stories, plus impact metrics): a `GetCommand`-then-check before the
+  `PutCommand` meant two concurrent creates deriving the same slug could both pass the check
+  and the second write would silently overwrite the first. Added a shared
+  `putIfSlugAvailable()` helper using `ConditionExpression: attribute_not_exists(slug)` so the
+  write itself is atomic — the loser now gets a clean `409` instead.
+- **Server-side `[slug]` detail-page fetches had no try/catch**: `getEvent`/`getProgram`/
+  `getStory` in `events|programs|blog/[slug]/page.tsx` only guarded `res.ok`, so a thrown
+  network error (DNS failure, timeout) would propagate as an unhandled rejection out of
+  `generateMetadata`, taking down the whole page (header/footer included) instead of falling
+  back gracefully like the client-side hooks already did. Wrapped all three in try/catch.
+- **Lambda deploys had zero validation gate**: `deploy-interest-form-lambda.yml` shipped
+  straight to the live Lambda on every push to `main` touching `backend/interest-form/**`,
+  with no lint or even a syntax check — the exact class of mistake that nearly shipped a
+  duplicate-`const` outage earlier this session. Added a `node --check index.mjs` step before
+  the deploy.
+- **No persisted test suite existed anywhere**: every prior verification pass this session was
+  a one-off Playwright script, run once against a local build and discarded. Added
+  `@playwright/test`, a 19-test smoke suite under `e2e/` (public page rendering, 404 handling,
+  the skip link, the new lightbox focus trap, admin auth redirect + rejected-login error), and
+  a `test` npm script wired into `ci.yml`. Every test mocks the interest-form API instead of
+  hitting the live Lambda, so the suite is safe to run unattended on every push/PR.
+- **Media lightbox had no real focus trap**: `role="dialog" aria-modal="true"` alone doesn't
+  stop Tab from reaching the masonry grid behind the overlay. Added focus-on-open (first
+  focusable element), Tab cycling within the dialog, focus-restore-on-close to the triggering
+  photo, and `inert` on the rest of the page while open.
+- **No skip-to-main-content link** anywhere — keyboard users had to tab through the full nav
+  on every page. Added one to both `SiteShell` and `AdminShell`, localized on the public site.
+- **`--muted` text (`#6b7280`) on `--surface-2` (`#eef3ee`) measured ~4.3:1 contrast**, just
+  under the 4.5:1 AA threshold for normal text. Darkened to `#4b5563` (one step further down
+  the same gray scale), now ~6.7:1.
+- **Admin login password field had only a `placeholder`**, no accessible name once typed into
+  (a classic anti-pattern, since placeholder text isn't reliably announced). Added
+  `aria-label`. Also added `<caption>` to the two admin tables (`submissions`, `audit-log`)
+  that had none.
+- **Event JSON-LD `startDate` parsed via server-local midnight** (`new Date(event.date)`),
+  which could shift the reported date by a day depending on the render server's timezone.
+  Reused the same UTC-explicit parser the `.ics` calendar feed already had
+  (`parseEventDate`, exported from `src/lib/ics.ts`).
+- **Docs were significantly stale**: `ARCHITECTURE.md` still described a pre-database,
+  single-table, no-admin-panel site; `ROUTES.md` was missing most public routes and every
+  `/admin/*` route; `TECH_STACK.md` flatly claimed "no auth, database beyond DynamoDB, or CMS
+  yet"; both READMEs were missing most of the Lambda's env vars; the root `README.md` was
+  still untouched `create-next-app` boilerplate. Rewrote all of the above to match the actual
+  system (10 DynamoDB tables, the admin panel, S3, the audit log, current deploy target).
+- **DynamoDB PITR** was confirmed live on all 10 tables via `aws dynamodb
+  describe-continuous-backups` (a documentation gap, not an actual infra gap — only 3 of 10
+  had this confirmed anywhere in the docs before).
+- Added `.github/CODEOWNERS` and PR/issue templates — a repo with branch protection but no
+  default reviewer or structured template had a real hygiene gap here.
+
 ## [2026-07-15] (31)
 
 ### Fixed — a stored XSS gap in JSON-LD, plus a round of admin UX and SEO/a11y fixes

@@ -9,7 +9,9 @@
   --surface: #ffffff;
   --surface-2: #eef3ee;
   --surface-soft: rgb(255 255 255 / 72%);
-  --muted: #6b7280;
+  /* One step darker than the original gray-500 (#6b7280) — that shade only cleared ~4.3:1
+     against --surface-2, just under the 4.5:1 AA threshold for normal text. */
+  --muted: #4b5563;
   --brand: #2f6f5e;
   --brand-deep: #25594c;
   --brand-soft: #dceadf;

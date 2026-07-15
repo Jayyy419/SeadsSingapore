@@ -53,6 +53,8 @@ export function MediaMasonry({ limit, showFilter = true }: MediaMasonryProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const leaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const enterTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLElement | null>(null);
 
   const photosBase = useMemo<Photo[]>(
     () => mediaItems.map((item, i) => ({ ...item, id: i, h: HEIGHTS[i % HEIGHTS.length] })),
@@ -123,17 +125,50 @@ export function MediaMasonry({ limit, showFilter = true }: MediaMasonryProps) {
   const lightboxItem = lightboxId !== null ? photosBase.find((p) => p.id === lightboxId) : null;
   const reduceMotion = prefersReducedMotion();
 
+  // Focus management for the lightbox dialog: move focus into it on open (so a keyboard/
+  // screen-reader user isn't left on a now-hidden-behind-overlay trigger), trap Tab inside it
+  // while open (role="dialog" aria-modal="true" alone doesn't enforce this — the browser will
+  // happily tab into the masonry grid behind the overlay without JS help), and restore focus
+  // to the photo that opened it on close.
   useEffect(() => {
     if (lightboxId === null) return;
+
+    const dialog = dialogRef.current;
+    const focusable = () =>
+      Array.from(dialog?.querySelectorAll<HTMLElement>('button, [href], [tabindex]:not([tabindex="-1"])') ?? []);
+    focusable()[0]?.focus();
+
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setLightboxId(null);
+      if (e.key === "Escape") {
+        setLightboxId(null);
+        return;
+      }
+      if (e.key !== "Tab") return;
+      const items = focusable();
+      if (items.length === 0) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
     };
     document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      triggerRef.current?.focus();
+    };
   }, [lightboxId]);
 
   return (
     <div className="space-y-4">
+      {/* inert removes this whole section from the tab order and screen-reader tree while the
+          lightbox dialog is open — role="dialog"/aria-modal alone don't stop Tab from reaching
+          content behind the overlay. */}
+      <div inert={lightboxId !== null} className="space-y-4">
       {showFilter && (
         <div className="flex flex-wrap gap-2">
           {categories.map((category) => {
@@ -173,7 +208,10 @@ export function MediaMasonry({ limit, showFilter = true }: MediaMasonryProps) {
               <button
                 key={photo.id}
                 type="button"
-                onClick={() => setLightboxId(photo.id)}
+                onClick={(e) => {
+                  triggerRef.current = e.currentTarget;
+                  setLightboxId(photo.id);
+                }}
                 className="group absolute overflow-hidden rounded-2xl border border-[color:var(--foreground-soft)] text-left"
                 style={{
                   left: pos.left,
@@ -229,6 +267,7 @@ export function MediaMasonry({ limit, showFilter = true }: MediaMasonryProps) {
           return null;
         })}
       </div>
+      </div>
 
       {lightboxItem && (
         <div
@@ -238,6 +277,7 @@ export function MediaMasonry({ limit, showFilter = true }: MediaMasonryProps) {
           onClick={() => setLightboxId(null)}
         >
           <div
+            ref={dialogRef}
             className="max-h-[92vh] w-full max-w-5xl overflow-hidden rounded-3xl border border-white/20 bg-[color:var(--inverse-bg)]"
             onClick={(event) => event.stopPropagation()}
           >

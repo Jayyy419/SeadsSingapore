@@ -33,5 +33,8 @@ From `package.json`:
 ## Notes
 
 - This project uses Next.js App Router in `src/app`.
-- Data is sourced from `src/content/siteContent.ts` and `src/content/media.ts` (no CMS/backend is wired up yet — see `docs/ARCHITECTURE.md`).
-- Analytics is enabled via Vercel Analytics in `src/app/layout.tsx`.
+- Most content (team, partners, programs, stories, events, impact metrics) is DynamoDB-backed
+  and managed through a self-built admin panel at `/admin`; testimonials and UI copy remain
+  local TypeScript modules (`src/content/*`) — see `docs/ARCHITECTURE.md`.
+- Error tracking is via Sentry (`@sentry/nextjs`), inactive until `SENTRY_DSN` is set — see
+  `docs/ENVIRONMENT.md`.

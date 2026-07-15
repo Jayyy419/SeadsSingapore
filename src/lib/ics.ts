@@ -3,8 +3,13 @@ const MONTHS: Record<string, number> = {
   jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11,
 };
 
-// Parses the site's fixed "DD Mon YYYY" event date format (e.g. "18 Jul 2026").
-function parseEventDate(dateStr: string): Date | null {
+// Parses the site's fixed "DD Mon YYYY" event date format (e.g. "18 Jul 2026") as UTC
+// midnight, not server-local midnight — `new Date(dateStr)` depends on the render server's
+// timezone, which for a single fixed calendar date (as opposed to a real date+time) can shift
+// the parsed day by one depending on where/when it runs. Exported so any other caller needing
+// this same date parsed (e.g. JSON-LD) gets identical behavior instead of a second ad-hoc
+// `new Date(...)` call.
+export function parseEventDate(dateStr: string): Date | null {
   const match = dateStr.trim().match(/^(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})$/);
   if (!match) return null;
   const [, day, monthName, year] = match;

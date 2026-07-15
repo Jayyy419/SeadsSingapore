@@ -1,17 +1,28 @@
 import type { Metadata } from "next";
 import { EventDetailContent } from "./event-detail-content";
 import { safeJsonLdString } from "@/lib/json-ld";
+import { parseEventDate } from "@/lib/ics";
 
 // Events moved from siteContent.ts (static) to DynamoDB so admins can create them without a
 // code change + deploy — that means generateStaticParams can no longer enumerate them at
 // build time, so this route renders dynamically per request instead of via SSG.
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://jztkgrm3lh.execute-api.ap-southeast-1.amazonaws.com";
 
+// A non-ok response (`res.ok` false) isn't the only way this can fail — a thrown network
+// error (DNS failure, connection refused, timeout) would otherwise propagate as an unhandled
+// rejection out of generateMetadata/the page component, taking down the whole route (header,
+// footer, everything) instead of falling back to null like EventDetailContent's own
+// client-side fetch already does.
 async function getEvent(slug: string) {
-  const res = await fetch(`${API_BASE_URL}/events`, { cache: "no-store" });
-  if (!res.ok) return null;
-  const data = await res.json();
-  return (data.events ?? []).find((event: { slug: string }) => event.slug === slug) ?? null;
+  try {
+    const res = await fetch(`${API_BASE_URL}/events`, { cache: "no-store" });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return (data.events ?? []).find((event: { slug: string }) => event.slug === slug) ?? null;
+  } catch (err) {
+    console.error("Failed to fetch event for", slug, err);
+    return null;
+  }
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
@@ -27,12 +38,15 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
 // Only fields backed by real event data — no fabricated end time/pricing/performer info.
 function buildEventJsonLd(event: { title: { en: string }; date: string; location: { en: string }; body: { en: string[] } }) {
-  const startDate = new Date(event.date);
+  // Parsed as UTC midnight via the same helper the .ics feed uses — `new Date(event.date)`
+  // parses as server-local midnight, which can shift this by a day depending on the render
+  // server's timezone (Singapore is UTC+8, but nothing guarantees the server is too).
+  const startDate = parseEventDate(event.date);
   return {
     "@context": "https://schema.org",
     "@type": "Event",
     name: event.title.en,
-    ...(Number.isNaN(startDate.getTime()) ? {} : { startDate: startDate.toISOString() }),
+    ...(startDate ? { startDate: startDate.toISOString().slice(0, 10) } : {}),
     location: { "@type": "Place", name: event.location.en },
     description: event.body.en.join(" "),
     eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",

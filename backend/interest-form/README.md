@@ -19,6 +19,9 @@ email.
   in this directory — scoped to just these tables + this bucket + SES + logs + `seads/*`
   secrets)
 
+All 10 DynamoDB tables above have point-in-time recovery (PITR) enabled (35-day rolling
+restore window) — confirmed via `aws dynamodb describe-continuous-backups` for each table.
+
 ## Monitoring
 
 - CloudWatch alarms `seads-interest-form-lambda-errors` / `-throttles` (`ap-southeast-1`) on
@@ -35,9 +38,27 @@ audience — the old stack was deleted after this one was verified working end-t
 
 ## Environment variables (set on the Lambda, not here)
 
-- `TABLE_NAME` — DynamoDB table name
+One env var per DynamoDB table (`index.mjs` never hardcodes a table name), plus:
+
+- `TABLE_NAME` — `seads-interest-submissions`
+- `IMPACT_METRICS_TABLE` — `seads-impact-metrics`
+- `STORY_SUBMISSIONS_TABLE` — `seads-story-submissions`
+- `ADMIN_CONFIG_TABLE` — `seads-admin-config` (stores the hashed admin password)
+- `EVENTS_TABLE` — `seads-events`
+- `AUDIT_LOG_TABLE` — `seads-admin-audit-log`
+- `TEAM_TABLE` — `seads-team`
+- `PARTNERS_TABLE` — `seads-partners`
+- `PROGRAMS_TABLE` — `seads-programs`
+- `STORIES_TABLE` — `seads-stories`
+- `MEDIA_BUCKET` — `seads-media` (see "The media bucket" below)
 - `NOTIFY_EMAIL` — SES-verified address to send/receive submission notifications
 - `ALLOWED_ORIGINS` — comma-separated list of allowed CORS origins (frontend URLs)
+- `ADMIN_PASSWORD` — bootstrap-only admin password; auto-migrated into `ADMIN_CONFIG_TABLE`
+  (hashed) on first successful login, so changing the password afterward never needs a
+  redeploy — see `handleChangePassword`/`checkPassword` in `index.mjs`
+- `ADMIN_SESSION_SECRET` — HMAC key signing admin session tokens (`x-admin-token` header)
+- `AWS_REGION` — not set manually; this is a reserved variable the Lambda runtime injects
+  automatically, read only to build the media bucket's public URL
 
 ## Secrets
 

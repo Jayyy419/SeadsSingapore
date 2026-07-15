@@ -24,6 +24,13 @@ jobs:
         with:
           node-version: "20"
 
+      # A syntax error here (e.g. a duplicate top-level `const` — this has happened before in
+      # this repo) would previously have gone straight to the live Lambda on the next step with
+      # no gate at all. `node --check` parses the file without running it, so this catches that
+      # class of mistake in seconds instead of as a production outage.
+      - name: Syntax check
+        run: node --check index.mjs
+
       - name: Install production dependencies
         run: npm ci --omit=dev
 

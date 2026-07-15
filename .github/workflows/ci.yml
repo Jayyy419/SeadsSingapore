@@ -33,3 +33,13 @@ jobs:
           NEXT_PUBLIC_SITE_URL: https://main.d2mrph1bcp6pjx.amplifyapp.com
           NEXT_PUBLIC_TURNSTILE_SITE_KEY: 0x4AAAAAAD0posjeQ2nKduks
           NEXT_PUBLIC_API_BASE_URL: https://jztkgrm3lh.execute-api.ap-southeast-1.amazonaws.com
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      # e2e/*.spec.ts mock every call to the interest-form API (see the comments in those
+      # files) instead of hitting the live Lambda, so this is safe to run unattended on every
+      # push/PR — it drives a real `next dev` server (playwright.config.ts's webServer), not
+      # just static analysis.
+      - name: Run e2e tests
+        run: npm test
