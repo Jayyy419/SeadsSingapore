@@ -28,6 +28,7 @@ const IMPACT_METRICS_TABLE = process.env.IMPACT_METRICS_TABLE;
 const STORY_SUBMISSIONS_TABLE = process.env.STORY_SUBMISSIONS_TABLE;
 const ADMIN_CONFIG_TABLE = process.env.ADMIN_CONFIG_TABLE;
 const EVENTS_TABLE = process.env.EVENTS_TABLE;
+const AUDIT_LOG_TABLE = process.env.AUDIT_LOG_TABLE;
 const NOTIFY_EMAIL = process.env.NOTIFY_EMAIL;
 // Admin auth lives here, not on the Amplify/Next.js side — Amplify Hosting's environment
 // variables for this app never reliably reach the deployed SSR compute's process.env at
@@ -47,6 +48,35 @@ const ADMIN_SESSION_SECRET = process.env.ADMIN_SESSION_SECRET;
 const SESSION_TTL_SECONDS = 60 * 60 * 8;
 
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "").split(",").filter(Boolean);
+
+// There's only one shared admin password, not per-user accounts, so this can't attribute an
+// action to a specific person — only record what changed and when, plus the source IP as a
+// weak (not fabricated) signal for distinguishing concurrent sessions. Best-effort: a failure
+// here never blocks the actual write it's logging, since an audit trail going missing is far
+// less bad than an admin action failing because logging it didn't work.
+const AUDIT_LOG_TTL_SECONDS = 60 * 60 * 24 * 365;
+
+async function logAudit(event, action, entityType, detail) {
+  if (!AUDIT_LOG_TABLE) return;
+  try {
+    await ddb.send(
+      new PutCommand({
+        TableName: AUDIT_LOG_TABLE,
+        Item: {
+          id: randomUUID(),
+          timestamp: new Date().toISOString(),
+          action,
+          entityType,
+          detail,
+          sourceIp: event.requestContext?.http?.sourceIp,
+          ttl: Math.floor(Date.now() / 1000) + AUDIT_LOG_TTL_SECONDS,
+        },
+      })
+    );
+  } catch (err) {
+    console.error("Audit log write failed:", err);
+  }
+}
 
 function corsHeaders(origin) {
   const allowOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0] || "*";
@@ -530,6 +560,11 @@ async function handleGetEvents(headers) {
   return json(200, headers, { events: items });
 }
 
+async function handleGetAuditLog(headers) {
+  const items = (await scanAll(AUDIT_LOG_TABLE)).sort((a, b) => (b.timestamp || "").localeCompare(a.timestamp || ""));
+  return json(200, headers, { entries: items });
+}
+
 // Same "other locales default to English on create, preserved on update" convention as
 // impact metrics — see handleCreateImpactMetric / handleUpdateImpactMetric above.
 async function handleCreateEvent(event, headers) {
@@ -684,21 +719,32 @@ export const handler = async (event) => {
       return handleGetImpactMetrics(headers);
     }
     if (method === "POST" && path === "/internal/impact-metrics") {
-      return handleCreateImpactMetric(event, headers);
+      const res = await handleCreateImpactMetric(event, headers);
+      if (res.statusCode < 300) await logAudit(event, "create", "impact-metric", JSON.parse(res.body).metricId);
+      return res;
     }
     const metricMatch = path.match(/^\/internal\/impact-metrics\/([^/]+)$/);
     if (method === "PUT" && metricMatch) {
-      return handleUpdateImpactMetric(event, headers, decodeURIComponent(metricMatch[1]));
+      const metricId = decodeURIComponent(metricMatch[1]);
+      const res = await handleUpdateImpactMetric(event, headers, metricId);
+      if (res.statusCode < 300) await logAudit(event, "update", "impact-metric", metricId);
+      return res;
     }
     if (method === "DELETE" && metricMatch) {
-      return handleDeleteImpactMetric(headers, decodeURIComponent(metricMatch[1]));
+      const metricId = decodeURIComponent(metricMatch[1]);
+      const res = await handleDeleteImpactMetric(headers, metricId);
+      if (res.statusCode < 300) await logAudit(event, "delete", "impact-metric", metricId);
+      return res;
     }
     if (method === "GET" && path === "/internal/submissions") {
       return handleGetSubmissions(headers);
     }
     const submissionMatch = path.match(/^\/internal\/submissions\/([^/]+)$/);
     if (method === "DELETE" && submissionMatch) {
-      return handleDeleteSubmission(headers, decodeURIComponent(submissionMatch[1]));
+      const id = decodeURIComponent(submissionMatch[1]);
+      const res = await handleDeleteSubmission(headers, id);
+      if (res.statusCode < 300) await logAudit(event, "delete", "submission", id);
+      return res;
     }
     if (method === "GET" && path === "/internal/event-rsvp-counts") {
       return handleGetEventRsvpCounts(headers);
@@ -708,26 +754,48 @@ export const handler = async (event) => {
     }
     const storyMatch = path.match(/^\/internal\/story-submissions\/([^/]+)$/);
     if (method === "PATCH" && storyMatch) {
-      return handleUpdateStorySubmission(event, headers, decodeURIComponent(storyMatch[1]));
+      const id = decodeURIComponent(storyMatch[1]);
+      const res = await handleUpdateStorySubmission(event, headers, id);
+      if (res.statusCode < 300) {
+        const status = JSON.parse(event.body || "{}").status;
+        await logAudit(event, status === "approved" ? "approve" : "reject", "story-submission", id);
+      }
+      return res;
     }
     if (method === "DELETE" && storyMatch) {
-      return handleDeleteStorySubmission(headers, decodeURIComponent(storyMatch[1]));
+      const id = decodeURIComponent(storyMatch[1]);
+      const res = await handleDeleteStorySubmission(headers, id);
+      if (res.statusCode < 300) await logAudit(event, "delete", "story-submission", id);
+      return res;
     }
     if (method === "GET" && path === "/internal/events") {
       return handleGetEvents(headers);
     }
     if (method === "POST" && path === "/internal/events") {
-      return handleCreateEvent(event, headers);
+      const res = await handleCreateEvent(event, headers);
+      if (res.statusCode < 300) await logAudit(event, "create", "event", JSON.parse(res.body).slug);
+      return res;
     }
     const eventMatch = path.match(/^\/internal\/events\/([^/]+)$/);
     if (method === "PUT" && eventMatch) {
-      return handleUpdateEvent(event, headers, decodeURIComponent(eventMatch[1]));
+      const slug = decodeURIComponent(eventMatch[1]);
+      const res = await handleUpdateEvent(event, headers, slug);
+      if (res.statusCode < 300) await logAudit(event, "update", "event", slug);
+      return res;
     }
     if (method === "DELETE" && eventMatch) {
-      return handleDeleteEvent(headers, decodeURIComponent(eventMatch[1]));
+      const slug = decodeURIComponent(eventMatch[1]);
+      const res = await handleDeleteEvent(headers, slug);
+      if (res.statusCode < 300) await logAudit(event, "delete", "event", slug);
+      return res;
     }
     if (method === "PATCH" && path === "/internal/admin-password") {
-      return handleChangePassword(event, headers);
+      const res = await handleChangePassword(event, headers);
+      if (res.statusCode < 300) await logAudit(event, "update", "admin-password", null);
+      return res;
+    }
+    if (method === "GET" && path === "/internal/audit-log") {
+      return handleGetAuditLog(headers);
     }
 
     return json(404, headers, { error: "Not found" });

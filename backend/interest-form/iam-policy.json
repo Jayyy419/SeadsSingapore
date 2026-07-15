@@ -38,6 +38,12 @@
       "Resource": "arn:aws:dynamodb:ap-southeast-1:140023398409:table/seads-events"
     },
     {
+      "Sid": "DynamoAuditLog",
+      "Effect": "Allow",
+      "Action": ["dynamodb:PutItem", "dynamodb:Scan"],
+      "Resource": "arn:aws:dynamodb:ap-southeast-1:140023398409:table/seads-admin-audit-log"
+    },
+    {
       "Sid": "SesSend",
       "Effect": "Allow",
       "Action": "ses:SendEmail",
