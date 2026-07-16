@@ -50,8 +50,15 @@ One env var per DynamoDB table (`index.mjs` never hardcodes a table name), plus:
 - `PARTNERS_TABLE` — `seads-partners`
 - `PROGRAMS_TABLE` — `seads-programs`
 - `STORIES_TABLE` — `seads-stories`
+- `SITE_CONTENT_TABLE` — `seads-site-content` (media gallery items, testimonials, FAQ
+  entries, and singleton config blobs — donate/social/announcement — see the "Site content"
+  section near the top of `index.mjs`)
 - `MEDIA_BUCKET` — `seads-media` (see "The media bucket" below)
-- `NOTIFY_EMAIL` — SES-verified address to send/receive submission notifications
+- `NOTIFY_EMAIL` — SES-verified address; both receives org notifications and sends
+  submitter-facing confirmation/decision emails (RSVP, join, story approval/rejection) as the
+  `Source`
+- `SITE_URL` — optional, used only to build links inside submitter-facing emails; falls back
+  to the same Amplify URL the frontend's `NEXT_PUBLIC_SITE_URL` defaults to if unset
 - `ALLOWED_ORIGINS` — comma-separated list of allowed CORS origins (frontend URLs)
 - `ADMIN_PASSWORD` — bootstrap-only admin password; auto-migrated into `ADMIN_CONFIG_TABLE`
   (hashed) on first successful login, so changing the password afterward never needs a
@@ -59,6 +66,17 @@ One env var per DynamoDB table (`index.mjs` never hardcodes a table name), plus:
 - `ADMIN_SESSION_SECRET` — HMAC key signing admin session tokens (`x-admin-token` header)
 - `AWS_REGION` — not set manually; this is a reserved variable the Lambda runtime injects
   automatically, read only to build the media bucket's public URL
+
+**Reminder for whoever adds the next table**: a new `*_TABLE` env var needs three separate
+changes, not just the code — (1) `aws dynamodb create-table` + enable PITR, (2) add a
+statement to `iam-policy.json` and re-apply it via the CloudShell/admin-credentials flow
+below, and (3) `aws lambda update-function-configuration` to actually set the env var on the
+live function. Forgetting step 3 is the one `deploy-interest-form-lambda.yml`'s `node --check`
+gate *can't* catch (missing env vars aren't a syntax error) — it shipped clean and only
+failed at runtime with `ValidationException: Value null at 'tableName'` the first time this
+happened (`SITE_CONTENT_TABLE`, 2026-07-16). The deploy workflow only ever touches function
+*code*, never `Environment.Variables` — there's no automation for step 3, so it's manual
+every time.
 
 ## Secrets
 

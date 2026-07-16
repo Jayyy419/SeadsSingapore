@@ -75,6 +75,19 @@ items, testimonials, FAQ entries, and singleton config blobs, keyed by a `type#u
   conditional social links, both donate-page states) — all mock `GET /site-content` rather
   than depending on live admin-configured data, keeping the suite deterministic.
 
+### Fixed — post-merge: `GET /site-content` returning 500 in production
+
+The Lambda deploy for the above (CI green, `node --check` passed) shipped code referencing
+`process.env.SITE_CONTENT_TABLE`, but the new env var itself was never set on the live
+function — creating the DynamoDB table and updating `iam-policy.json` both happened, setting
+the actual Lambda environment variable didn't. Caught immediately via a live smoke check
+right after the "deploy succeeded" CI result (`GET /site-content` → `500`, CloudWatch showing
+`ValidationException: Value null at 'tableName'`), fixed with one
+`aws lambda update-function-configuration` call, confirmed live in under 2 minutes. See
+`docs/LEARNING_GUIDE.md` Part 18 for the full writeup and `backend/interest-form/README.md`'s
+env-vars section for the reminder this earned about the three separate steps a new table
+needs.
+
 ## [2026-07-15] (32)
 
 ### Fixed — race conditions, a resilience gap, CI safety net, and doc rot found by a 5-way parallel audit

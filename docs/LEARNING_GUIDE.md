@@ -2322,6 +2322,32 @@ manual re-transcription, and the failure mode (silent corruption, caught by a do
 error rather than at the point of the mistake) is easy to miss until something is well
 overdue for a lint pass.
 
+### A new table needs three changes, and only two of them are automated
+
+Adding `SITE_CONTENT_TABLE` required three separate steps outside the code itself: creating
+the DynamoDB table (+ enabling PITR), adding a statement to `iam-policy.json` and applying it
+via CloudShell, and setting the actual `SITE_CONTENT_TABLE` environment variable on the live
+Lambda function. The first two got done; the third didn't — and nothing caught the omission
+before merge, because nothing *could*: `node --check` (the syntax gate added last round
+specifically to catch this class of "should have failed before prod" mistake) only parses the
+file, and referencing an unset env var is completely valid JavaScript. `deploy-interest-form-
+lambda.yml` also only ever touches function *code* (`update-function-code`) — there's no step
+anywhere in this pipeline that manages `Environment.Variables`, so a forgotten env var doesn't
+even have a place to be caught automatically. It surfaced immediately on the very first live
+request after deploy, as `ValidationException: Value null at 'tableName'` in CloudWatch logs
+— the DynamoDB client faithfully told the Lambda it was told to query no table at all, since
+`process.env.SITE_CONTENT_TABLE` really was `undefined`. Two things made this a fast fix
+rather than a scare: doing the live smoke check immediately after every "deploy succeeded" CI
+result instead of trusting the green checkmark as the finish line (a workflow reporting
+success only proves the *code* step it ran succeeded, not that the feature actually works
+end-to-end against real infrastructure), and checking CloudWatch logs directly rather than
+guessing at the cause of a bare `{"message":"Internal Server Error"}` API Gateway response
+(which by itself carries zero information about *which* line failed). The transferable
+lesson: any checklist for "things a new backend dependency needs" should explicitly separate
+what CI enforces from what a human has to remember, and a green CI run for a change that adds
+a new env var dependency is not sufficient evidence the feature works — only a live check
+against the actual deployed thing is.
+
 ## Glossary
 
 - **Accessible name**: the text assistive technology (screen readers) announces for an
