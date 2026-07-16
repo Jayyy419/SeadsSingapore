@@ -1,24 +1,7 @@
 import Link from "next/link";
 import { ReactNode } from "react";
 import { AdminLogoutButton } from "@/components/admin-logout-button";
-
-const NAV = [
-  { href: "/admin", label: "Dashboard" },
-  { href: "/admin/impact-metrics", label: "Impact metrics" },
-  { href: "/admin/events", label: "Events" },
-  { href: "/admin/team", label: "Team" },
-  { href: "/admin/partners", label: "Partners" },
-  { href: "/admin/programs", label: "Programs" },
-  { href: "/admin/blog", label: "Blog" },
-  { href: "/admin/media", label: "Media" },
-  { href: "/admin/testimonials", label: "Testimonials" },
-  { href: "/admin/faq", label: "FAQ" },
-  { href: "/admin/submissions", label: "Submissions" },
-  { href: "/admin/stories", label: "Story submissions" },
-  { href: "/admin/audit-log", label: "Audit log" },
-  { href: "/admin/site-settings", label: "Site settings" },
-  { href: "/admin/settings", label: "Settings" },
-];
+import { AdminNav } from "@/components/admin-nav";
 
 export function AdminShell({ children, title, subtitle }: { children: ReactNode; title: string; subtitle?: string }) {
   return (
@@ -35,13 +18,7 @@ export function AdminShell({ children, title, subtitle }: { children: ReactNode;
             <Link href="/admin" prefetch={false} className="font-display text-lg font-bold text-[color:var(--foreground)]">
               Seads <span className="text-[color:var(--brand)]">Admin</span>
             </Link>
-            <nav className="hidden gap-4 text-sm sm:flex">
-              {NAV.map((item) => (
-                <Link key={item.href} href={item.href} prefetch={false} className="text-[color:var(--muted)] hover:text-[color:var(--brand)]">
-                  {item.label}
-                </Link>
-              ))}
-            </nav>
+            <AdminNav />
           </div>
           <div className="flex items-center gap-4">
             <Link href="/" prefetch={false} className="text-sm font-semibold text-[color:var(--muted)] hover:text-[color:var(--brand)]">
