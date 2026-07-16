@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import { SiteShell } from "@/components/site-shell";
+import { ShareButtons } from "@/components/share-buttons";
 import { useLocale } from "@/lib/locale-context";
 import { useStories } from "@/lib/use-stories";
 
@@ -23,12 +24,21 @@ export function StoryDetailContent({ slug }: { slug: string }) {
             <Image src={story.photo} alt={story.title[locale]} fill sizes="(min-width: 640px) 640px, 100vw" className="object-cover" priority />
           </div>
         )}
-        <p className="text-xs font-semibold uppercase tracking-wide text-[color:var(--accent)]">{story.category[locale]}</p>
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-[color:var(--accent)]">{story.category[locale]}</p>
+          {story.updatedAt && (
+            <p className="text-xs text-[color:var(--muted)]">
+              {t.updatedLabel}{" "}
+              {new Date(story.updatedAt).toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric" })}
+            </p>
+          )}
+        </div>
         {story.body[locale].map((paragraph, i) => (
           <p key={i} className="text-sm leading-relaxed text-[color:var(--muted)]">
             {paragraph}
           </p>
         ))}
+        <ShareButtons title={story.title[locale]} />
       </article>
       <Link href="/blog" className="mt-6 inline-block text-sm font-semibold text-[color:var(--foreground)] hover:text-[color:var(--brand)]">
         &larr; {t.backToStories}

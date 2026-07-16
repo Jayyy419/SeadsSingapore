@@ -3,6 +3,9 @@
 import { ReactNode } from "react";
 import Link from "next/link";
 import { SiteHeader } from "@/components/site-header";
+import { AnnouncementBanner } from "@/components/announcement-banner";
+import { SocialLinks } from "@/components/social-links";
+import { NewsletterSignup } from "@/components/newsletter-signup";
 import { useLocale } from "@/lib/locale-context";
 
 type SiteShellProps = {
@@ -22,6 +25,7 @@ export function SiteShell({ children, title, subtitle }: SiteShellProps) {
     { label: t.navPartners, href: "/partners" },
     { label: t.navDonate, href: "/donate" },
     { label: t.navContact, href: "/contact" },
+    { label: t.faqTitle, href: "/faq" },
     { label: t.footerPrivacy, href: "/privacy" },
   ];
 
@@ -33,6 +37,7 @@ export function SiteShell({ children, title, subtitle }: SiteShellProps) {
       >
         {t.skipToContent}
       </a>
+      <AnnouncementBanner />
       <SiteHeader />
 
       <main id="main-content" className="mx-auto w-full max-w-6xl px-4 pb-16 pt-14 sm:px-6 lg:px-8">
@@ -59,7 +64,9 @@ export function SiteShell({ children, title, subtitle }: SiteShellProps) {
             <a href="mailto:hello@seads.sg" className="mt-1 block hover:text-[color:var(--footer-fg)]">
               hello@seads.sg
             </a>
+            <SocialLinks className="mt-4" />
           </div>
+          <NewsletterSignup />
         </div>
         <div className="mx-auto mt-6 flex w-full max-w-6xl flex-wrap gap-4.5 border-t border-white/10 px-4 pt-5 text-[13px] sm:px-6 lg:px-8">
           {footerLinks.map((link) => (

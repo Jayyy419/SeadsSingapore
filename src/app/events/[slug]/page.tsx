@@ -37,7 +37,12 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 }
 
 // Only fields backed by real event data — no fabricated end time/pricing/performer info.
-function buildEventJsonLd(event: { title: { en: string }; date: string; location: { en: string }; body: { en: string[] } }) {
+const JSON_LD_EVENT_STATUS: Record<string, string> = {
+  cancelled: "https://schema.org/EventCancelled",
+  postponed: "https://schema.org/EventPostponed",
+};
+
+function buildEventJsonLd(event: { title: { en: string }; date: string; location: { en: string }; body: { en: string[] }; status?: string }) {
   // Parsed as UTC midnight via the same helper the .ics feed uses — `new Date(event.date)`
   // parses as server-local midnight, which can shift this by a day depending on the render
   // server's timezone (Singapore is UTC+8, but nothing guarantees the server is too).
@@ -50,7 +55,7 @@ function buildEventJsonLd(event: { title: { en: string }; date: string; location
     location: { "@type": "Place", name: event.location.en },
     description: event.body.en.join(" "),
     eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
-    eventStatus: "https://schema.org/EventScheduled",
+    eventStatus: JSON_LD_EVENT_STATUS[event.status ?? ""] ?? "https://schema.org/EventScheduled",
   };
 }
 

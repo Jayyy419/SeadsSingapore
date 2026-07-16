@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { internalApiFetch } from "@/lib/internal-api";
+import { collectTranslations } from "@/lib/admin-form";
 
 export async function updateProgram(formData: FormData) {
   const slug = String(formData.get("slug"));
@@ -15,7 +16,16 @@ export async function updateProgram(formData: FormData) {
 
   const res = await internalApiFetch(`/internal/programs/${encodeURIComponent(slug)}`, {
     method: "PUT",
-    body: JSON.stringify({ tagEn, nameEn, descriptionEn, whoEn, bodyEn, photo, order }),
+    body: JSON.stringify({
+      tagEn,
+      nameEn,
+      descriptionEn,
+      whoEn,
+      bodyEn,
+      photo,
+      order,
+      ...collectTranslations(formData, ["tag", "name", "description", "who", "body"]),
+    }),
   });
   if (!res.ok) {
     throw new Error(`Failed to update program ${slug}: ${res.status}`);

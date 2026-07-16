@@ -2,8 +2,8 @@
 
 import Image from "next/image";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { mediaItems, type MediaItem } from "@/content/media";
 import { useLocale } from "@/lib/locale-context";
+import { useSiteContent, type SiteMediaItem } from "@/lib/use-site-content";
 
 type MediaMasonryProps = {
   limit?: number;
@@ -11,14 +11,16 @@ type MediaMasonryProps = {
 };
 
 const allCategory = "All" as const;
-type Category = typeof allCategory | MediaItem["category"];
+// Plain string rather than the old static union — gallery items are admin-created now, so
+// categories are whatever the admin typed.
+type Category = string;
 
 const TRANSITION_MS = 450;
 const STAGGER_MS = 40;
 const GAP = 14;
 const HEIGHTS = [260, 340, 200, 300, 380, 240, 320, 260, 220, 360, 280, 300];
 
-type Photo = MediaItem & { id: number; h: number };
+type Photo = SiteMediaItem & { id: number; h: number };
 
 type Position = { left: number; top: number };
 type Rect = Position & { width: number; height: number };
@@ -43,6 +45,9 @@ function prefersReducedMotion() {
 
 export function MediaMasonry({ limit, showFilter = true }: MediaMasonryProps) {
   const { t } = useLocale();
+  // Gallery items moved from src/content/media.ts (static, placeholder SVGs) to DynamoDB so
+  // admins can add real photos without a deploy — same live-swap pattern as everything else.
+  const { media } = useSiteContent();
   const [activeCategory, setActiveCategory] = useState<Category>(allCategory);
   const [lightboxId, setLightboxId] = useState<number | null>(null);
   const [containerWidth, setContainerWidth] = useState(1200);
@@ -57,8 +62,8 @@ export function MediaMasonry({ limit, showFilter = true }: MediaMasonryProps) {
   const triggerRef = useRef<HTMLElement | null>(null);
 
   const photosBase = useMemo<Photo[]>(
-    () => mediaItems.map((item, i) => ({ ...item, id: i, h: HEIGHTS[i % HEIGHTS.length] })),
-    [],
+    () => media.map((item, i) => ({ ...item, id: i, h: HEIGHTS[i % HEIGHTS.length] })),
+    [media],
   );
 
   const categories = useMemo(() => {

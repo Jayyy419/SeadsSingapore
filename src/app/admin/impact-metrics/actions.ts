@@ -6,13 +6,20 @@ import { internalApiFetch } from "@/lib/internal-api";
 export async function updateImpactMetric(formData: FormData) {
   const metricId = String(formData.get("metricId"));
   const value = String(formData.get("value") ?? "");
-  const labelEn = String(formData.get("labelEn") ?? "");
-  const noteEn = String(formData.get("noteEn") ?? "");
   const order = Number(formData.get("order"));
+
+  // This Lambda handler predates applyLocalized() and takes locale-keyed objects directly —
+  // absent keys leave that locale's stored text untouched, same convention as everywhere else.
+  const localized = (base: string) =>
+    Object.fromEntries(
+      (["En", "Zh", "Ms", "Hi"] as const)
+        .map((suffix) => [suffix.toLowerCase(), formData.get(`${base}${suffix}`)])
+        .filter(([, v]) => typeof v === "string")
+    );
 
   const res = await internalApiFetch(`/internal/impact-metrics/${encodeURIComponent(metricId)}`, {
     method: "PUT",
-    body: JSON.stringify({ value, label: { en: labelEn }, note: { en: noteEn }, order }),
+    body: JSON.stringify({ value, label: localized("label"), note: localized("note"), order }),
   });
   if (!res.ok) {
     throw new Error(`Failed to update metric ${metricId}: ${res.status}`);

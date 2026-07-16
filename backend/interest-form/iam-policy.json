@@ -74,6 +74,12 @@
       "Resource": "arn:aws:dynamodb:ap-southeast-1:140023398409:table/seads-stories"
     },
     {
+      "Sid": "DynamoSiteContent",
+      "Effect": "Allow",
+      "Action": ["dynamodb:PutItem", "dynamodb:GetItem", "dynamodb:Scan", "dynamodb:DeleteItem"],
+      "Resource": "arn:aws:dynamodb:ap-southeast-1:140023398409:table/seads-site-content"
+    },
+    {
       "Sid": "SesSend",
       "Effect": "Allow",
       "Action": "ses:SendEmail",

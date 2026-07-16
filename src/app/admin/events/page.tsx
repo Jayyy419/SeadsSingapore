@@ -1,6 +1,7 @@
 import { internalApiFetch } from "@/lib/internal-api";
 import { AdminShell } from "@/components/admin-shell";
 import { AdminFetchError } from "@/components/admin-fetch-error";
+import { AdminTranslations, TranslationField } from "@/components/admin-translations";
 import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { createEvent, updateEvent, deleteEvent } from "./actions";
 
@@ -17,6 +18,7 @@ type Event = {
   location: Record<string, string>;
   body: Record<string, string[]>;
   capacity?: number;
+  status?: "cancelled" | "postponed";
 };
 
 async function getEvents(): Promise<{ events: Event[]; error: boolean }> {
@@ -39,7 +41,7 @@ export default async function AdminEventsPage() {
   return (
     <AdminShell
       title="Events"
-      subtitle="Only the English fields are editable here — other languages default to the English text on create and are otherwise left untouched. See docs/LEARNING_GUIDE.md."
+      subtitle="Events shown on /events. New entries start with English text in every language — open an event's Translations section to provide 中文/Melayu/हिन्दी versions."
     >
       <div className="flex flex-col gap-4">
         {events.map((event) => (
@@ -49,6 +51,14 @@ export default async function AdminEventsPage() {
               <p className="text-xs font-semibold uppercase tracking-wide text-[color:var(--accent)]">
                 {event.slug} · {counts[event.slug] ?? 0} RSVPs
               </p>
+              <a
+                href={`/events/${event.slug}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs font-semibold text-[color:var(--muted)] hover:text-[color:var(--brand)]"
+              >
+                View on site ↗
+              </a>
             </div>
             <label className="text-sm text-[color:var(--foreground)]">
               Title (EN)
@@ -102,6 +112,40 @@ export default async function AdminEventsPage() {
                 className="mt-1 w-full rounded-lg border border-[color:var(--foreground-soft)] bg-[color:var(--surface)] px-3 py-2 text-sm"
               />
             </label>
+            <label className="text-sm text-[color:var(--foreground)]">
+              Status
+              <select
+                name="status"
+                defaultValue={event.status ?? "scheduled"}
+                className="mt-1 w-full rounded-lg border border-[color:var(--foreground-soft)] bg-[color:var(--surface)] px-3 py-2 text-sm"
+              >
+                <option value="scheduled">Scheduled (normal)</option>
+                <option value="postponed">Postponed — banner shown, RSVPs stay open</option>
+                <option value="cancelled">Cancelled — banner shown, RSVPs closed</option>
+              </select>
+            </label>
+            <AdminTranslations>
+              {(
+                [
+                  ["Zh", "中文"],
+                  ["Ms", "Bahasa Melayu"],
+                  ["Hi", "हिन्दी"],
+                ] as const
+              ).map(([suffix, lang]) => (
+                <div key={suffix} className="grid gap-3 sm:grid-cols-2">
+                  <TranslationField base="title" suffix={suffix} label={`Title (${lang})`} defaultValue={event.title?.[suffix.toLowerCase()]} />
+                  <TranslationField base="type" suffix={suffix} label={`Type (${lang})`} defaultValue={event.type?.[suffix.toLowerCase()]} />
+                  <TranslationField base="location" suffix={suffix} label={`Location (${lang})`} defaultValue={event.location?.[suffix.toLowerCase()]} />
+                  <TranslationField
+                    base="body"
+                    suffix={suffix}
+                    label={`Description (${lang})`}
+                    defaultValue={event.body?.[suffix.toLowerCase()]?.join("\n")}
+                    textarea
+                  />
+                </div>
+              ))}
+            </AdminTranslations>
             <div className="flex gap-2 sm:col-span-2">
               <button
                 type="submit"

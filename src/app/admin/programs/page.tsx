@@ -2,6 +2,7 @@ import { internalApiFetch } from "@/lib/internal-api";
 import { AdminShell } from "@/components/admin-shell";
 import { AdminImageUpload } from "@/components/admin-image-upload";
 import { AdminFetchError } from "@/components/admin-fetch-error";
+import { AdminTranslations, TranslationField } from "@/components/admin-translations";
 import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { updateProgram, createProgram, deleteProgram } from "./actions";
 
@@ -32,13 +33,23 @@ export default async function AdminProgramsPage() {
   return (
     <AdminShell
       title="Programs"
-      subtitle="Only the English fields are editable here — other languages default to the English text on create and are otherwise left untouched. See docs/LEARNING_GUIDE.md."
+      subtitle="Programs shown on /programs. New entries start with English text in every language — open a program's Translations section to provide 中文/Melayu/हिन्दी versions."
     >
       <div className="flex flex-col gap-4">
         {programs.map((program) => (
           <form key={program.slug} action={updateProgram} className="section-card grid gap-3 p-5 sm:grid-cols-2">
             <input type="hidden" name="slug" value={program.slug} />
-            <p className="text-xs font-semibold uppercase tracking-wide text-[color:var(--accent)] sm:col-span-2">{program.slug}</p>
+            <div className="flex items-center justify-between sm:col-span-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[color:var(--accent)]">{program.slug}</p>
+              <a
+                href={`/programs/${program.slug}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs font-semibold text-[color:var(--muted)] hover:text-[color:var(--brand)]"
+              >
+                View on site ↗
+              </a>
+            </div>
             <label className="text-sm text-[color:var(--foreground)]">
               Name (EN)
               <input
@@ -92,6 +103,35 @@ export default async function AdminProgramsPage() {
             <div className="sm:col-span-2">
               <AdminImageUpload name="photo" label="Photo" defaultValue={program.photo} />
             </div>
+            <AdminTranslations>
+              {(
+                [
+                  ["Zh", "中文"],
+                  ["Ms", "Bahasa Melayu"],
+                  ["Hi", "हिन्दी"],
+                ] as const
+              ).map(([suffix, lang]) => (
+                <div key={suffix} className="grid gap-3 sm:grid-cols-2">
+                  <TranslationField base="name" suffix={suffix} label={`Name (${lang})`} defaultValue={program.name?.[suffix.toLowerCase()]} />
+                  <TranslationField base="tag" suffix={suffix} label={`Tag (${lang})`} defaultValue={program.tag?.[suffix.toLowerCase()]} />
+                  <TranslationField
+                    base="description"
+                    suffix={suffix}
+                    label={`Description (${lang})`}
+                    defaultValue={program.description?.[suffix.toLowerCase()]}
+                    textarea
+                  />
+                  <TranslationField base="who" suffix={suffix} label={`Who it's for (${lang})`} defaultValue={program.who?.[suffix.toLowerCase()]} textarea />
+                  <TranslationField
+                    base="body"
+                    suffix={suffix}
+                    label={`Body (${lang})`}
+                    defaultValue={program.body?.[suffix.toLowerCase()]?.join("\n")}
+                    textarea
+                  />
+                </div>
+              ))}
+            </AdminTranslations>
             <div className="flex gap-2 sm:col-span-2">
               <button
                 type="submit"

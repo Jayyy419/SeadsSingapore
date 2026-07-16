@@ -10,9 +10,13 @@ const NAV = [
   { href: "/admin/partners", label: "Partners" },
   { href: "/admin/programs", label: "Programs" },
   { href: "/admin/blog", label: "Blog" },
+  { href: "/admin/media", label: "Media" },
+  { href: "/admin/testimonials", label: "Testimonials" },
+  { href: "/admin/faq", label: "FAQ" },
   { href: "/admin/submissions", label: "Submissions" },
   { href: "/admin/stories", label: "Story submissions" },
   { href: "/admin/audit-log", label: "Audit log" },
+  { href: "/admin/site-settings", label: "Site settings" },
   { href: "/admin/settings", label: "Settings" },
 ];
 

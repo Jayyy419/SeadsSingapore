@@ -30,6 +30,9 @@ export type EventItem = {
   // docs/LEARNING_GUIDE.md's admin/CMS section) — update spotsFilled as RSVPs come in.
   capacity?: number;
   spotsFilled?: number;
+  // Absent means scheduled — admin-settable via /admin/events for calling off or pushing
+  // back an event without deleting it (which would break shared links and lose RSVPs).
+  status?: "cancelled" | "postponed";
 };
 
 export type Story = {
@@ -39,6 +42,8 @@ export type Story = {
   excerpt: LocalizedString;
   body: Record<Locale, string[]>;
   photo?: string;
+  // Set by the Lambda on every admin save; absent on the static seed stories.
+  updatedAt?: string;
 };
 
 export type Testimonial = {

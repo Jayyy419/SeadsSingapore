@@ -4,6 +4,32 @@ import { useState } from "react";
 
 const MAX_BYTES = 5 * 1024 * 1024;
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+// Longest edge after client-side downscaling — far larger than any display size on the site,
+// small enough that a modern phone photo (often 12MP+/8MB+) comfortably fits under MAX_BYTES.
+const MAX_DIMENSION = 2000;
+
+// Shrinks an oversized photo in the browser (canvas redraw to JPEG) instead of rejecting it —
+// previously a typical phone photo just failed with "must be under 5MB" and the admin had to
+// find external resizing tooling before they could continue. Animated GIFs are excluded
+// (a canvas redraw would freeze them to one frame); an oversized GIF still gets the clear
+// error instead.
+async function downscaleImage(file: File): Promise<File> {
+  const bitmap = await createImageBitmap(file);
+  try {
+    const scale = Math.min(1, MAX_DIMENSION / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Canvas unavailable");
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.85));
+    if (!blob) throw new Error("Could not encode image");
+    return new File([blob], file.name.replace(/\.\w+$/, ".jpg"), { type: "image/jpeg" });
+  } finally {
+    bitmap.close();
+  }
+}
 
 // Uploads go browser -> S3 directly via a short-lived presigned URL (see
 // /admin/api/upload-url and the Lambda's POST /internal/uploads) — this Lambda/API Gateway
@@ -17,7 +43,7 @@ export function AdminImageUpload({ name, label, defaultValue }: { name: string; 
   const [errorMsg, setErrorMsg] = useState("");
 
   async function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
+    let file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
 
@@ -27,9 +53,23 @@ export function AdminImageUpload({ name, label, defaultValue }: { name: string; 
       return;
     }
     if (file.size > MAX_BYTES) {
-      setStatus("error");
-      setErrorMsg("Image must be under 5MB.");
-      return;
+      if (file.type === "image/gif") {
+        setStatus("error");
+        setErrorMsg("GIF must be under 5MB (large GIFs can't be auto-resized without losing animation).");
+        return;
+      }
+      try {
+        file = await downscaleImage(file);
+      } catch {
+        setStatus("error");
+        setErrorMsg("Image must be under 5MB (automatic resizing failed).");
+        return;
+      }
+      if (file.size > MAX_BYTES) {
+        setStatus("error");
+        setErrorMsg("Image is still over 5MB after resizing — please use a smaller photo.");
+        return;
+      }
     }
 
     setStatus("uploading");

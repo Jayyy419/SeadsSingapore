@@ -1,6 +1,7 @@
 import { internalApiFetch } from "@/lib/internal-api";
 import { AdminShell } from "@/components/admin-shell";
 import { AdminFetchError } from "@/components/admin-fetch-error";
+import { AdminTranslations, TranslationField } from "@/components/admin-translations";
 import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { updateImpactMetric, createImpactMetric, deleteImpactMetric } from "./actions";
 
@@ -28,7 +29,7 @@ export default async function AdminImpactMetricsPage() {
   return (
     <AdminShell
       title="Impact metrics"
-      subtitle="Only the English label/note are editable here — other languages keep their last translated value (or default to the English text on create) until updated separately. See docs/LEARNING_GUIDE.md."
+      subtitle="The headline numbers on the homepage. New entries start with English text in every language — open a metric's Translations section to provide 中文/Melayu/हिन्दी versions."
     >
       <div className="flex flex-col gap-4">
         {metrics.map((metric) => (
@@ -67,6 +68,22 @@ export default async function AdminImpactMetricsPage() {
                 className="mt-1 w-full rounded-lg border border-[color:var(--foreground-soft)] bg-[color:var(--surface)] px-3 py-2 text-sm"
               />
             </label>
+            <div className="sm:col-span-3">
+              <AdminTranslations>
+                {(
+                  [
+                    ["Zh", "中文"],
+                    ["Ms", "Bahasa Melayu"],
+                    ["Hi", "हिन्दी"],
+                  ] as const
+                ).map(([suffix, lang]) => (
+                  <div key={suffix} className="grid gap-3 sm:grid-cols-2">
+                    <TranslationField base="label" suffix={suffix} label={`Label (${lang})`} defaultValue={metric.label?.[suffix.toLowerCase()]} />
+                    <TranslationField base="note" suffix={suffix} label={`Note (${lang})`} defaultValue={metric.note?.[suffix.toLowerCase()]} />
+                  </div>
+                ))}
+              </AdminTranslations>
+            </div>
             <div className="flex gap-2 sm:col-span-3">
               <button
                 type="submit"

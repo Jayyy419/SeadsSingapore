@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { internalApiFetch } from "@/lib/internal-api";
+import { collectTranslations } from "@/lib/admin-form";
 
 export async function updateTeamMember(formData: FormData) {
   const slug = String(formData.get("slug"));
@@ -13,7 +14,7 @@ export async function updateTeamMember(formData: FormData) {
 
   const res = await internalApiFetch(`/internal/team/${encodeURIComponent(slug)}`, {
     method: "PUT",
-    body: JSON.stringify({ name, roleEn, bioEn, photo, order }),
+    body: JSON.stringify({ name, roleEn, bioEn, photo, order, ...collectTranslations(formData, ["role", "bio"]) }),
   });
   if (!res.ok) {
     throw new Error(`Failed to update team member ${slug}: ${res.status}`);
