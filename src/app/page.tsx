@@ -11,7 +11,11 @@ import { useEvents } from "@/lib/use-events";
 import { usePrograms } from "@/lib/use-programs";
 import { useStories } from "@/lib/use-stories";
 import { useTeam } from "@/lib/use-team";
-import { impactMetrics as staticImpactMetrics, testimonials, type ImpactMetric } from "@/content/siteContent";
+import { useSiteContent } from "@/lib/use-site-content";
+import { AnnouncementBanner } from "@/components/announcement-banner";
+import { SocialLinks } from "@/components/social-links";
+import { NewsletterSignup } from "@/components/newsletter-signup";
+import { impactMetrics as staticImpactMetrics, type ImpactMetric } from "@/content/siteContent";
 
 // Renders the static, hardcoded numbers immediately (no loading flash), then swaps in the
 // admin-editable live values from DynamoDB (via the interest-form Lambda's public
@@ -63,9 +67,11 @@ export default function Home() {
   const { programs } = usePrograms();
   const { stories } = useStories();
   const { team } = useTeam();
+  const { testimonials } = useSiteContent();
 
   return (
     <div className="min-h-screen">
+      <AnnouncementBanner />
       <SiteHeader />
 
       {/* HERO */}
@@ -312,7 +318,9 @@ export default function Home() {
           <div className="text-[13px] text-[color:var(--footer-muted)]">
             <p>{t.footerLocation}</p>
             <p className="mt-1">hello@seads.sg</p>
+            <SocialLinks className="mt-4" />
           </div>
+          <NewsletterSignup />
         </div>
         <div className="mx-auto mt-6 flex max-w-6xl flex-wrap gap-4.5 border-t border-white/10 pt-5 text-[13px]">
           <Link href="/about" className="text-[color:var(--footer-muted)] hover:text-[color:var(--footer-fg)]">{t.navAbout}</Link>
@@ -322,6 +330,7 @@ export default function Home() {
           <Link href="/partners" className="text-[color:var(--footer-muted)] hover:text-[color:var(--footer-fg)]">{t.navPartners}</Link>
           <Link href="/donate" className="text-[color:var(--footer-muted)] hover:text-[color:var(--footer-fg)]">{t.navDonate}</Link>
           <Link href="/contact" className="text-[color:var(--footer-muted)] hover:text-[color:var(--footer-fg)]">{t.navContact}</Link>
+          <Link href="/faq" className="text-[color:var(--footer-muted)] hover:text-[color:var(--footer-fg)]">{t.faqTitle}</Link>
           <Link href="/privacy" className="text-[color:var(--footer-muted)] hover:text-[color:var(--footer-fg)]">{t.footerPrivacy}</Link>
         </div>
       </footer>

@@ -2,6 +2,7 @@ import { internalApiFetch } from "@/lib/internal-api";
 import { AdminShell } from "@/components/admin-shell";
 import { AdminImageUpload } from "@/components/admin-image-upload";
 import { AdminFetchError } from "@/components/admin-fetch-error";
+import { AdminTranslations, TranslationField } from "@/components/admin-translations";
 import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { updateTeamMember, createTeamMember, deleteTeamMember } from "./actions";
 
@@ -30,12 +31,23 @@ export default async function AdminTeamPage() {
   return (
     <AdminShell
       title="Team"
-      subtitle="Only the English role/bio are editable here — other languages default to the English text on create and are otherwise left untouched. See docs/LEARNING_GUIDE.md."
+      subtitle="Team member bios shown on /team. New entries start with English text in every language — open a member's Translations section to provide 中文/Melayu/हिन्दी versions."
     >
       <div className="flex flex-col gap-4">
         {team.map((member) => (
           <form key={member.slug} action={updateTeamMember} className="section-card grid gap-3 p-5 sm:grid-cols-2">
             <input type="hidden" name="slug" value={member.slug} />
+            <div className="flex items-center justify-between sm:col-span-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[color:var(--accent)]">{member.slug}</p>
+              <a
+                href="/team"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs font-semibold text-[color:var(--muted)] hover:text-[color:var(--brand)]"
+              >
+                View on site ↗
+              </a>
+            </div>
             <label className="text-sm text-[color:var(--foreground)]">
               Name
               <input
@@ -73,6 +85,20 @@ export default async function AdminTeamPage() {
             <div className="sm:col-span-2">
               <AdminImageUpload name="photo" label="Photo" defaultValue={member.photo} />
             </div>
+            <AdminTranslations>
+              {(
+                [
+                  ["Zh", "中文"],
+                  ["Ms", "Bahasa Melayu"],
+                  ["Hi", "हिन्दी"],
+                ] as const
+              ).map(([suffix, lang]) => (
+                <div key={suffix} className="grid gap-3 sm:grid-cols-2">
+                  <TranslationField base="role" suffix={suffix} label={`Role (${lang})`} defaultValue={member.role?.[suffix.toLowerCase()]} />
+                  <TranslationField base="bio" suffix={suffix} label={`Bio (${lang})`} defaultValue={member.bio?.[suffix.toLowerCase()]} textarea />
+                </div>
+              ))}
+            </AdminTranslations>
             <div className="flex gap-2 sm:col-span-2">
               <button
                 type="submit"

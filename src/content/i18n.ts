@@ -178,6 +178,29 @@ export type Translation = {
   adminLoginIncorrectPassword: string;
   adminLoginBackToSite: string;
   skipToContent: string;
+  followUs: string;
+  newsletterTitle: string;
+  newsletterEmailPh: string;
+  newsletterButton: string;
+  newsletterDone: string;
+  dismissLabel: string;
+  faqTitle: string;
+  faqSubtitle: string;
+  faqEmpty: string;
+  donatePayNowTitle: string;
+  donatePayNowBody: string;
+  copyLabel: string;
+  copiedLabel: string;
+  upcomingEventsTitle: string;
+  pastEventsTitle: string;
+  noUpcomingEvents: string;
+  eventCancelledLabel: string;
+  eventPostponedLabel: string;
+  eventCancelledBody: string;
+  eventPostponedBody: string;
+  shareLabel: string;
+  copyLinkLabel: string;
+  updatedLabel: string;
 };
 
 export const translations: Record<Locale, Translation> = {
@@ -319,6 +342,29 @@ export const translations: Record<Locale, Translation> = {
     adminLoginPasswordPlaceholder: "Password", adminLoginButton: "Log in",
     adminLoginIncorrectPassword: "Incorrect password.", adminLoginBackToSite: "Back to seads.sg",
     skipToContent: "Skip to main content",
+    followUs: "Follow us",
+    newsletterTitle: "Stay in the loop",
+    newsletterEmailPh: "Your email",
+    newsletterButton: "Subscribe",
+    newsletterDone: "You're subscribed — check your inbox!",
+    dismissLabel: "Dismiss",
+    faqTitle: "Frequently asked questions",
+    faqSubtitle: "Quick answers about joining, volunteering, and our programs.",
+    faqEmpty: "No questions here yet — check back soon.",
+    donatePayNowTitle: "Donate via PayNow",
+    donatePayNowBody: "Scan the QR code with your banking app, or use our PayNow ID below.",
+    copyLabel: "Copy",
+    copiedLabel: "Copied!",
+    upcomingEventsTitle: "Upcoming events",
+    pastEventsTitle: "Past events",
+    noUpcomingEvents: "No upcoming events right now — subscribe below or follow us to hear about the next one.",
+    eventCancelledLabel: "Cancelled",
+    eventPostponedLabel: "Postponed",
+    eventCancelledBody: "This event has been cancelled.",
+    eventPostponedBody: "This event has been postponed — a new date will be announced.",
+    shareLabel: "Share",
+    copyLinkLabel: "Copy link",
+    updatedLabel: "Updated",
   },
   zh: {
     navHome: "首页", navAbout: "关于我们", navPrograms: "项目", navEvents: "活动", navStories: "故事", navMedia: "媒体", navDonate: "捐赠",
@@ -458,6 +504,29 @@ export const translations: Record<Locale, Translation> = {
     adminLoginPasswordPlaceholder: "密码", adminLoginButton: "登录",
     adminLoginIncorrectPassword: "密码错误。", adminLoginBackToSite: "返回 seads.sg",
     skipToContent: "跳到主要内容",
+    followUs: "关注我们",
+    newsletterTitle: "订阅最新动态",
+    newsletterEmailPh: "您的邮箱",
+    newsletterButton: "订阅",
+    newsletterDone: "订阅成功——请查收邮件！",
+    dismissLabel: "关闭",
+    faqTitle: "常见问题",
+    faqSubtitle: "关于加入、志愿服务和我们项目的快速解答。",
+    faqEmpty: "暂无内容——请稍后再来。",
+    donatePayNowTitle: "通过 PayNow 捐款",
+    donatePayNowBody: "使用银行应用扫描二维码，或使用下方的 PayNow 账号。",
+    copyLabel: "复制",
+    copiedLabel: "已复制！",
+    upcomingEventsTitle: "即将举行的活动",
+    pastEventsTitle: "往期活动",
+    noUpcomingEvents: "目前暂无即将举行的活动——欢迎订阅或关注我们，第一时间获取活动信息。",
+    eventCancelledLabel: "已取消",
+    eventPostponedLabel: "已延期",
+    eventCancelledBody: "该活动已取消。",
+    eventPostponedBody: "该活动已延期——新日期将另行公布。",
+    shareLabel: "分享",
+    copyLinkLabel: "复制链接",
+    updatedLabel: "更新于",
   },
   ms: {
     navHome: "Laman Utama", navAbout: "Tentang Kami", navPrograms: "Program", navEvents: "Acara", navStories: "Kisah", navMedia: "Media", navDonate: "Derma",
@@ -597,6 +666,29 @@ export const translations: Record<Locale, Translation> = {
     adminLoginPasswordPlaceholder: "Kata laluan", adminLoginButton: "Log masuk",
     adminLoginIncorrectPassword: "Kata laluan salah.", adminLoginBackToSite: "Kembali ke seads.sg",
     skipToContent: "Langkau ke kandungan utama",
+    followUs: "Ikuti kami",
+    newsletterTitle: "Kekal berhubung",
+    newsletterEmailPh: "E-mel anda",
+    newsletterButton: "Langgan",
+    newsletterDone: "Anda telah melanggan — semak peti masuk anda!",
+    dismissLabel: "Tutup",
+    faqTitle: "Soalan lazim",
+    faqSubtitle: "Jawapan ringkas tentang penyertaan, kesukarelawanan dan program kami.",
+    faqEmpty: "Belum ada soalan — sila kembali lagi.",
+    donatePayNowTitle: "Derma melalui PayNow",
+    donatePayNowBody: "Imbas kod QR dengan aplikasi perbankan anda, atau gunakan ID PayNow kami di bawah.",
+    copyLabel: "Salin",
+    copiedLabel: "Disalin!",
+    upcomingEventsTitle: "Acara akan datang",
+    pastEventsTitle: "Acara lepas",
+    noUpcomingEvents: "Tiada acara akan datang buat masa ini — langgan di bawah atau ikuti kami untuk berita acara seterusnya.",
+    eventCancelledLabel: "Dibatalkan",
+    eventPostponedLabel: "Ditangguhkan",
+    eventCancelledBody: "Acara ini telah dibatalkan.",
+    eventPostponedBody: "Acara ini telah ditangguhkan — tarikh baharu akan diumumkan.",
+    shareLabel: "Kongsi",
+    copyLinkLabel: "Salin pautan",
+    updatedLabel: "Dikemas kini",
   },
   hi: {
     navHome: "होम", navAbout: "हमारे बारे में", navPrograms: "कार्यक्रम", navEvents: "इवेंट्स", navStories: "कहानियाँ", navMedia: "मीडिया", navDonate: "दान करें",
@@ -736,5 +828,28 @@ export const translations: Record<Locale, Translation> = {
     adminLoginPasswordPlaceholder: "पासवर्ड", adminLoginButton: "लॉग इन करें",
     adminLoginIncorrectPassword: "गलत पासवर्ड।", adminLoginBackToSite: "seads.sg पर वापस जाएं",
     skipToContent: "मुख्य सामग्री पर जाएं",
+    followUs: "हमें फॉलो करें",
+    newsletterTitle: "अपडेट पाते रहें",
+    newsletterEmailPh: "आपका ईमेल",
+    newsletterButton: "सब्सक्राइब करें",
+    newsletterDone: "आपने सब्सक्राइब कर लिया है — अपना इनबॉक्स देखें!",
+    dismissLabel: "बंद करें",
+    faqTitle: "अक्सर पूछे जाने वाले प्रश्न",
+    faqSubtitle: "जुड़ने, स्वयंसेवा और हमारे कार्यक्रमों के बारे में त्वरित उत्तर।",
+    faqEmpty: "अभी कोई प्रश्न नहीं — जल्द ही फिर देखें।",
+    donatePayNowTitle: "PayNow से दान करें",
+    donatePayNowBody: "अपने बैंकिंग ऐप से QR कोड स्कैन करें, या नीचे हमारी PayNow ID उपयोग करें।",
+    copyLabel: "कॉपी करें",
+    copiedLabel: "कॉपी हो गया!",
+    upcomingEventsTitle: "आगामी कार्यक्रम",
+    pastEventsTitle: "पिछले कार्यक्रम",
+    noUpcomingEvents: "अभी कोई आगामी कार्यक्रम नहीं है — अगले कार्यक्रम की जानकारी के लिए नीचे सब्सक्राइब करें या हमें फॉलो करें।",
+    eventCancelledLabel: "रद्द",
+    eventPostponedLabel: "स्थगित",
+    eventCancelledBody: "यह कार्यक्रम रद्द कर दिया गया है।",
+    eventPostponedBody: "यह कार्यक्रम स्थगित कर दिया गया है — नई तारीख की घोषणा की जाएगी।",
+    shareLabel: "साझा करें",
+    copyLinkLabel: "लिंक कॉपी करें",
+    updatedLabel: "अपडेट किया गया",
   },
 };

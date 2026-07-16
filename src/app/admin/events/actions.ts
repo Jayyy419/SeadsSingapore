@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { internalApiFetch } from "@/lib/internal-api";
+import { collectTranslations } from "@/lib/admin-form";
 
 function revalidateEventPaths() {
   revalidatePath("/admin/events");
@@ -36,10 +37,20 @@ export async function updateEvent(formData: FormData) {
   const locationEn = String(formData.get("locationEn") ?? "");
   const bodyEn = String(formData.get("bodyEn") ?? "");
   const capacity = formData.get("capacity");
+  const status = String(formData.get("status") ?? "scheduled");
 
   const res = await internalApiFetch(`/internal/events/${encodeURIComponent(slug)}`, {
     method: "PUT",
-    body: JSON.stringify({ titleEn, typeEn, date, locationEn, bodyEn, capacity: capacity === "" ? "" : capacity }),
+    body: JSON.stringify({
+      titleEn,
+      typeEn,
+      date,
+      locationEn,
+      bodyEn,
+      status,
+      capacity: capacity === "" ? "" : capacity,
+      ...collectTranslations(formData, ["title", "type", "location", "body"]),
+    }),
   });
   if (!res.ok) {
     throw new Error(`Failed to update event ${slug}: ${res.status}`);

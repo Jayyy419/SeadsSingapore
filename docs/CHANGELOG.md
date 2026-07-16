@@ -4,6 +4,77 @@ All notable changes to this project should be documented in this file.
 
 This format is inspired by Keep a Changelog and uses a date-based release style.
 
+## [2026-07-16] (33)
+
+### Added — a product/feature audit round: donations, translations, and 7 new site surfaces
+
+Found by a 4-way parallel product audit (visitor journey/conversion, admin workflow
+ergonomics, static-content gaps, engagement/communications) — the first audit round this
+session focused on missing features and content-ownership gaps rather than technical
+correctness. New DynamoDB table `seads-site-content` (single-table grab-bag for media gallery
+items, testimonials, FAQ entries, and singleton config blobs, keyed by a `type#uuid`/
+`config#id` `itemId`) backs most of this.
+
+- **Donate page was a dead end** — no payment mechanism existed at all, just "coming soon."
+  Added admin-configurable PayNow (QR image upload + PayNow ID + instructions,
+  `/admin/site-settings`) with an `enabled` flag — /donate keeps the original coming-soon
+  card until an admin fills everything in and flips it on.
+- **The 4-locale i18n was silently defeated for all admin content**: neither the admin forms
+  nor the Lambda's update handlers ever accepted zh/ms/hi text, so every non-English visitor
+  saw English on every admin-created item. Added `applyLocalized()` to the Lambda (reads
+  `<field>Zh`/`<field>Ms`/`<field>Hi` payload keys) and a collapsible "Translations" section
+  to every content admin form (Team/Events/Programs/Blog/Impact-metrics).
+- **No submitter-facing email existed** — RSVPs, join submissions, and story submissions all
+  notified only the org, never the person who submitted. Added confirmation emails (RSVP
+  confirmed/waitlisted with event details, a join acknowledgment, and a story
+  approved/rejected notification) — all best-effort, reusing the SES setup that already
+  existed for org notifications.
+- **Media gallery was left behind in the DynamoDB migration** — `/media` was still a
+  hardcoded array of 6 placeholder SVGs literally reading "Add your photo here," the one
+  content type that never got an admin surface. Added `/admin/media` (photo, caption,
+  category, reorder) and switched `media-masonry.tsx` to the same static-fallback-then-
+  live-swap pattern as everything else.
+- **Testimonials were still static** — 3 hardcoded sample quotes with no admin surface. Added
+  `/admin/testimonials`.
+- **No social links or newsletter signup anywhere** on the site — a real discoverability/
+  retention leak for a youth org. Added admin-configurable social links (Instagram/TikTok/
+  LinkedIn/Facebook/YouTube — only configured platforms render) and an email-only newsletter
+  signup in both footers, storing into the existing submissions table as
+  `interestType: "newsletter"` (zero new storage).
+- **Events never expired**: the list sorted oldest-first with no upcoming/past distinction
+  and no empty state. Split into upcoming (soonest first) and past (most recent first)
+  sections; added a `status` field (`cancelled`/`postponed`) with a banner on the event's
+  detail page, a badge on list cards, RSVPs disabled for cancelled events, and the
+  corresponding `schema.org/EventCancelled`/`EventPostponed` JSON-LD status.
+- **Admin submissions had no search, filter, or export** — with hundreds of rows, an admin
+  couldn't find a specific person or produce an attendance/contact list without copying out
+  of the browser. Added a search box (name/email/message), type/event filters (as URL query
+  params, so they survive refresh and pagination), and a CSV export Route Handler under
+  `/admin/submissions/export` (Excel-formula-injection-safe cell escaping).
+- **No site-wide announcement capability** — "applications open" / "event moved" required a
+  deploy. Added an admin-configurable banner (message, optional link, `enabled` flag) shown
+  on every public page; dismissal is remembered in `localStorage` keyed by the message text,
+  so editing the message re-surfaces it for everyone who dismissed the old one.
+- **No FAQ page existed** despite a youth org fielding the same questions repeatedly. Added
+  `/faq` (admin-editable question/answer pairs, native `<details>` accordion) plus footer/nav
+  links.
+- **Admin session expiry mid-edit dumped to Next's generic error screen** with no
+  explanation. Added `src/app/admin/error.tsx` explaining the likely cause (8-hour session
+  expired) with a direct link back to login. Also added "View on site ↗" links next to
+  Team/Programs/Events/Blog admin items so an admin can quickly check a change without
+  hunting for the public URL.
+- **Image upload rejected any photo over 5MB** with no help — a typical modern phone photo
+  routinely exceeds that. Added client-side canvas downscaling (longest edge capped at 2000px,
+  re-encoded as JPEG at 0.85 quality) before the size check now runs a second time; only
+  animated GIFs (which a canvas redraw would freeze to one frame) still get a hard rejection.
+- **Blog stories had no share mechanism, no visible date, and no way to pass a story along**
+  short of copying the URL bar by hand. Added copy-link + native-share-or-WhatsApp-fallback
+  buttons and a visible "Updated" date (from the existing `updatedAt` field) on story detail
+  pages.
+- Extended the Playwright suite by 5 tests (FAQ rendering, announcement dismissal/persistence,
+  conditional social links, both donate-page states) — all mock `GET /site-content` rather
+  than depending on live admin-configured data, keeping the suite deterministic.
+
 ## [2026-07-15] (32)
 
 ### Fixed — race conditions, a resilience gap, CI safety net, and doc rot found by a 5-way parallel audit

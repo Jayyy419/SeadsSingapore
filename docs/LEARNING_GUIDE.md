@@ -2257,6 +2257,71 @@ itself (as this session's CHANGELOG/LEARNING_GUIDE updates already do) is the on
 that actually prevents this — a *separate* "go audit the docs later" pass will always find
 drift, because later always arrives after several more features have shipped without it.
 
+## Part 18: Retrofitting i18n, a Grab-Bag Table, and a Base64 Transcription Lesson
+
+A fourth audit round this session (visitor journey, admin ergonomics, static-content gaps,
+engagement/communications) was deliberately aimed at *product* gaps rather than technical
+correctness — the previous four rounds had already covered security, accessibility, testing,
+infra, and docs. Three implementation patterns from this round are worth carrying forward.
+
+### Retrofitting i18n after the fact means finding every silent narrowing
+
+The 4-locale system (`src/content/i18n.ts`) was designed in from the start for *static* UI
+copy. What broke it for *admin-created* content wasn't a missing feature so much as a chain of
+small, individually-reasonable narrowings, each of which quietly assumed English-only:
+`handleCreateEvent` seeded every locale with the same English string
+(`Object.fromEntries(LOCALES.map((l) => [l, titleEn]))`) — reasonable for "don't leave other
+locales blank on create." Then `handleUpdateEvent` only ever read `payload.titleEn` — also
+reasonable, since no form sent anything else. Then the admin form only rendered `titleEn` — also
+reasonable, since the handler didn't accept anything else. Each layer's decision made sense
+in isolation and depended on the layer next to it; nowhere was there a single obviously-wrong
+line, just three components consistently agreeing not to support a feature the product was
+already advertising. The fix (`applyLocalized()` in `index.mjs`, reading `<field>Zh`/`<field>Ms`/
+`<field>Hi` keys when present) had to touch all three layers at once — patching just the
+Lambda would have done nothing without a form to submit the new fields, and patching just the
+form would have silently dropped the data server-side. The transferable lesson: when a
+cross-cutting feature (i18n, permissions, audit logging) is bolted onto a system with several
+independent layers, grep for every place a value gets narrowed to a single case — each one is
+a candidate for having quietly opted the whole stack out of the feature.
+
+### One grab-bag table beats five single-purpose ones
+
+Media gallery items, testimonials, FAQ entries, and three singleton config blobs (donate/
+social/announcement) are five different "things," but none of them are large or numerous
+enough to justify their own DynamoDB table and their own set of `TABLE_NAME` env vars,
+IAM statements, and CRUD handler boilerplate. They share one table (`seads-site-content`)
+instead, distinguished by an `itemId` prefix (`media#<uuid>`, `testimonial#<uuid>`, `faq#<uuid>`,
+`config#donate`) and a `type` attribute for the Scan-then-filter-by-type read path
+(`handleGetSiteContent`). This only works because every item in the table is small, low-write-
+volume, and read together on most page loads anyway (the public `/site-content` endpoint
+returns all of them in one response, which is exactly the access pattern the homepage/footer/
+FAQ page actually have) — it would be the wrong call for anything with real query patterns of
+its own (filtering, pagination, high write volume) or where the shared blast radius of one
+table (a bad `ConditionExpression`, a runaway Scan) matters more than the setup savings. The
+generic `handleCreateSiteItem`/`handleUpdateSiteItem`/`handleDeleteSiteItem` trio, parameterized
+by a `SITE_COLLECTIONS` spec object (field names + max lengths + which field is a photo needing
+S3 cleanup), is what makes adding a *sixth* collection later a few lines of config rather than
+another full set of handlers.
+
+### A base64 blob is the wrong thing to hand-type across a chat message
+
+Applying the updated IAM policy needed the user to run a command in AWS CloudShell (this
+session's Lambda role updates always go through the user's own credentials — see Part 6's
+least-privilege discussion). The first attempt encoded the policy JSON as base64 and pasted it
+into a chat message for the user to copy; AWS CloudShell's `aws iam put-role-policy` failed
+with a JSON parse error. The base64 itself round-tripped correctly when checked programmatically
+(`base64 -d | python3 -m json.tool`) — the corruption happened in the manual re-typing of a
+~4700-character encoded blob into a chat response, not in the encoding step itself. The fix
+was to stop encoding at all: a plain `cat > file << 'EOF' ... EOF` heredoc with the literal JSON
+inline has zero encoding/decoding steps for a human (or an LLM) to introduce an error into,
+even though it's more visually verbose in the chat. The general lesson: any time a value needs
+to survive being manually copied by a human between two systems that don't share a clipboard,
+prefer the most literal, least-encoded representation of that value — encoding schemes (base64,
+URL-encoding, escaping) that are "safe" for programmatic round-trips are not safe against
+manual re-transcription, and the failure mode (silent corruption, caught by a downstream parse
+error rather than at the point of the mistake) is easy to miss until something is well
+overdue for a lint pass.
+
 ## Glossary
 
 - **Accessible name**: the text assistive technology (screen readers) announces for an

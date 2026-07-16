@@ -2,6 +2,7 @@ import { internalApiFetch } from "@/lib/internal-api";
 import { AdminShell } from "@/components/admin-shell";
 import { AdminImageUpload } from "@/components/admin-image-upload";
 import { AdminFetchError } from "@/components/admin-fetch-error";
+import { AdminTranslations, TranslationField } from "@/components/admin-translations";
 import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { updateStory, createStory, deleteStory } from "./actions";
 
@@ -30,13 +31,23 @@ export default async function AdminBlogPage() {
   return (
     <AdminShell
       title="Blog stories"
-      subtitle="These are the staff-authored stories on /blog — separate from the community submissions under Story submissions. Only the English fields are editable here — other languages default to the English text on create and are otherwise left untouched. See docs/LEARNING_GUIDE.md."
+      subtitle="These are the staff-authored stories on /blog — separate from the community submissions under Story submissions. New entries start with English text in every language — open a story's Translations section to provide 中文/Melayu/हिन्दी versions."
     >
       <div className="flex flex-col gap-4">
         {stories.map((story) => (
           <form key={story.slug} action={updateStory} className="section-card grid gap-3 p-5 sm:grid-cols-2">
             <input type="hidden" name="slug" value={story.slug} />
-            <p className="text-xs font-semibold uppercase tracking-wide text-[color:var(--accent)] sm:col-span-2">{story.slug}</p>
+            <div className="flex items-center justify-between sm:col-span-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[color:var(--accent)]">{story.slug}</p>
+              <a
+                href={`/blog/${story.slug}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs font-semibold text-[color:var(--muted)] hover:text-[color:var(--brand)]"
+              >
+                View on site ↗
+              </a>
+            </div>
             <label className="text-sm text-[color:var(--foreground)]">
               Title (EN)
               <input
@@ -73,6 +84,28 @@ export default async function AdminBlogPage() {
             <div className="sm:col-span-2">
               <AdminImageUpload name="photo" label="Photo" defaultValue={story.photo} />
             </div>
+            <AdminTranslations>
+              {(
+                [
+                  ["Zh", "中文"],
+                  ["Ms", "Bahasa Melayu"],
+                  ["Hi", "हिन्दी"],
+                ] as const
+              ).map(([suffix, lang]) => (
+                <div key={suffix} className="grid gap-3 sm:grid-cols-2">
+                  <TranslationField base="title" suffix={suffix} label={`Title (${lang})`} defaultValue={story.title?.[suffix.toLowerCase()]} />
+                  <TranslationField base="category" suffix={suffix} label={`Category (${lang})`} defaultValue={story.category?.[suffix.toLowerCase()]} />
+                  <TranslationField base="excerpt" suffix={suffix} label={`Excerpt (${lang})`} defaultValue={story.excerpt?.[suffix.toLowerCase()]} textarea />
+                  <TranslationField
+                    base="body"
+                    suffix={suffix}
+                    label={`Body (${lang})`}
+                    defaultValue={story.body?.[suffix.toLowerCase()]?.join("\n")}
+                    textarea
+                  />
+                </div>
+              ))}
+            </AdminTranslations>
             <div className="flex gap-2 sm:col-span-2">
               <button
                 type="submit"

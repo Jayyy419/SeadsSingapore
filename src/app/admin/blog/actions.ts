@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { internalApiFetch } from "@/lib/internal-api";
+import { collectTranslations } from "@/lib/admin-form";
 
 export async function updateStory(formData: FormData) {
   const slug = String(formData.get("slug"));
@@ -13,7 +14,14 @@ export async function updateStory(formData: FormData) {
 
   const res = await internalApiFetch(`/internal/stories/${encodeURIComponent(slug)}`, {
     method: "PUT",
-    body: JSON.stringify({ categoryEn, titleEn, excerptEn, bodyEn, photo }),
+    body: JSON.stringify({
+      categoryEn,
+      titleEn,
+      excerptEn,
+      bodyEn,
+      photo,
+      ...collectTranslations(formData, ["category", "title", "excerpt", "body"]),
+    }),
   });
   if (!res.ok) {
     throw new Error(`Failed to update story ${slug}: ${res.status}`);
