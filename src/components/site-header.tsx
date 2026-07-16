@@ -261,10 +261,11 @@ export function SiteHeader() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-[color:var(--foreground-soft)] bg-[color:var(--background-overlay)]">
-      <div
-        ref={containerRef}
-        className="relative mx-auto grid w-full max-w-6xl grid-cols-[1fr_auto_1fr] items-center gap-4 px-4 py-3 sm:px-6 lg:px-8"
-      >
+      <div ref={containerRef} className="relative w-full">
+        {/* Measured against this full-width wrapper (not the max-w-6xl content row below) so
+            the vine stretches edge-to-edge across the header instead of stopping at the
+            content column's width — computeSprigsNow's centers are still relative to this
+            same containerRef, so sprig alignment on the nav buttons is unaffected. */}
         <svg
           width={vine.width}
           height={vine.height}
@@ -284,6 +285,7 @@ export function SiteHeader() {
           ))}
         </svg>
 
+        <div className="relative mx-auto grid w-full max-w-6xl grid-cols-[1fr_auto_1fr] items-center gap-4 px-4 py-3 sm:px-6 lg:px-8">
         <Link href="/" className="flex shrink-0 items-center gap-2 justify-self-start">
           <svg width="24" height="24" viewBox="0 0 22 22" className="shrink-0">
             <ellipse cx="11" cy="13" rx="6" ry="7.5" fill="#8a5a34" />
@@ -446,6 +448,7 @@ export function SiteHeader() {
           <span className="h-0.5 w-4 rounded-sm bg-[color:var(--foreground)]" />
           <span className="h-0.5 w-4 rounded-sm bg-[color:var(--foreground)]" />
         </button>
+        </div>
       </div>
 
       {menuOpen && (
