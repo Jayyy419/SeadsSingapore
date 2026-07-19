@@ -2348,6 +2348,53 @@ what CI enforces from what a human has to remember, and a green CI run for a cha
 a new env var dependency is not sufficient evidence the feature works — only a live check
 against the actual deployed thing is.
 
+## Part 19: A 4-Way Security/Performance/QOL/Ideation Audit, and Knowing When to Scope a Feature Down
+
+A fifth audit round split four ways at once — security re-audit of only the newest surfaces,
+performance impact of recent additions, QOL rough edges, and pure forward-looking feature
+ideation — landed one real security fix, five small QOL/perf fixes, and three new features.
+Two things from this round are worth carrying forward.
+
+### A placeholder value is a spec, even when nobody wrote it down as one
+
+The security fix added a scheme allowlist (`isSafeUrl()`) to admin-supplied link fields, since
+`social-links.tsx` and `announcement-banner.tsx` both rendered them straight into `<a href>`
+with no protocol check — a compromised admin password could have planted a `javascript:` URI
+that ran in every visitor's browser. The first pass required every link to parse as an
+absolute URL with an `http:`/`https:`/`mailto:`/`tel:` scheme, which is exactly correct for the
+five social-platform fields — and would have silently broken the announcement banner's `linkUrl`
+field, whose admin form (`src/app/admin/site-settings/page.tsx`) has always shown the
+placeholder text `/join`, a same-site relative path. Nobody had written "relative paths must be
+supported" in a spec anywhere; the placeholder text *was* the spec, just not one phrased as a
+requirement. The fix added an `allowRelative` option (a leading `/` that isn't `//` is
+inherently safe — it can never carry a scheme) applied only to that one field. The transferable
+lesson: before tightening validation on an existing field, read every place that field is
+rendered *and* every hint (placeholder, existing stored values, help text) about what a valid
+value looks like — the UI copy already sitting in the form is often a more reliable source of
+"what does this field actually need to accept" than reasoning about the field from its name
+alone.
+
+### Scoping an ambitious idea down to its actual value, honestly
+
+The feature-ideation pass proposed "event-day check-in via the existing QR codes": scan a
+personal QR at the door, mark attendance, see a live headcount. Built at full fidelity, that
+means generating a unique QR per RSVP, embedding it in the confirmation email, and building a
+camera-scanning UI — three new pieces of surface area (email template changes, a new
+per-attendee identifier, mobile camera permissions) for a nonprofit's volunteer-run door table.
+What actually got built is a `/admin/events/[slug]/check-in` roster: every RSVP for an event,
+a toggleable "Check in" button, and a live headcount in the page subtitle — reusing the
+submissions table with one new `attended` field and two small routes
+(`GET /internal/events/{slug}/rsvps`, `PATCH /internal/submissions/{id}/attendance`). This
+delivers the actual stated value ("no more paper sign-in sheets," "a live headcount view")
+without the QR-scanning mechanism, because a volunteer with a phone and a name list can check
+someone in just as fast as scanning a code, and the list approach has no email-template or
+camera-permission surface to get wrong. The transferable lesson: when an idea's *title*
+implies a specific mechanism ("via QR codes") but its *justification* is really about an
+outcome (fewer paper sheets, a live count), building for the outcome and being explicit about
+what got cut — rather than silently building the smaller thing and calling it done, or over-
+building the literal mechanism because it was named first — keeps the scoping decision visible
+and reversible if the cut piece turns out to matter later.
+
 ## Glossary
 
 - **Accessible name**: the text assistive technology (screen readers) announces for an

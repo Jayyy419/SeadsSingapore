@@ -4,7 +4,58 @@ All notable changes to this project should be documented in this file.
 
 This format is inspired by Keep a Changelog and uses a date-based release style.
 
-## [2026-07-16] (33)
+## [2026-07-19] (34)
+
+### Added — a 4-way audit round (security/performance/QOL/feature ideation): fixes plus 3 new features
+
+Found by 4 parallel audits scoped to only the surfaces added in the last two rounds
+(donations, translations, media/testimonials/FAQ, submissions search/export, announcement
+banner) rather than re-auditing anything already covered. One security fix, five QOL/perf
+fixes, and three new features building on existing infra with no new tables beyond one small
+addition.
+
+- **Admin-supplied social/announcement links had no scheme allowlist** — `social-links.tsx`
+  and `announcement-banner.tsx` rendered `social.*`/`announcement.linkUrl` directly as
+  `<a href>` with only a length cap on the backend. A compromised admin password could have
+  planted a `javascript:` URI that ran in every visitor's browser on click. Added
+  `isSafeUrl()` on both the Lambda (`SITE_CONFIGS.social.urlFields`,
+  `.announcement.relativeUrlFields` — the banner's link intentionally allows relative paths
+  like `/join`) and the frontend (`src/lib/safe-url.ts`) as defense in depth.
+- **Header vine recomputed its SVG path on every raw `resize` event** — a drag-resize could
+  fire dozens of uncoalesced rebuilds a second. Coalesced `site-header.tsx`'s resize handler
+  to one `requestAnimationFrame` per frame.
+- **Admin dashboard cards were stale** — Media/Testimonials/FAQ/Site settings (all real
+  routes, all in the nav dropdowns) had no card on `/admin`. Added the missing four, plus a
+  card for the new Analytics page below.
+- **Cancelling an event had no confirmation** despite being more consequential than delete
+  (public banner, RSVPs closed) — the status `<select>` just saved with everything else on
+  "Save." Added `EventSaveButton`, which confirms only when the save would actually change
+  status to `cancelled`, so editing an already-cancelled event's other fields doesn't nag.
+- **The Translations section gave no completeness signal** — same collapsed text whether 0 or
+  3 locales were filled in, so checking status meant expanding every item. Added
+  `countTranslatedLocales()` (any non-empty field counts a locale as touched) and a `(N/3)`
+  badge in the summary, wired into all 5 forms that use it (Events/Team/Programs/
+  Impact-metrics/Blog).
+- **CSV export gave zero feedback until the browser's download UI appeared.** Replaced the
+  plain `<a href>` with `ExportCsvButton` (client-side `fetch` + blob download), which shows
+  "Exporting…" for the real duration of the request.
+- **Added `/my-activity`** — a public, email-keyed lookup so a volunteer juggling multiple
+  events/applications can see their own RSVP/submission history without an account. New
+  Lambda route `POST /my-activity` filters the existing submissions table by email
+  (IP-rate-limited at 20/10min, since — unlike the admin view — this is reachable by anyone
+  who knows an email); no new table.
+- **Added `/admin/analytics`** — submissions-over-30-days, submissions-by-type, and
+  event RSVP fill-rate, all computed from data already in `/internal/submissions`,
+  `/internal/events`, and `/internal/story-submissions` (`aggregate.ts`'s pure functions).
+  Plain CSS bars, no charting dependency.
+- **Added day-of event check-in** — `/admin/events/[slug]/check-in` lists an event's RSVPs
+  with a toggleable "Check in" action and a live headcount in the page subtitle, replacing a
+  paper sign-in sheet. New `attended` boolean on submission rows, set via
+  `PATCH /internal/submissions/{id}/attendance`; new `GET /internal/events/{slug}/rsvps` for
+  the roster. Scoped down from the original "scan a personal QR code" idea — the QR
+  infrastructure already exists per-event, but a distinct per-attendee QR would mean new
+  email-template work; the list+toggle delivers the actual ask (no more paper sheets, a live
+  count) without that additional surface.
 
 ### Added — a product/feature audit round: donations, translations, and 7 new site surfaces
 

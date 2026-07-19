@@ -2,7 +2,7 @@ import { internalApiFetch } from "@/lib/internal-api";
 import { AdminShell } from "@/components/admin-shell";
 import { AdminImageUpload } from "@/components/admin-image-upload";
 import { AdminFetchError } from "@/components/admin-fetch-error";
-import { AdminTranslations, TranslationField } from "@/components/admin-translations";
+import { AdminTranslations, TranslationField, countTranslatedLocales } from "@/components/admin-translations";
 import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { updateStory, createStory, deleteStory } from "./actions";
 
@@ -84,7 +84,7 @@ export default async function AdminBlogPage() {
             <div className="sm:col-span-2">
               <AdminImageUpload name="photo" label="Photo" defaultValue={story.photo} />
             </div>
-            <AdminTranslations>
+            <AdminTranslations translatedCount={countTranslatedLocales([story.title, story.category, story.excerpt, story.body])}>
               {(
                 [
                   ["Zh", "中文"],

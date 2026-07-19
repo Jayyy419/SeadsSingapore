@@ -201,6 +201,12 @@ export type Translation = {
   shareLabel: string;
   copyLinkLabel: string;
   updatedLabel: string;
+  myActivityTitle: string;
+  myActivitySubtitle: string;
+  myActivityEmailPh: string;
+  myActivityButton: string;
+  myActivityEmpty: string;
+  myActivityError: string;
 };
 
 export const translations: Record<Locale, Translation> = {
@@ -365,6 +371,12 @@ export const translations: Record<Locale, Translation> = {
     shareLabel: "Share",
     copyLinkLabel: "Copy link",
     updatedLabel: "Updated",
+    myActivityTitle: "My activity",
+    myActivitySubtitle: "Enter the email you used when RSVPing or applying to see your history.",
+    myActivityEmailPh: "you@example.com",
+    myActivityButton: "Look up",
+    myActivityEmpty: "No activity found for that email yet.",
+    myActivityError: "Couldn't look that up right now — please try again.",
   },
   zh: {
     navHome: "首页", navAbout: "关于我们", navPrograms: "项目", navEvents: "活动", navStories: "故事", navMedia: "媒体", navDonate: "捐赠",
@@ -527,6 +539,12 @@ export const translations: Record<Locale, Translation> = {
     shareLabel: "分享",
     copyLinkLabel: "复制链接",
     updatedLabel: "更新于",
+    myActivityTitle: "我的活动记录",
+    myActivitySubtitle: "输入您报名或申请时使用的电子邮箱，查看您的记录。",
+    myActivityEmailPh: "you@example.com",
+    myActivityButton: "查询",
+    myActivityEmpty: "未找到该邮箱的相关记录。",
+    myActivityError: "暂时无法查询，请稍后再试。",
   },
   ms: {
     navHome: "Laman Utama", navAbout: "Tentang Kami", navPrograms: "Program", navEvents: "Acara", navStories: "Kisah", navMedia: "Media", navDonate: "Derma",
@@ -689,6 +707,12 @@ export const translations: Record<Locale, Translation> = {
     shareLabel: "Kongsi",
     copyLinkLabel: "Salin pautan",
     updatedLabel: "Dikemas kini",
+    myActivityTitle: "Aktiviti saya",
+    myActivitySubtitle: "Masukkan e-mel yang anda gunakan semasa RSVP atau memohon untuk melihat sejarah anda.",
+    myActivityEmailPh: "you@example.com",
+    myActivityButton: "Semak",
+    myActivityEmpty: "Tiada aktiviti dijumpai untuk e-mel itu setakat ini.",
+    myActivityError: "Tidak dapat menyemak sekarang — sila cuba lagi.",
   },
   hi: {
     navHome: "होम", navAbout: "हमारे बारे में", navPrograms: "कार्यक्रम", navEvents: "इवेंट्स", navStories: "कहानियाँ", navMedia: "मीडिया", navDonate: "दान करें",
@@ -851,5 +875,11 @@ export const translations: Record<Locale, Translation> = {
     shareLabel: "साझा करें",
     copyLinkLabel: "लिंक कॉपी करें",
     updatedLabel: "अपडेट किया गया",
+    myActivityTitle: "मेरी गतिविधि",
+    myActivitySubtitle: "अपनी गतिविधि देखने के लिए वह ईमेल दर्ज करें जो आपने RSVP या आवेदन करते समय इस्तेमाल किया था।",
+    myActivityEmailPh: "you@example.com",
+    myActivityButton: "खोजें",
+    myActivityEmpty: "उस ईमेल के लिए अभी तक कोई गतिविधि नहीं मिली।",
+    myActivityError: "अभी खोज नहीं हो पाई — कृपया फिर से प्रयास करें।",
   },
 };

@@ -70,6 +70,7 @@ export function SiteHeader() {
   const groupRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const isMobileRef = useRef(isMobile);
+  const resizeRafRef = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     isMobileRef.current = isMobile;
@@ -134,20 +135,28 @@ export function SiteHeader() {
       measureVine();
       computeSprigsNow();
     }, 300);
+    // Coalesced to at most once per animation frame — a raw `resize` listener fires dozens of
+    // times/sec during a drag-resize, and each call re-measures the container and rebuilds the
+    // vine's SVG path, so running it uncoalesced makes every drag-resize frame do real work.
     const onResize = () => {
-      const mobile = window.innerWidth < MOBILE_BREAKPOINT;
-      if (mobile !== isMobileRef.current) {
-        isMobileRef.current = mobile;
-        setIsMobile(mobile);
-        if (!mobile) setMenuOpen(false);
-      }
-      measureVine();
+      if (resizeRafRef.current !== undefined) return;
+      resizeRafRef.current = requestAnimationFrame(() => {
+        resizeRafRef.current = undefined;
+        const mobile = window.innerWidth < MOBILE_BREAKPOINT;
+        if (mobile !== isMobileRef.current) {
+          isMobileRef.current = mobile;
+          setIsMobile(mobile);
+          if (!mobile) setMenuOpen(false);
+        }
+        measureVine();
+      });
     };
     window.addEventListener("resize", onResize);
     return () => {
       cancelAnimationFrame(raf);
       clearTimeout(timeout);
       window.removeEventListener("resize", onResize);
+      if (resizeRafRef.current !== undefined) cancelAnimationFrame(resizeRafRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

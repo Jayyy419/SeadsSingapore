@@ -3,6 +3,7 @@ import { AdminShell } from "@/components/admin-shell";
 import { AdminPagination } from "@/components/admin-pagination";
 import { AdminFetchError } from "@/components/admin-fetch-error";
 import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
+import { ExportCsvButton } from "@/components/export-csv-button";
 import { deleteSubmission } from "./actions";
 import { filterSubmissions, type Submission } from "./filter";
 
@@ -79,12 +80,10 @@ export default async function AdminSubmissionsPage({
         >
           Filter
         </button>
-        <a
+        <ExportCsvButton
           href={`/admin/submissions/export${filterQuery ? `?${filterQuery}` : ""}`}
-          className="rounded-full border border-[color:var(--foreground-soft)] px-4 py-2 text-xs font-semibold text-[color:var(--foreground)] hover:border-[color:var(--brand)] hover:text-[color:var(--brand)]"
-        >
-          Export CSV
-        </a>
+          className="rounded-full border border-[color:var(--foreground-soft)] px-4 py-2 text-xs font-semibold text-[color:var(--foreground)] hover:border-[color:var(--brand)] hover:text-[color:var(--brand)] disabled:opacity-60"
+        />
       </form>
 
       <div className="section-card overflow-x-auto p-2">

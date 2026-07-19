@@ -34,6 +34,23 @@ function diffFields(oldItem, newItem, fields) {
   return fields.filter((f) => JSON.stringify(oldItem[f]) !== JSON.stringify(newItem[f]));
 }
 
+// Admin-supplied link fields (social profiles, announcement banner link) are rendered as
+// <a href> to every site visitor. Without a scheme allowlist, a javascript: URI stored here
+// would execute in every visitor's browser on click if the shared admin password were ever
+// compromised — so reject anything that isn't a normal web/mail/phone link.
+const SAFE_URL_SCHEMES = new Set(["http:", "https:", "mailto:", "tel:"]);
+// allowRelative covers same-site links like the announcement banner's "/join" — a bare "/"
+// path can never carry a scheme, so it's inherently safe; "//host/path" is excluded since
+// that's scheme-relative and would still navigate off-site.
+function isSafeUrl(value, { allowRelative = false } = {}) {
+  if (allowRelative && value.startsWith("/") && !value.startsWith("//")) return true;
+  try {
+    return SAFE_URL_SCHEMES.has(new URL(value).protocol);
+  } catch {
+    return false;
+  }
+}
+
 // Used by every slugified entity's create handler (events/team/partners/programs/stories) in
 // place of a bare PutCommand. The preceding GetCommand-then-check in each handler is only
 // advisory — two concurrent creates deriving the same slug could both pass that check before
@@ -705,6 +722,87 @@ async function handleDeleteSubmission(headers, id) {
   return json(200, headers, { ok: true });
 }
 
+// Public, email-keyed lookup so a volunteer juggling multiple events/applications can see
+// their own history without an account — every submission (RSVP, join, story interest) is
+// already keyed by the email they typed in, so this just filters the same table down to one
+// person instead of building a new identity system. Rate-limited by IP since, unlike the
+// admin submissions view, this is reachable by anyone who can guess or already knows an email.
+async function handleMyActivity(event, headers) {
+  let payload;
+  try {
+    payload = JSON.parse(event.body || "{}");
+  } catch {
+    return json(400, headers, { error: "Invalid JSON body" });
+  }
+
+  const email = typeof payload.email === "string" ? payload.email.trim().toLowerCase().slice(0, 200) : "";
+  if (!isValidEmail(email)) {
+    return json(400, headers, { error: "A valid email is required" });
+  }
+
+  const remoteIp = event.requestContext?.http?.sourceIp;
+  if (remoteIp && !(await checkRateLimit(`ip#myactivity#${remoteIp}`, 20))) {
+    return json(429, headers, { error: "Too many lookups — please try again in a few minutes." });
+  }
+
+  const [submissions, events] = await Promise.all([scanAll(TABLE_NAME), scanAll(EVENTS_TABLE)]);
+  const eventBySlug = new Map(events.map((e) => [e.slug, e]));
+
+  const activity = submissions
+    .filter((item) => !String(item.id).startsWith("ratelimit#") && item.email?.toLowerCase() === email)
+    .map((item) => {
+      const evt = item.eventSlug ? eventBySlug.get(item.eventSlug) : null;
+      return {
+        submittedAt: item.submittedAt,
+        interestType: item.interestType || null,
+        eventSlug: item.eventSlug || null,
+        eventTitle: evt?.title?.en || null,
+        eventDate: evt?.date || null,
+        rsvpStatus: item.rsvpStatus || null,
+      };
+    })
+    .sort((a, b) => (b.submittedAt || "").localeCompare(a.submittedAt || ""));
+
+  return json(200, headers, { activity });
+}
+
+// Admin-only, per-event RSVP roster for the day-of check-in page — a live headcount view
+// replacing a paper sign-in sheet, using the same submission rows the public RSVP already
+// wrote (no new table).
+async function handleGetEventRsvps(headers, slug) {
+  const items = (await scanAll(TABLE_NAME))
+    .filter((item) => item.interestType === "event" && item.eventSlug === slug)
+    .map((item) => ({ id: item.id, name: item.name, email: item.email, rsvpStatus: item.rsvpStatus || null, attended: item.attended === true }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  return json(200, headers, { rsvps: items });
+}
+
+// Toggles a single RSVP's day-of attendance — deliberately separate from handleUpdateSubmission
+// (which doesn't exist; submissions are otherwise immutable, only deletable) since check-in is
+// its own lightweight action a volunteer at the door repeats many times in a row.
+async function handleSetAttendance(event, headers, id) {
+  let payload;
+  try {
+    payload = JSON.parse(event.body || "{}");
+  } catch {
+    return json(400, headers, { error: "Invalid JSON body" });
+  }
+  const existing = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { id } }));
+  if (!existing.Item) {
+    return json(404, headers, { error: "Submission not found" });
+  }
+  const attended = payload.attended === true;
+  await ddb.send(
+    new UpdateCommand({
+      TableName: TABLE_NAME,
+      Key: { id },
+      UpdateExpression: "SET attended = :attended",
+      ExpressionAttributeValues: { ":attended": attended },
+    })
+  );
+  return json(200, headers, { ok: true, attended });
+}
+
 async function handleGetEventRsvpCounts(headers) {
   const counts = {};
   for (const item of await scanAll(TABLE_NAME)) {
@@ -877,8 +975,11 @@ const SITE_COLLECTIONS = {
 
 const SITE_CONFIGS = {
   donate: { fields: { qrImage: 500, payNowId: 100, instructions: 1000 }, photoField: "qrImage" },
-  social: { fields: { instagram: 300, tiktok: 300, linkedin: 300, facebook: 300, youtube: 300 } },
-  announcement: { fields: { message: 300, linkUrl: 300, linkLabel: 100 } },
+  social: {
+    fields: { instagram: 300, tiktok: 300, linkedin: 300, facebook: 300, youtube: 300 },
+    urlFields: ["instagram", "tiktok", "linkedin", "facebook", "youtube"],
+  },
+  announcement: { fields: { message: 300, linkUrl: 300, linkLabel: 100 }, relativeUrlFields: ["linkUrl"] },
 };
 
 async function handleGetSiteContent(headers) {
@@ -980,6 +1081,12 @@ async function handleUpdateSiteConfig(event, headers, configId) {
   for (const [field, maxLen] of Object.entries(spec.fields)) {
     if (typeof payload[field] !== "string") continue;
     const value = payload[field].trim().slice(0, maxLen);
+    if (value && spec.urlFields?.includes(field) && !isSafeUrl(value)) {
+      return json(400, headers, { error: `${field} must be a valid http(s)/mailto/tel link` });
+    }
+    if (value && spec.relativeUrlFields?.includes(field) && !isSafeUrl(value, { allowRelative: true })) {
+      return json(400, headers, { error: `${field} must be a relative path or a valid http(s)/mailto/tel link` });
+    }
     if (spec.photoField === field && item[field] && item[field] !== value) await deleteMediaObjectIfOwned(item[field]);
     item[field] = value;
   }
@@ -1455,6 +1562,11 @@ export const handler = async (event) => {
     return handleSubmitStory(event, headers);
   }
 
+  // Public, email-keyed activity lookup — see handleMyActivity above.
+  if (method === "POST" && path === "/my-activity") {
+    return handleMyActivity(event, headers);
+  }
+
   // Public read of approved community stories — no internal-key required, this is meant to
   // be fetched by the public /blog page at request time.
   if (method === "GET" && path === "/community-stories") {
@@ -1558,6 +1670,17 @@ export const handler = async (event) => {
     }
     if (method === "GET" && path === "/internal/event-rsvp-counts") {
       return handleGetEventRsvpCounts(headers);
+    }
+    const eventRsvpsMatch = path.match(/^\/internal\/events\/([^/]+)\/rsvps$/);
+    if (method === "GET" && eventRsvpsMatch) {
+      return handleGetEventRsvps(headers, decodeURIComponent(eventRsvpsMatch[1]));
+    }
+    const attendanceMatch = path.match(/^\/internal\/submissions\/([^/]+)\/attendance$/);
+    if (method === "PATCH" && attendanceMatch) {
+      const id = decodeURIComponent(attendanceMatch[1]);
+      const res = await handleSetAttendance(event, headers, id);
+      if (res.statusCode < 300) await logAudit(event, "update", "attendance", id);
+      return res;
     }
     if (method === "GET" && path === "/internal/story-submissions") {
       return handleGetStorySubmissions(headers);

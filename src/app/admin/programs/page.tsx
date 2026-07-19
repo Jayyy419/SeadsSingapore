@@ -2,7 +2,7 @@ import { internalApiFetch } from "@/lib/internal-api";
 import { AdminShell } from "@/components/admin-shell";
 import { AdminImageUpload } from "@/components/admin-image-upload";
 import { AdminFetchError } from "@/components/admin-fetch-error";
-import { AdminTranslations, TranslationField } from "@/components/admin-translations";
+import { AdminTranslations, TranslationField, countTranslatedLocales } from "@/components/admin-translations";
 import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { updateProgram, createProgram, deleteProgram } from "./actions";
 
@@ -103,7 +103,9 @@ export default async function AdminProgramsPage() {
             <div className="sm:col-span-2">
               <AdminImageUpload name="photo" label="Photo" defaultValue={program.photo} />
             </div>
-            <AdminTranslations>
+            <AdminTranslations
+              translatedCount={countTranslatedLocales([program.name, program.tag, program.description, program.who, program.body])}
+            >
               {(
                 [
                   ["Zh", "中文"],

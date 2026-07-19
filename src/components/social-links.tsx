@@ -2,6 +2,7 @@
 
 import { useSiteContent } from "@/lib/use-site-content";
 import { useLocale } from "@/lib/locale-context";
+import { isSafeUrl } from "@/lib/safe-url";
 
 // Minimal single-path glyphs so no icon library is needed — each is the platform's
 // widely-recognized mark simplified to one filled path.
@@ -26,7 +27,7 @@ export function SocialLinks({ className }: { className?: string }) {
 
   const links = (["instagram", "tiktok", "linkedin", "facebook", "youtube"] as const)
     .map((platform) => ({ platform, url: social?.[platform] }))
-    .filter((l): l is { platform: (typeof l)["platform"]; url: string } => !!l.url);
+    .filter((l): l is { platform: (typeof l)["platform"]; url: string } => isSafeUrl(l.url));
 
   if (links.length === 0) return null;
 

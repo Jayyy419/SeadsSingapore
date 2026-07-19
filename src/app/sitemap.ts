@@ -5,7 +5,22 @@ import type { MetadataRoute } from "next";
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://main.d2mrph1bcp6pjx.amplifyapp.com";
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://jztkgrm3lh.execute-api.ap-southeast-1.amazonaws.com";
 
-const ROUTES = ["", "/about", "/programs", "/events", "/team", "/contact", "/partners", "/donate", "/media", "/blog", "/join", "/faq", "/privacy"];
+const ROUTES = [
+  "",
+  "/about",
+  "/programs",
+  "/events",
+  "/team",
+  "/contact",
+  "/partners",
+  "/donate",
+  "/media",
+  "/blog",
+  "/join",
+  "/faq",
+  "/my-activity",
+  "/privacy",
+];
 
 // Events are DynamoDB-backed and admin-created/deleted at any time (see docs/LEARNING_GUIDE.md
 // Part 13) — fetching the live list here, rather than the frozen siteContent.ts seed, keeps the
