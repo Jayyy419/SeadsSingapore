@@ -13,7 +13,7 @@
     "test": "playwright test"
   },
   "dependencies": {
-    "@sentry/nextjs": "^10.65.0",
+    "@sentry/nextjs": "^10.67.0",
     "next": "16.2.10",
     "qrcode": "^1.5.4",
     "react": "19.2.7",
