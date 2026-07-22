@@ -1,7 +1,7 @@
 import { internalApiFetch } from "@/lib/internal-api";
 import { AdminShell } from "@/components/admin-shell";
 import { AdminFetchError } from "@/components/admin-fetch-error";
-import { AdminTranslations, TranslationField } from "@/components/admin-translations";
+import { AdminTranslations, TranslationField, countTranslatedLocales } from "@/components/admin-translations";
 import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { updateImpactMetric, createImpactMetric, deleteImpactMetric } from "./actions";
 
@@ -69,7 +69,7 @@ export default async function AdminImpactMetricsPage() {
               />
             </label>
             <div className="sm:col-span-3">
-              <AdminTranslations>
+              <AdminTranslations translatedCount={countTranslatedLocales([metric.label, metric.note])}>
                 {(
                   [
                     ["Zh", "中文"],

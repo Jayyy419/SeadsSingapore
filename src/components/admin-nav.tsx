@@ -38,6 +38,7 @@ const GROUPS: NavGroup[] = [
     key: "system",
     label: "System",
     items: [
+      { href: "/admin/analytics", label: "Analytics" },
       { href: "/admin/audit-log", label: "Audit log" },
       { href: "/admin/site-settings", label: "Site settings" },
       { href: "/admin/settings", label: "Settings" },

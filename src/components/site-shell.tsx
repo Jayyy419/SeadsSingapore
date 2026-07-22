@@ -26,6 +26,7 @@ export function SiteShell({ children, title, subtitle }: SiteShellProps) {
     { label: t.navDonate, href: "/donate" },
     { label: t.navContact, href: "/contact" },
     { label: t.faqTitle, href: "/faq" },
+    { label: t.myActivityTitle, href: "/my-activity" },
     { label: t.footerPrivacy, href: "/privacy" },
   ];
 

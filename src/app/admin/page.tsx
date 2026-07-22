@@ -7,10 +7,15 @@ const SECTIONS = [
   { href: "/admin/team", label: "Team", description: "Edit team member bios and photos." },
   { href: "/admin/partners", label: "Partners", description: "Edit partner names, logos, and links." },
   { href: "/admin/programs", label: "Programs", description: "Create, edit, and delete programs, with photos." },
-  { href: "/admin/submissions", label: "Interest form submissions", description: "Everyone who's filled in the 'Get Involved' form. Delete spam/test entries." },
   { href: "/admin/blog", label: "Blog", description: "Create and edit the staff-authored stories on /blog, with photos." },
+  { href: "/admin/media", label: "Media", description: "Edit the media gallery's photos, captions, and categories." },
+  { href: "/admin/testimonials", label: "Testimonials", description: "Edit the quotes and author details shown around the site." },
+  { href: "/admin/faq", label: "FAQ", description: "Edit the questions and answers on the /faq page." },
+  { href: "/admin/submissions", label: "Interest form submissions", description: "Everyone who's filled in the 'Get Involved' form. Delete spam/test entries." },
   { href: "/admin/stories", label: "Story submissions", description: "Approve, reject, or delete community-submitted stories." },
+  { href: "/admin/analytics", label: "Analytics", description: "Submissions over time, RSVP fill rates, and story approval stats." },
   { href: "/admin/audit-log", label: "Audit log", description: "See a record of recent admin create/edit/delete actions." },
+  { href: "/admin/site-settings", label: "Site settings", description: "Donation details, social media links, and the site-wide announcement banner." },
   { href: "/admin/settings", label: "Settings", description: "Change the admin password." },
 ];
 

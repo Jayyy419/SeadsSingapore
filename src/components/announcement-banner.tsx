@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useSiteContent } from "@/lib/use-site-content";
 import { useLocale } from "@/lib/locale-context";
+import { isSafeUrl } from "@/lib/safe-url";
 
 // Admin-configurable site-wide banner ("applications open", "Saturday's event moved", …) —
 // previously anything like this needed a code change + deploy. Dismissal is remembered in
@@ -28,7 +29,7 @@ export function AnnouncementBanner() {
     <div className="flex items-center justify-center gap-3 bg-[color:var(--brand)] px-4 py-2.5 text-sm text-white">
       <p className="min-w-0">
         {active.message}
-        {active.linkUrl && (
+        {isSafeUrl(active.linkUrl, { allowRelative: true }) && (
           <a href={active.linkUrl} className="ml-2 font-semibold underline underline-offset-2 hover:opacity-85">
             {active.linkLabel || active.linkUrl}
           </a>
