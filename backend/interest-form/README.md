@@ -60,12 +60,36 @@ One env var per DynamoDB table (`index.mjs` never hardcodes a table name), plus:
 - `SITE_URL` — optional, used only to build links inside submitter-facing emails; falls back
   to the same Amplify URL the frontend's `NEXT_PUBLIC_SITE_URL` defaults to if unset
 - `ALLOWED_ORIGINS` — comma-separated list of allowed CORS origins (frontend URLs)
-- `ADMIN_PASSWORD` — bootstrap-only admin password; auto-migrated into `ADMIN_CONFIG_TABLE`
-  (hashed) on first successful login, so changing the password afterward never needs a
-  redeploy — see `handleChangePassword`/`checkPassword` in `index.mjs`
-- `ADMIN_SESSION_SECRET` — HMAC key signing admin session tokens (`x-admin-token` header)
 - `AWS_REGION` — not set manually; this is a reserved variable the Lambda runtime injects
   automatically, read only to build the media bucket's public URL
+
+### Secrets (SSM Parameter Store, *not* env vars)
+
+Secrets are **never** Lambda environment variables: anyone with
+`lambda:GetFunctionConfiguration` can read those in cleartext. They live in SSM Parameter
+Store as `SecureString` (encrypted under the AWS-managed `alias/aws/ssm` key), so reading one
+requires both `ssm:GetParameter` and `kms:Decrypt`, and every read is auditable in CloudTrail.
+Values are fetched lazily at runtime and cached for the life of the warm container
+(`getSsmParameter` in `index.mjs`); only *successful* reads are cached, so a transient SSM
+failure can't pin a bad value.
+
+- `/seads/turnstile-secret-key` — Cloudflare Turnstile secret. **Fails open**: if it can't be
+  read, `verifyTurnstile` lets the submission through rather than taking down the public form.
+- `/seads/admin-session-secret` — HMAC key signing admin session tokens (`x-admin-token`
+  header). **Fails closed**: if it can't be read, no token validates. Rotating this parameter
+  immediately invalidates every outstanding admin session, which is the intended lever for
+  "log everyone out now."
+
+Both were migrated off plaintext/Secrets Manager on 2026-08-30 (see `docs/CHANGELOG.md`).
+There is deliberately **no** `ADMIN_PASSWORD` — the only source of truth for the admin
+password is the salted scrypt hash in `ADMIN_CONFIG_TABLE`, so no plaintext copy of it exists
+anywhere. Admins change it through `handleChangePassword` (`/admin/settings` in the UI); if
+that stored hash were ever deleted, re-seed it there rather than reintroducing a bootstrap
+env var.
+
+Adding a new secret needs the same care as a new table: create the parameter (tagged
+`Project=SeadsSingapore`, `Environment=Production`), confirm `iam-policy.json`'s
+`SsmParameterRead`/`SsmDecrypt` statements cover it, and only then deploy code that reads it.
 
 **Reminder for whoever adds the next table**: a new `*_TABLE` env var needs three separate
 changes, not just the code — (1) `aws dynamodb create-table` + enable PITR, (2) add a
