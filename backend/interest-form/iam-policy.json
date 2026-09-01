@@ -86,10 +86,21 @@
       "Resource": "*"
     },
     {
-      "Sid": "SecretsRead",
+      "Sid": "SsmParameterRead",
       "Effect": "Allow",
-      "Action": "secretsmanager:GetSecretValue",
-      "Resource": "arn:aws:secretsmanager:ap-southeast-1:140023398409:secret:seads/*"
+      "Action": ["ssm:GetParameter", "ssm:GetParameters"],
+      "Resource": "arn:aws:ssm:ap-southeast-1:140023398409:parameter/seads/*"
+    },
+    {
+      "Sid": "SsmDecrypt",
+      "Effect": "Allow",
+      "Action": "kms:Decrypt",
+      "Resource": "arn:aws:kms:ap-southeast-1:140023398409:key/1db38225-ad6b-4100-a4a0-9252f410f703",
+      "Condition": {
+        "StringEquals": {
+          "kms:ViaService": "ssm.ap-southeast-1.amazonaws.com"
+        }
+      }
     }
   ]
 }

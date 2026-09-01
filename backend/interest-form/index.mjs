@@ -1,14 +1,14 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, PutCommand, UpdateCommand, GetCommand, ScanCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
 import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
-import { SecretsManagerClient, GetSecretValueCommand } from "@aws-sdk/client-secrets-manager";
+import { SSMClient, GetParameterCommand } from "@aws-sdk/client-ssm";
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { randomUUID, createHmac, timingSafeEqual, scryptSync, randomBytes } from "node:crypto";
 
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 const ses = new SESClient({});
-const secretsManager = new SecretsManagerClient({});
+const ssm = new SSMClient({});
 const s3 = new S3Client({});
 
 // A plain ScanCommand caps out at ~1MB per call and silently returns only a partial result
@@ -95,12 +95,38 @@ const SITE_URL = process.env.SITE_URL || "https://main.d2mrph1bcp6pjx.amplifyapp
 // proxy: it forwards the password to POST /admin-login and forwards the resulting session
 // token on every subsequent /internal/* call, and this Lambda does all real verification.
 //
-// ADMIN_PASSWORD (env var) is only the *bootstrap* value now — the real source of truth is a
-// salted/hashed entry in ADMIN_CONFIG_TABLE, lazily migrated on first successful login so
-// changing the password later never requires an AWS CLI call again (see handleChangePassword).
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
-const ADMIN_SESSION_SECRET = process.env.ADMIN_SESSION_SECRET;
+// Secrets live in SSM Parameter Store (SecureString), never as Lambda environment variables:
+// anyone with lambda:GetFunctionConfiguration can read an env var in cleartext, whereas reading
+// these requires ssm:GetParameter *and* kms:Decrypt, and every read is auditable in CloudTrail.
+// The admin password itself is deliberately NOT here — the only source of truth for it is the
+// salted scrypt hash in ADMIN_CONFIG_TABLE (see checkPassword), so there is no plaintext copy
+// of it anywhere in this system.
+const TURNSTILE_SECRET_PARAM = "/seads/turnstile-secret-key";
+const ADMIN_SESSION_SECRET_PARAM = "/seads/admin-session-secret";
 const SESSION_TTL_SECONDS = 60 * 60 * 8;
+
+// Cached across warm Lambda invocations so we're not calling SSM on every request. Only
+// *successful* reads are cached: caching a transient failure would pin the wrong value (a null
+// Turnstile secret, or an unusable session secret) for the entire life of the warm container.
+const ssmCache = new Map();
+
+async function getSsmParameter(name) {
+  if (ssmCache.has(name)) return ssmCache.get(name);
+  const result = await ssm.send(new GetParameterCommand({ Name: name, WithDecryption: true }));
+  const value = result.Parameter?.Value ?? null;
+  if (value !== null) ssmCache.set(name, value);
+  return value;
+}
+
+// Unlike the Turnstile secret (which fails open — see getTurnstileSecret), a missing session
+// secret must fail closed: signing or verifying with a fallback value would either mint tokens
+// nothing can verify or, far worse, accept forged ones. Throwing here surfaces as a 500 at the
+// call site rather than as a silent auth bypass.
+async function getAdminSessionSecret() {
+  const secret = await getSsmParameter(ADMIN_SESSION_SECRET_PARAM);
+  if (!secret) throw new Error(`Missing SSM parameter ${ADMIN_SESSION_SECRET_PARAM}`);
+  return secret;
+}
 
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "").split(",").filter(Boolean);
 
@@ -222,21 +248,16 @@ async function checkRateLimit(key, limit) {
   }
 }
 
-// Cached across warm Lambda invocations so we're not calling Secrets Manager on every request.
-let cachedTurnstileSecret;
 async function getTurnstileSecret() {
-  if (cachedTurnstileSecret !== undefined) return cachedTurnstileSecret;
   try {
-    const result = await secretsManager.send(new GetSecretValueCommand({ SecretId: "seads/turnstile-secret-key" }));
-    cachedTurnstileSecret = result.SecretString || null;
+    return await getSsmParameter(TURNSTILE_SECRET_PARAM);
   } catch (err) {
     console.error("Could not load Turnstile secret, skipping bot-check:", err);
-    cachedTurnstileSecret = null;
+    return null;
   }
-  return cachedTurnstileSecret;
 }
 
-// Fails open (allows the submission through) on our own infra errors — a Secrets Manager or
+// Fails open (allows the submission through) on our own infra errors — an SSM or
 // network blip shouldn't take down the form — but fails closed on an actual failed/missing
 // verification, which is the case this exists to catch.
 async function verifyTurnstile(token, remoteIp) {
@@ -479,21 +500,29 @@ async function handleSubmitStory(event, headers) {
   return json(200, headers, { ok: true });
 }
 
-function signToken(payload) {
-  return createHmac("sha256", ADMIN_SESSION_SECRET).update(payload).digest("hex");
+async function signToken(payload) {
+  const secret = await getAdminSessionSecret();
+  return createHmac("sha256", secret).update(payload).digest("hex");
 }
 
-function createSessionToken() {
+async function createSessionToken() {
   const expiresAt = String(Date.now() + SESSION_TTL_SECONDS * 1000);
-  return `${expiresAt}.${signToken(expiresAt)}`;
+  return `${expiresAt}.${await signToken(expiresAt)}`;
 }
 
-function isValidSessionToken(token) {
-  if (!token || !ADMIN_SESSION_SECRET) return false;
+async function isValidSessionToken(token) {
+  if (!token) return false;
   const [payload, signature] = token.split(".");
   if (!payload || !signature) return false;
 
-  const expected = signToken(payload);
+  let expected;
+  try {
+    expected = await signToken(payload);
+  } catch (err) {
+    // Fail closed — an unreadable session secret must never authenticate anyone.
+    console.error("Could not verify session token:", err);
+    return false;
+  }
   const a = Buffer.from(signature);
   const b = Buffer.from(expected);
   if (a.length !== b.length || !timingSafeEqual(a, b)) return false;
@@ -501,7 +530,7 @@ function isValidSessionToken(token) {
   return Number.isFinite(Number(payload)) && Date.now() < Number(payload);
 }
 
-function requireValidAdminToken(event) {
+async function requireValidAdminToken(event) {
   const provided = event.headers?.["x-admin-token"] || event.headers?.["X-Admin-Token"];
   return isValidSessionToken(provided);
 }
@@ -526,24 +555,26 @@ async function storePassword(password) {
   );
 }
 
-// The DynamoDB-stored hash is the real source of truth once it exists; ADMIN_PASSWORD (the
-// Lambda env var) is only the bootstrap value, checked and auto-migrated on first successful
-// login so that changing the password afterward never needs an AWS CLI call again.
+// The salted scrypt hash in ADMIN_CONFIG_TABLE is the *only* source of truth for the password.
+// There used to be an ADMIN_PASSWORD env-var bootstrap branch here, checked when no stored hash
+// existed yet and auto-migrated on first successful login; it was removed once the hash existed,
+// because it required keeping a cleartext copy of a live credential in the function's
+// environment (readable by anyone with lambda:GetFunctionConfiguration) to cover a
+// one-time-only case that had already happened. Admins change the password through
+// handleChangePassword; if the stored hash were ever deleted, re-seed it there rather than
+// reintroducing a plaintext bootstrap value.
 async function checkPassword(password) {
   if (!password) return false;
 
   const stored = await getStoredPasswordConfig();
-  if (stored) {
-    const expected = Buffer.from(stored.hash, "hex");
-    const actual = Buffer.from(hashPassword(password, stored.salt), "hex");
-    return expected.length === actual.length && timingSafeEqual(expected, actual);
+  if (!stored) {
+    console.error("No stored password config — admin login is unavailable until one is seeded.");
+    return false;
   }
 
-  if (ADMIN_PASSWORD && password === ADMIN_PASSWORD.trim()) {
-    await storePassword(password);
-    return true;
-  }
-  return false;
+  const expected = Buffer.from(stored.hash, "hex");
+  const actual = Buffer.from(hashPassword(password, stored.salt), "hex");
+  return expected.length === actual.length && timingSafeEqual(expected, actual);
 }
 
 // Unlike the public interest-form/story endpoints, there's only one shared password and no
@@ -569,7 +600,7 @@ async function handleAdminLogin(event, headers) {
     return json(401, headers, { ok: false, error: "Incorrect password" });
   }
 
-  return json(200, headers, { ok: true, token: createSessionToken() });
+  return json(200, headers, { ok: true, token: await createSessionToken() });
 }
 
 async function handleChangePassword(event, headers) {
@@ -602,7 +633,7 @@ async function handleVerifySession(event, headers) {
     return json(400, headers, { error: "Invalid JSON body" });
   }
 
-  return json(200, headers, { valid: isValidSessionToken(payload?.token) });
+  return json(200, headers, { valid: await isValidSessionToken(payload?.token) });
 }
 
 async function handleGetImpactMetrics(headers) {
@@ -1633,7 +1664,7 @@ export const handler = async (event) => {
   // same one issued by /admin-login and checked by /verify-session) rather than a separate
   // static key — ties data-access authorization directly to being logged in as admin.
   if (path.startsWith("/internal/")) {
-    if (!requireValidAdminToken(event)) {
+    if (!(await requireValidAdminToken(event))) {
       return json(401, headers, { error: "Unauthorized" });
     }
 
