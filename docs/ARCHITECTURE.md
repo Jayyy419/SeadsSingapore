@@ -133,8 +133,10 @@ purpose-built alternative.
 
 `/admin/*`, gated by `src/proxy.ts` (redirects to `/admin/login` without a valid session
 cookie). Single shared admin password (no per-user accounts) — see
-`backend/interest-form/README.md`'s "Environment variables" for `ADMIN_PASSWORD`/
-`ADMIN_SESSION_SECRET` and how the password is stored/rotated.
+`backend/interest-form/README.md`'s "Secrets (SSM Parameter Store, *not* env vars)" for
+`/seads/admin-session-secret` and how the password is stored/rotated. There is deliberately no
+`ADMIN_PASSWORD` anywhere — the only source of truth is the salted scrypt hash in
+`ADMIN_CONFIG_TABLE`, changed through `/admin/settings`.
 
 - **Content CRUD**: `/admin/team`, `/admin/partners`, `/admin/programs`, `/admin/blog`,
   `/admin/events`, `/admin/impact-metrics` — each a Server Component list page + Server
@@ -244,7 +246,7 @@ Browser --POST/GET--> API Gateway (HTTP API, seads-interest-form-api)
   account-wide throttle above, plus Cloudflare Turnstile (below) on the frontend form.
 - **Turnstile**: bot check on the "Get Involved" form, verified server-side (the Lambda calls
   Cloudflare's `siteverify` before touching DynamoDB — the frontend token alone proves
-  nothing on its own). Secret key in Secrets Manager (`seads/turnstile-secret-key`); site key
+  nothing on its own). Secret key in SSM Parameter Store (`/seads/turnstile-secret-key`); site key
   is public (`NEXT_PUBLIC_TURNSTILE_SITE_KEY`). Both sides degrade gracefully if unconfigured
   (widget doesn't render / Lambda skips the check) rather than hard-failing the form.
 

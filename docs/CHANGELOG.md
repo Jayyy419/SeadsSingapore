@@ -4,6 +4,39 @@ All notable changes to this project should be documented in this file.
 
 This format is inspired by Keep a Changelog and uses a date-based release style.
 
+## [2026-09-01] (35)
+
+### Changed — finished the secrets migration: SSM Parameter Store only, no plaintext env vars
+
+Completes the cutover prepared in #51. The interest-form Lambda now reads both of its secrets
+from SSM Parameter Store at runtime and holds no credential material in its environment at all.
+
+- **Turnstile secret moved off Secrets Manager** to SSM `/seads/turnstile-secret-key`, and the
+  admin session-signing key off the plaintext `ADMIN_SESSION_SECRET` env var to
+  `/seads/admin-session-secret`. Both are `SecureString` under `alias/aws/ssm`, so reading one
+  now needs `ssm:GetParameter` *and* `kms:Decrypt` and is auditable in CloudTrail — where
+  `lambda:GetFunctionConfiguration` alone used to be enough to read either in cleartext.
+- **Removed `ADMIN_PASSWORD` and `ADMIN_SESSION_SECRET` from the Lambda's environment.**
+  `ADMIN_PASSWORD` was doubly dead: `checkPassword`'s bootstrap branch was deleted in #51, and
+  the value it still held no longer matched the stored hash (a live `/admin-login` with it
+  returned 401), so it had been a stale copy of a superseded credential sitting in cleartext.
+- **Verified the cutover by rejection, not by success.** `verifyTurnstile` fails *open* — it
+  lets submissions through when it cannot read the secret — so a successful form submission
+  would have been equally consistent with "SSM works" and "bot protection is silently off".
+  The check that actually proves it is a garbage token being **rejected** (400), which can only
+  happen if the secret was read and Cloudflare answered `success: false`. Confirmed against a
+  clean CloudWatch window (no "Could not load Turnstile secret", no `AccessDenied`) and with
+  `/verify-session` returning 200 rather than the 500 a failed session-secret read would give.
+- **Deleted Secrets Manager `seads/turnstile-secret-key`** with a 30-day recovery window
+  (restorable until 2026-10-01), and only after CloudTrail confirmed no principal had read it
+  since the deploy. Never force-deleted.
+
+The live role already carried the required `ssm:GetParameter`/`kms:Decrypt` grants, so no IAM
+change was made and neither existing inline policy was modified. Still outstanding: rotating
+the shared admin password itself, which can only be done through `/admin/settings` by someone
+who knows the current one — `handleChangePassword` verifies `currentPassword` against the
+stored scrypt hash and there is deliberately no reset path.
+
 ## [2026-07-19] (34)
 
 ### Added — a 4-way audit round (security/performance/QOL/feature ideation): fixes plus 3 new features
