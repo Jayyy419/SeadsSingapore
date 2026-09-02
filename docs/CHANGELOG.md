@@ -4,6 +4,35 @@ All notable changes to this project should be documented in this file.
 
 This format is inspired by Keep a Changelog and uses a date-based release style.
 
+## [2026-09-02] (36)
+
+### Fixed — the admin panel redirected every request to the login page
+
+`/admin/*` became completely unreachable: logging in succeeded, then every page bounced
+straight back to `/admin/login`, and Server Actions (the Media/Team/Programs save buttons)
+silently did nothing because they were being redirected too.
+
+- **Root cause.** `proxy.ts` gated every `/admin/*` request on `isValidSessionToken()`, which
+  did a `fetch` to the Lambda's `POST /verify-session` and ended in a bare
+  `catch { return false }`. That fetch started failing instantly inside the middleware runtime,
+  so an *infrastructure* failure was indistinguishable from *"you are not logged in"* — and
+  because the `catch` logged nothing, the failure was invisible in both the Lambda logs and the
+  Amplify logs. Measured against production: a request carrying a session cookie returned a 307
+  in 0.139s, where the `/verify-session` round-trip it was supposedly making takes ~1s.
+- **Fix.** Middleware now answers a purely local question — is a session cookie present, shaped
+  like the Lambda's `${expiresAtMs}.${hmacSha256Hex}` token, and unexpired
+  (`hasUnexpiredSessionCookie`). No network call, so there is no longer a remote dependency that
+  can lock every admin out of the panel, and each admin navigation drops a ~1s round-trip.
+- **This does not weaken authorization**, because middleware was never the security boundary.
+  Every read and write already goes through `internalApiFetch` to the Lambda's `/internal/*`
+  routes, which call `requireValidAdminToken` and verify the HMAC before touching data. A forged
+  cookie now gets past the middleware gate but still cannot read or change anything — verified
+  locally: a well-formed unexpired cookie with a forged signature passes middleware, reaches the
+  Lambda, gets `401`, and is redirected back to login.
+- **`internalApiFetch` now treats a `401` as authoritative** and redirects to `/admin/login`,
+  so an expired session ends at the login page instead of rendering an empty list or throwing a
+  raw `failed: 401` — both of which read to an admin as data loss.
+
 ## [2026-09-01] (35)
 
 ### Changed — finished the secrets migration: SSM Parameter Store only, no plaintext env vars

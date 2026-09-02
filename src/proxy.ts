@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { SESSION_COOKIE, isValidSessionToken } from "@/lib/admin-session";
+import { SESSION_COOKIE, hasUnexpiredSessionCookie } from "@/lib/admin-session";
 import { securityHeaders } from "@/lib/security-headers";
 
 const PUBLIC_ADMIN_PATHS = ["/admin/login", "/admin/api/login", "/admin/api/logout"];
@@ -23,9 +23,12 @@ export async function proxy(request: NextRequest) {
     return withSecurityHeaders(NextResponse.next());
   }
 
+  // Presence-and-expiry only, evaluated locally — see hasUnexpiredSessionCookie for why this
+  // deliberately doesn't verify the signature, and why doing so here used to take the entire
+  // admin panel down. Real authorization happens in the Lambda on every /internal/* call.
   if (pathname.startsWith("/admin")) {
     const token = request.cookies.get(SESSION_COOKIE)?.value;
-    if (!(await isValidSessionToken(token))) {
+    if (!hasUnexpiredSessionCookie(token)) {
       const loginUrl = new URL("/admin/login", request.url);
       return withSecurityHeaders(NextResponse.redirect(loginUrl));
     }
