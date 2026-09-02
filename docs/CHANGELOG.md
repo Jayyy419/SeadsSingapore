@@ -4,6 +4,27 @@ All notable changes to this project should be documented in this file.
 
 This format is inspired by Keep a Changelog and uses a date-based release style.
 
+## [2026-09-02] (37)
+
+### Fixed — `/admin/analytics` 500ed on every load, because it read the wrong response key
+
+With the login redirect from (36) out of the way, the page could finally be reached — and it
+turned out to have been broken since it shipped, throwing
+`TypeError: a is not iterable` (digest `382610076`) on every request.
+
+- **Root cause.** `GET /internal/story-submissions` responds with `{ submissions }`, but the
+  analytics page destructured `{ entries }` — the key `/internal/audit-log` uses. Since the
+  response was a perfectly good `200`, the `!res.ok` fallback never applied, so `stories` was
+  simply `undefined`, and `storyStatusCounts`'s `for (const s of stories)` threw. `/admin/stories`
+  reads the same endpoint correctly as `data.submissions ?? []`.
+- **Why it stayed hidden.** `proxy.ts` was redirecting every `/admin/*` request to the login page,
+  so nothing ever rendered this page to discover the crash. Fixing the redirect is what surfaced
+  it — the two bugs were unrelated and stacked.
+- **Also hardened.** Analytics was the only admin page reading its payload without a `?? []`
+  guard; every other one already had it, which is why the others degraded to an empty list while
+  this one took the whole route down with a 500. All three reads here are now guarded, so a future
+  shape change shows an empty chart plus the existing error banner instead of a 500.
+
 ## [2026-09-02] (36)
 
 ### Fixed — the admin panel redirected every request to the login page
