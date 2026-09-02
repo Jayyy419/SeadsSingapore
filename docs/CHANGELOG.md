@@ -4,6 +4,68 @@ All notable changes to this project should be documented in this file.
 
 This format is inspired by Keep a Changelog and uses a date-based release style.
 
+## [2026-09-02] (36)
+
+### Fixed — the admin panel redirected every request to the login page
+
+`/admin/*` became completely unreachable: logging in succeeded, then every page bounced
+straight back to `/admin/login`, and Server Actions (the Media/Team/Programs save buttons)
+silently did nothing because they were being redirected too.
+
+- **Root cause.** `proxy.ts` gated every `/admin/*` request on `isValidSessionToken()`, which
+  did a `fetch` to the Lambda's `POST /verify-session` and ended in a bare
+  `catch { return false }`. That fetch started failing instantly inside the middleware runtime,
+  so an *infrastructure* failure was indistinguishable from *"you are not logged in"* — and
+  because the `catch` logged nothing, the failure was invisible in both the Lambda logs and the
+  Amplify logs. Measured against production: a request carrying a session cookie returned a 307
+  in 0.139s, where the `/verify-session` round-trip it was supposedly making takes ~1s.
+- **Fix.** Middleware now answers a purely local question — is a session cookie present, shaped
+  like the Lambda's `${expiresAtMs}.${hmacSha256Hex}` token, and unexpired
+  (`hasUnexpiredSessionCookie`). No network call, so there is no longer a remote dependency that
+  can lock every admin out of the panel, and each admin navigation drops a ~1s round-trip.
+- **This does not weaken authorization**, because middleware was never the security boundary.
+  Every read and write already goes through `internalApiFetch` to the Lambda's `/internal/*`
+  routes, which call `requireValidAdminToken` and verify the HMAC before touching data. A forged
+  cookie now gets past the middleware gate but still cannot read or change anything — verified
+  locally: a well-formed unexpired cookie with a forged signature passes middleware, reaches the
+  Lambda, gets `401`, and is redirected back to login.
+- **`internalApiFetch` now treats a `401` as authoritative** and redirects to `/admin/login`,
+  so an expired session ends at the login page instead of rendering an empty list or throwing a
+  raw `failed: 401` — both of which read to an admin as data loss.
+
+## [2026-09-01] (35)
+
+### Changed — finished the secrets migration: SSM Parameter Store only, no plaintext env vars
+
+Completes the cutover prepared in #51. The interest-form Lambda now reads both of its secrets
+from SSM Parameter Store at runtime and holds no credential material in its environment at all.
+
+- **Turnstile secret moved off Secrets Manager** to SSM `/seads/turnstile-secret-key`, and the
+  admin session-signing key off the plaintext `ADMIN_SESSION_SECRET` env var to
+  `/seads/admin-session-secret`. Both are `SecureString` under `alias/aws/ssm`, so reading one
+  now needs `ssm:GetParameter` *and* `kms:Decrypt` and is auditable in CloudTrail — where
+  `lambda:GetFunctionConfiguration` alone used to be enough to read either in cleartext.
+- **Removed `ADMIN_PASSWORD` and `ADMIN_SESSION_SECRET` from the Lambda's environment.**
+  `ADMIN_PASSWORD` was doubly dead: `checkPassword`'s bootstrap branch was deleted in #51, and
+  the value it still held no longer matched the stored hash (a live `/admin-login` with it
+  returned 401), so it had been a stale copy of a superseded credential sitting in cleartext.
+- **Verified the cutover by rejection, not by success.** `verifyTurnstile` fails *open* — it
+  lets submissions through when it cannot read the secret — so a successful form submission
+  would have been equally consistent with "SSM works" and "bot protection is silently off".
+  The check that actually proves it is a garbage token being **rejected** (400), which can only
+  happen if the secret was read and Cloudflare answered `success: false`. Confirmed against a
+  clean CloudWatch window (no "Could not load Turnstile secret", no `AccessDenied`) and with
+  `/verify-session` returning 200 rather than the 500 a failed session-secret read would give.
+- **Deleted Secrets Manager `seads/turnstile-secret-key`** with a 30-day recovery window
+  (restorable until 2026-10-01), and only after CloudTrail confirmed no principal had read it
+  since the deploy. Never force-deleted.
+
+The live role already carried the required `ssm:GetParameter`/`kms:Decrypt` grants, so no IAM
+change was made and neither existing inline policy was modified. Still outstanding: rotating
+the shared admin password itself, which can only be done through `/admin/settings` by someone
+who knows the current one — `handleChangePassword` verifies `currentPassword` against the
+stored scrypt hash and there is deliberately no reset path.
+
 ## [2026-07-19] (34)
 
 ### Added — a 4-way audit round (security/performance/QOL/feature ideation): fixes plus 3 new features
