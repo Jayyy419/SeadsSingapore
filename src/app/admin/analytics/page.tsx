@@ -14,15 +14,21 @@ async function getJson<T>(path: string, fallback: T): Promise<{ data: T; error: 
 
 export default async function AdminAnalyticsPage() {
   const [submissionsRes, eventsRes, storiesRes] = await Promise.all([
-    getJson<{ submissions: Submission[] }>("/internal/submissions", { submissions: [] }),
-    getJson<{ events: EventItem[] }>("/internal/events", { events: [] }),
-    getJson<{ entries: StorySubmission[] }>("/internal/story-submissions", { entries: [] }),
+    getJson<{ submissions?: Submission[] }>("/internal/submissions", { submissions: [] }),
+    getJson<{ events?: EventItem[] }>("/internal/events", { events: [] }),
+    // `/internal/story-submissions` responds with { submissions }, not { entries } —
+    // `entries` is what `/internal/audit-log` returns. Reading the wrong key here left
+    // `stories` undefined, and storyStatusCounts' `for...of` then threw "is not iterable",
+    // 500ing this whole page. See how /admin/stories reads the same endpoint.
+    getJson<{ submissions?: StorySubmission[] }>("/internal/story-submissions", { submissions: [] }),
   ]);
 
   const error = submissionsRes.error || eventsRes.error || storiesRes.error;
-  const submissions = submissionsRes.data.submissions;
-  const events = eventsRes.data.events;
-  const stories = storiesRes.data.entries;
+  // `?? []` so that if one of these payloads ever changes shape again, the page degrades to an
+  // empty chart plus the error banner instead of taking the entire admin route down with a 500.
+  const submissions = submissionsRes.data.submissions ?? [];
+  const events = eventsRes.data.events ?? [];
+  const stories = storiesRes.data.submissions ?? [];
 
   const byDay = submissionsByDay(submissions, 30);
   const byType = interestTypeCounts(submissions);
