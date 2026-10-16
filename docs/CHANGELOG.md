@@ -4,6 +4,40 @@ All notable changes to this project should be documented in this file.
 
 This format is inspired by Keep a Changelog and uses a date-based release style.
 
+## [2026-10-16] (47)
+
+### Added — attendees can cancel their own RSVP from the email
+
+- Every RSVP email now ends with a personal link to `/rsvp/cancel`: the confirmation, the
+  waitlist email ("leave the waitlist"), the waitlist-promotion email and the "already
+  registered" reminder. Until now, someone who couldn't make it had to reply and hope an admin
+  deleted the row by hand. Most just didn't turn up, and their spot sat empty while people
+  waited for it.
+- Cancelling a confirmed RSVP frees the spot through the same `releaseRsvpSlot` as an admin
+  delete (40), so the first person on the waitlist gets it and is emailed. Leaving the
+  waitlist frees nothing, since it never held a spot. The team inbox is told, with the attendee
+  as Reply-To, and it's in the audit log.
+- **Two steps on purpose.** Opening the link only shows what would be cancelled; pressing the
+  button cancels. Mail security scanners open links in emails automatically, so a link that
+  cancelled on open would cancel RSVPs nobody meant to cancel. The delete is conditional, so a
+  double-click or two open tabs release the spot once. A past event can be viewed but not
+  cancelled.
+- The links are signed and last 180 days. The token rides in the URL fragment (never sent to a
+  server or in a Referer) and is stripped from the address bar once read. The page is
+  `noindex`.
+- Signed links are now one helper, `signLink`/`verifyLink`, with a key derived per purpose,
+  so a My Activity link can't be replayed as a cancel link or the reverse. Existing activity
+  links stay valid: their key derivation is unchanged.
+- Copy in en/zh/ms/hi.
+- Tests: backend `test/rsvp-cancel.test.mjs` (12) covers:
+  - the links in each email, and resending one for an existing RSVP;
+  - viewing changing nothing, and confirming freeing the spot or promoting the waitlist;
+  - leaving the waitlist freeing nothing, and a double confirm releasing the spot once;
+  - the team notification and audit entry;
+  - past events;
+  - tampered links, links of another purpose, and expiry.
+  E2E `e2e/rsvp-cancel.spec.ts` (7). Backend 65/65, e2e 51/51.
+
 ## [2026-10-16] (46)
 
 ### Go-live readiness — privacy notices on every form; ops hardening

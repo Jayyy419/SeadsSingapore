@@ -220,6 +220,19 @@ export type Translation = {
   myActivityShowingFor: string;
   myActivityLoading: string;
   myActivityTooMany: string;
+  rsvpCancelTitle: string;
+  rsvpCancelSubtitle: string;
+  rsvpCancelLoading: string;
+  rsvpCancelConfirmLead: string;
+  rsvpCancelWaitlistLead: string;
+  rsvpCancelButton: string;
+  rsvpLeaveWaitlistButton: string;
+  rsvpCancelKeep: string;
+  rsvpCancelDone: string;
+  rsvpCancelGone: string;
+  rsvpCancelInvalid: string;
+  rsvpCancelPast: string;
+  rsvpCancelNoLink: string;
 };
 
 export const translations: Record<Locale, Translation> = {
@@ -403,6 +416,19 @@ export const translations: Record<Locale, Translation> = {
     myActivityShowingFor: "Showing activity for",
     myActivityLoading: "Loading your activity…",
     myActivityTooMany: "Too many requests — please try again in a few minutes.",
+    rsvpCancelTitle: "Cancel your RSVP",
+    rsvpCancelSubtitle: "Can't make it? Let us know so someone else can have your spot.",
+    rsvpCancelLoading: "Checking your link…",
+    rsvpCancelConfirmLead: "You're about to cancel your RSVP for:",
+    rsvpCancelWaitlistLead: "You're about to leave the waitlist for:",
+    rsvpCancelButton: "Cancel my RSVP",
+    rsvpLeaveWaitlistButton: "Leave the waitlist",
+    rsvpCancelKeep: "Keep my RSVP",
+    rsvpCancelDone: "Done — you're off the list. Thanks for letting us know.",
+    rsvpCancelGone: "This RSVP has already been cancelled.",
+    rsvpCancelInvalid: "This link is invalid or has expired. If you still need to cancel, reply to your RSVP email.",
+    rsvpCancelPast: "This event has already taken place, so there's nothing to cancel.",
+    rsvpCancelNoLink: "Open this page from the link in your RSVP email.",
   },
   zh: {
     navHome: "首页", navAbout: "关于我们", navPrograms: "项目", navEvents: "活动", navStories: "故事", navMedia: "媒体", navDonate: "捐赠",
@@ -584,6 +610,19 @@ export const translations: Record<Locale, Translation> = {
     myActivityShowingFor: "以下是该邮箱的记录：",
     myActivityLoading: "正在加载您的记录…",
     myActivityTooMany: "请求过于频繁，请几分钟后再试。",
+    rsvpCancelTitle: "取消您的报名",
+    rsvpCancelSubtitle: "无法参加？请告诉我们，好让其他人获得您的名额。",
+    rsvpCancelLoading: "正在核验您的链接…",
+    rsvpCancelConfirmLead: "您即将取消以下活动的报名：",
+    rsvpCancelWaitlistLead: "您即将退出以下活动的候补名单：",
+    rsvpCancelButton: "取消我的报名",
+    rsvpLeaveWaitlistButton: "退出候补名单",
+    rsvpCancelKeep: "保留我的报名",
+    rsvpCancelDone: "已完成——您已不在名单上。感谢您告知我们。",
+    rsvpCancelGone: "此报名已被取消。",
+    rsvpCancelInvalid: "此链接无效或已过期。如仍需取消，请直接回复您的报名确认邮件。",
+    rsvpCancelPast: "该活动已经结束，无需取消。",
+    rsvpCancelNoLink: "请通过报名确认邮件中的链接打开此页面。",
   },
   ms: {
     navHome: "Laman Utama", navAbout: "Tentang Kami", navPrograms: "Program", navEvents: "Acara", navStories: "Kisah", navMedia: "Media", navDonate: "Derma",
@@ -765,6 +804,19 @@ export const translations: Record<Locale, Translation> = {
     myActivityShowingFor: "Menunjukkan aktiviti untuk",
     myActivityLoading: "Memuatkan aktiviti anda…",
     myActivityTooMany: "Terlalu banyak permintaan — sila cuba lagi dalam beberapa minit.",
+    rsvpCancelTitle: "Batalkan RSVP anda",
+    rsvpCancelSubtitle: "Tidak dapat hadir? Beritahu kami supaya orang lain boleh mendapat tempat anda.",
+    rsvpCancelLoading: "Menyemak pautan anda…",
+    rsvpCancelConfirmLead: "Anda akan membatalkan RSVP anda untuk:",
+    rsvpCancelWaitlistLead: "Anda akan keluar daripada senarai menunggu untuk:",
+    rsvpCancelButton: "Batalkan RSVP saya",
+    rsvpLeaveWaitlistButton: "Keluar daripada senarai menunggu",
+    rsvpCancelKeep: "Kekalkan RSVP saya",
+    rsvpCancelDone: "Selesai — anda telah dikeluarkan daripada senarai. Terima kasih kerana memberitahu kami.",
+    rsvpCancelGone: "RSVP ini telah pun dibatalkan.",
+    rsvpCancelInvalid: "Pautan ini tidak sah atau telah tamat tempoh. Jika anda masih perlu membatalkan, balas e-mel RSVP anda.",
+    rsvpCancelPast: "Acara ini telah pun berlangsung, jadi tiada apa-apa untuk dibatalkan.",
+    rsvpCancelNoLink: "Buka halaman ini melalui pautan dalam e-mel RSVP anda.",
   },
   hi: {
     navHome: "होम", navAbout: "हमारे बारे में", navPrograms: "कार्यक्रम", navEvents: "इवेंट्स", navStories: "कहानियाँ", navMedia: "मीडिया", navDonate: "दान करें",
@@ -946,5 +998,18 @@ export const translations: Record<Locale, Translation> = {
     myActivityShowingFor: "इसके लिए गतिविधि दिखाई जा रही है",
     myActivityLoading: "आपकी गतिविधि लोड हो रही है…",
     myActivityTooMany: "बहुत अधिक अनुरोध — कृपया कुछ मिनट बाद फिर से प्रयास करें।",
+    rsvpCancelTitle: "अपना RSVP रद्द करें",
+    rsvpCancelSubtitle: "नहीं आ पा रहे? हमें बताएँ ताकि आपकी जगह किसी और को मिल सके।",
+    rsvpCancelLoading: "आपका लिंक जाँचा जा रहा है…",
+    rsvpCancelConfirmLead: "आप इस कार्यक्रम के लिए अपना RSVP रद्द करने वाले हैं:",
+    rsvpCancelWaitlistLead: "आप इस कार्यक्रम की प्रतीक्षा सूची छोड़ने वाले हैं:",
+    rsvpCancelButton: "मेरा RSVP रद्द करें",
+    rsvpLeaveWaitlistButton: "प्रतीक्षा सूची छोड़ें",
+    rsvpCancelKeep: "मेरा RSVP बनाए रखें",
+    rsvpCancelDone: "हो गया — आप सूची से हटा दिए गए हैं। हमें बताने के लिए धन्यवाद।",
+    rsvpCancelGone: "यह RSVP पहले ही रद्द किया जा चुका है।",
+    rsvpCancelInvalid: "यह लिंक अमान्य है या इसकी समय-सीमा समाप्त हो गई है। यदि आपको अब भी रद्द करना है, तो अपने RSVP ईमेल का उत्तर दें।",
+    rsvpCancelPast: "यह कार्यक्रम पहले ही हो चुका है, इसलिए रद्द करने के लिए कुछ नहीं है।",
+    rsvpCancelNoLink: "इस पृष्ठ को अपने RSVP ईमेल में दिए गए लिंक से खोलें।",
   },
 };
