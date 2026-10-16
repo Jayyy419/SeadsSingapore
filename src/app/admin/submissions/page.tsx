@@ -122,7 +122,13 @@ export default async function AdminSubmissionsPage({
                   <form action={deleteSubmission}>
                     <input type="hidden" name="id" value={s.id} />
                     <ConfirmSubmitButton
-                      confirmMessage={`Delete the submission from ${s.name}? This can't be undone.`}
+                      confirmMessage={
+                        // Deleting a confirmed RSVP now frees its spot, and the first person on the
+                        // event's waitlist gets it and is emailed — say so before, not after.
+                        s.rsvpStatus === "confirmed"
+                          ? `Delete ${s.name}'s RSVP? If anyone is on this event's waitlist, the first person will get this spot and be emailed. This can't be undone.`
+                          : `Delete the submission from ${s.name}? This can't be undone.`
+                      }
                       className="text-xs font-semibold text-[color:var(--muted)] hover:text-[#e2965f]"
                     >
                       Delete
