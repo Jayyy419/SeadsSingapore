@@ -52,7 +52,7 @@ export default async function StoryDetailPage({ params }: { params: Promise<{ sl
       {story && (
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLdString(buildArticleJsonLd(story)) }} />
       )}
-      <StoryDetailContent slug={slug} />
+      <StoryDetailContent slug={slug} live={story} />
     </>
   );
 }

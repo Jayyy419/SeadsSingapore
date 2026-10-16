@@ -10,12 +10,16 @@ import { eventCapacityLabel, isEventFull } from "@/lib/event-capacity";
 import { buildWhatsAppLink } from "@/lib/whatsapp";
 import { useEventRsvpCounts } from "@/lib/use-event-rsvp-counts";
 import { useEvents } from "@/lib/use-events";
+import type { EventItem } from "@/content/siteContent";
 
-export function EventDetailContent({ slug }: { slug: string }) {
+// `live` is this event as the page's own server render just fetched it (uncached). The shared
+// list behind useEvents() can be up to a minute old, so an event created or edited moments ago
+// — a link shared straight after publishing, a just-cancelled event — still renders correctly.
+export function EventDetailContent({ slug, live }: { slug: string; live?: EventItem | null }) {
   const { locale, t } = useLocale();
   const { events, loaded } = useEvents();
   const rsvpCounts = useEventRsvpCounts();
-  const event = events.find((e) => e.slug === slug);
+  const event = live ?? events.find((e) => e.slug === slug);
   // Wait for the live fetch before 404ing — a newly admin-created event won't be in the
   // static fallback useEvents() starts with, so a slug "not found" against just the fallback
   // doesn't mean it doesn't really exist.

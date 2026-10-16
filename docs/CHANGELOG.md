@@ -4,6 +4,37 @@ All notable changes to this project should be documented in this file.
 
 This format is inspired by Keep a Changelog and uses a date-based release style.
 
+## [2026-10-16] (49)
+
+### Changed — public pages render from a cached server fetch; the browser no longer calls the API on every visit
+
+- Every public page used to fetch its content from the browser: about six API calls per
+  home-page view. Content appeared after a flash of the bundled fallback, search engines
+  indexed the fallback, and the API's shared throttle could be hit by a handful of
+  simultaneous visitors.
+- Public pages now live in the `src/app/(site)/` route group (URLs unchanged). Its layout
+  fetches the seven public endpoints on the server, cached for 60 seconds
+  (`getPublicData` in `src/lib/public-data.ts`), and passes them down through
+  `PublicDataProvider`. The pages are prerendered and refreshed every minute (`1m` in the
+  build output).
+  Measured against a production build: the home page, team, programs and blog make **no**
+  browser API calls; events pages make only the live RSVP-count call. The admin panel stays
+  outside the group, because its pages are `force-dynamic` and would turn the cached fetches
+  into live ones on every admin request.
+- An admin edit reaches the public site **within a minute**. Amplify doesn't support
+  on-demand revalidation (`revalidatePath`/`revalidateTag`), so a timer is the only option
+  there.
+- Detail pages (events, programs, blog) also pass the record their server render already
+  fetches live (`live`). So a just-created or just-cancelled item is right immediately, and
+  an unknown slug now returns a real **404** (it used to return 200 with an empty page).
+- The five list hooks are now thin wrappers over one `usePublicList` (137 lines removed).
+  `useSiteContent` and the home page's impact metrics read the same prefetch. With no prefetch
+  (`next dev`, so the e2e suite, whose per-test browser mocks keep working, or a failed server
+  fetch), they behave exactly as before.
+- Verified: e2e 55/55 (dev, prefetch off); production build plus `next start`. On the build,
+  11 public pages loaded with no runtime errors, the API-call counts above were measured, and
+  detail pages returned 200 for real slugs and 404 for unknown ones.
+
 ## [2026-10-16] (48)
 
 ### Added — unsubscribe and delete your own data from My activity

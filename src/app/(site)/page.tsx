@@ -12,6 +12,7 @@ import { usePrograms } from "@/lib/use-programs";
 import { useStories } from "@/lib/use-stories";
 import { useTeam } from "@/lib/use-team";
 import { useSiteContent } from "@/lib/use-site-content";
+import { usePrefetched } from "@/lib/public-data-context";
 import { AnnouncementBanner } from "@/components/announcement-banner";
 import { SocialLinks } from "@/components/social-links";
 import { NewsletterSignup } from "@/components/newsletter-signup";
@@ -21,10 +22,18 @@ import { impactMetrics as staticImpactMetrics, type ImpactMetric } from "@/conte
 // admin-editable live values from DynamoDB (via the interest-form Lambda's public
 // /impact-metrics endpoint) once they arrive — falls back to the static ones silently on
 // any fetch error, since stale-but-real numbers beat a broken homepage.
+type RawImpactMetric = { value: string; label: Record<string, string>; note: Record<string, string> };
+
+const toImpactMetrics = (data: { metrics?: RawImpactMetric[] } | null): ImpactMetric[] | null =>
+  data?.metrics?.length ? data.metrics.map((m) => ({ value: m.value, label: m.label, note: m.note }) as ImpactMetric) : null;
+
 function useImpactMetrics(): ImpactMetric[] {
-  const [metrics, setMetrics] = useState<ImpactMetric[]>(staticImpactMetrics);
+  // The server's prefetch when there is one (see usePublicList for the pattern).
+  const prefetched = usePrefetched<{ metrics?: RawImpactMetric[] }>("impact-metrics");
+  const [metrics, setMetrics] = useState<ImpactMetric[]>(() => toImpactMetrics(prefetched ?? null) ?? staticImpactMetrics);
 
   useEffect(() => {
+    if (prefetched !== undefined) return;
     const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
     if (!baseUrl) return;
 
@@ -32,14 +41,8 @@ function useImpactMetrics(): ImpactMetric[] {
     fetch(`${baseUrl}/impact-metrics`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        if (cancelled || !data?.metrics?.length) return;
-        setMetrics(
-          data.metrics.map((m: { value: string; label: Record<string, string>; note: Record<string, string> }) => ({
-            value: m.value,
-            label: m.label,
-            note: m.note,
-          }))
-        );
+        const live = toImpactMetrics(data);
+        if (!cancelled && live) setMetrics(live);
       })
       .catch(() => {
         // Fetch failed — the static fallback set above stays in place.
@@ -48,7 +51,7 @@ function useImpactMetrics(): ImpactMetric[] {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [prefetched]);
 
   return metrics;
 }
