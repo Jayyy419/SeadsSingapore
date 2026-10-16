@@ -205,8 +205,9 @@ Browser --POST/GET--> API Gateway (HTTP API, seads-interest-form-api)
   what a photo needs. See `backend/interest-form/README.md`'s "The media bucket" for the
   bucket policy/CORS/public-access-block configuration (committed as IaC alongside the code).
 - **SES**: production access approved 2026-07-13 — no more sandbox limits (verified
-  recipients only, 200/day). `NOTIFY_EMAIL` must still be a SES-verified *sender* address;
-  re-verify and update the Lambda env var if it changes.
+  recipients only, 200/day). `SENDER_EMAIL` (the no-reply From; falls back to `NOTIFY_EMAIL`,
+  the team inbox) must be a SES-verified identity; re-verify and update the Lambda env var if
+  it changes.
 - **IAM**: the Lambda's execution role (`seads-interest-form-lambda-role-sg`) is scoped to
   read/write on exactly the 10 tables above, presigned-URL generation + object delete on
   `seads-media` only, `ses:SendEmail`, CloudWatch Logs, and reads under the `seads/*` Secrets

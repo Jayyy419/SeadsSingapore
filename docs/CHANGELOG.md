@@ -4,6 +4,30 @@ All notable changes to this project should be documented in this file.
 
 This format is inspired by Keep a Changelog and uses a date-based release style.
 
+## [2026-10-16] (45)
+
+### Added — a no-reply sender, separate from the team inbox
+
+- `NOTIFY_EMAIL` used to be both the From on every email and the inbox for team
+  notifications. A new optional `SENDER_EMAIL` is now the From, shown as
+  `Seads Singapore <address>`, and is meant to be a no-reply address. `NOTIFY_EMAIL` stays the
+  inbox. If `SENDER_EMAIL` is unset, the From falls back to `NOTIFY_EMAIL` as before, so this
+  is safe to deploy before the new address exists.
+- Replies still reach a person:
+  - Everything sent to visitors carries the team inbox as **Reply-To**. The waitlist email
+    says "just reply to let us know", and with a no-reply From that would otherwise bounce.
+  - Team notifications carry the **visitor's address** as Reply-To, so hitting reply answers
+    them directly.
+- All eight send sites now go through one `sendEmail()` helper instead of eight hand-built
+  `SendEmailCommand`s.
+- `isValidEmail` now also rejects `,;<>()"[]\` and anything over 254 characters. The
+  visitor's address becomes a Reply-To header, and SES rejects the whole message over a
+  malformed one, which would silently drop the team notification. Apostrophes and plus-tags
+  are still accepted.
+- Tests: `test/email.test.mjs` checks From, Reply-To and recipient for confirmations, both
+  kinds of notification and waitlist promotions, plus the address rules (6 of its 9 fail
+  against the old code; the other 3 are guards). Backend 53/53.
+
 ## [2026-10-16] (44)
 
 ### Fixed — "past" events judged in Singapore time; postponed events take RSVPs again
