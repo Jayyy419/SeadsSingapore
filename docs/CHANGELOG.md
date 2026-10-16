@@ -4,6 +4,31 @@ All notable changes to this project should be documented in this file.
 
 This format is inspired by Keep a Changelog and uses a date-based release style.
 
+## [2026-10-16] (46)
+
+### Go-live readiness — privacy notices on every form; ops hardening
+
+- **Privacy notices where data is collected.** Singapore's PDPA expects people to be told the
+  purpose when they hand data over, not only on a policy page. Each form now says so beside its
+  submit button, with a link to the policy (`FormPrivacyNotice`): Get Involved/RSVP (every page
+  that embeds `InterestForm`), the footer newsletter signup, and story submissions. The story
+  form also says an approved story is published under the author's name and their email stays
+  private.
+- **Privacy policy brought up to date** (en/zh/ms/hi). It was written when the site had one
+  form. It now covers RSVPs, waitlists and the newsletter; community stories (published under
+  your name if approved, email never published); the emails the site sends; that the only
+  cookie is staff sign-in (it previously said "we don't use cookies"); Amazon's email service;
+  and the My activity page for seeing what you've submitted.
+- **Ops changes, made directly in AWS** (recorded in `docs/ARCHITECTURE.md`):
+  - API Gateway stage throttle raised from 5 req/s (burst 10) to 20 (burst 50). The home page
+    makes about six API calls per visit, so two simultaneous visitors exceeded the old burst.
+  - API Gateway access logging turned on (30-day retention). It traced the constant ~29
+    req/min to the project's own Route 53 health check.
+  - `seads-media` versioning on, with old versions expiring after 30 days.
+  - Requested the Lambda concurrent-execution quota go from 10 (new-account default, shared by
+    every project in this account) to 1000.
+- Tests: `e2e/privacy-notice.spec.ts` (all 4 fail against the old components). E2E 44/44.
+
 ## [2026-10-16] (45)
 
 ### Added — a no-reply sender, separate from the team inbox

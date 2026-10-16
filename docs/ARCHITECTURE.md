@@ -185,6 +185,13 @@ Browser --POST/GET--> API Gateway (HTTP API, seads-interest-form-api)
   `ALLOWED_ORIGINS` env var), and the public write endpoints are throttled + per-IP/per-email
   rate-limited (see `checkRateLimit` in `index.mjs`) to limit abuse. `GET /health` is
   unauthenticated with no DB/SES calls, used only by the Route 53 health check below.
+  Stage throttle: 20 req/s, burst 50, shared by every visitor. It was 5/10, but the home page
+  makes about six API calls per visit, so two people arriving together exceeded the burst and
+  sections silently fell back to their built-in content. Worst case at 20 req/s sustained for
+  a month is about $90, which the $30 budget alert catches early. Access logging is on
+  (`/aws/apigateway/seads-interest-form-access`, 30-day retention), recording method, path,
+  status, source IP and user agent per request. That's how the steady ~29 req/min was traced
+  to the Route 53 health checkers.
 - **Lambda**: `seads-interest-form-handler`, source in `backend/interest-form/index.mjs`.
   One handler function per route (`handleSubmitInterest`, `handleCreateEvent`,
   `handleGetEvents`, `handleUpdateTeamMember`, …), dispatched by a chain of `if` checks against
@@ -204,6 +211,8 @@ Browser --POST/GET--> API Gateway (HTTP API, seads-interest-form-api)
   pass through the Lambda/API Gateway, which have their own request-size limits far below
   what a photo needs. See `backend/interest-form/README.md`'s "The media bucket" for the
   bucket policy/CORS/public-access-block configuration (committed as IaC alongside the code).
+  Versioning is on, with old versions expiring after 30 days (`expire-old-versions-30d`), so a
+  photo deleted or overwritten by mistake can be restored for a month.
 - **SES**: production access approved 2026-07-13 — no more sandbox limits (verified
   recipients only, 200/day). `SENDER_EMAIL` (the no-reply From; falls back to `NOTIFY_EMAIL`,
   the team inbox) must be a SES-verified identity; re-verify and update the Lambda env var if
@@ -239,8 +248,13 @@ Browser --POST/GET--> API Gateway (HTTP API, seads-interest-form-api)
   `seads-frontend-health-check` against the Amplify site's `/`) — Route 53 health-check
   metrics only publish to CloudWatch in `us-east-1` regardless of where the checked endpoint
   lives, so those two alarms (and their SNS topic) are in `us-east-1`, separate from the
-  Lambda alarms' `ap-southeast-1` SNS topic. Both topics are named `seads-alerts` and email
-  the same address — same name, different region, easy to mix up.
+  Lambda alarms' `ap-southeast-1` SNS topic. Both topics are named `seads-alerts`: same name,
+  different region, easy to mix up. As of 2026-10-16 only the `ap-southeast-1` one has an
+  email subscriber; the `us-east-1` topic has none, so "site down" alarms reach nobody until
+  one is added.
+- **Lambda concurrency**: the account's concurrent-execution quota was still the new-account
+  10, shared by every Lambda in this account (other projects included). An increase to the
+  AWS default of 1000 was requested on 2026-10-16.
 - **WAF**: not used. AWS WAF doesn't support API Gateway *HTTP APIs* (only REST APIs, ALBs,
   CloudFront, etc.) — fronting this with CloudFront just to attach WAF was judged not worth
   the added infrastructure for a single contact-form endpoint. Abuse mitigation instead: the

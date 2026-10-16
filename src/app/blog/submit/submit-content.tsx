@@ -4,6 +4,7 @@ import Script from "next/script";
 import { useState } from "react";
 import { SiteShell } from "@/components/site-shell";
 import { useLocale } from "@/lib/locale-context";
+import { FormPrivacyNotice } from "@/components/form-privacy-notice";
 
 declare global {
   interface Window {
@@ -105,6 +106,7 @@ export function SubmitStoryContent() {
         >
           {status === "loading" ? "..." : t.submitForReview}
         </button>
+        <FormPrivacyNotice publishesStory className="text-[color:var(--muted)]" />
       </form>
       <Script src="https://challenges.cloudflare.com/turnstile/v0/api.js" strategy="afterInteractive" async defer />
     </SiteShell>

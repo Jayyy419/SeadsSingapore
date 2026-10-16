@@ -3,6 +3,7 @@
 import Script from "next/script";
 import { useState } from "react";
 import { useLocale } from "@/lib/locale-context";
+import { FormPrivacyNotice } from "@/components/form-privacy-notice";
 
 declare global {
   interface Window {
@@ -165,6 +166,7 @@ export function InterestForm({
           >
             {submitStatus === "loading" ? "..." : (submitLabel ?? t.submit)}
           </button>
+          <FormPrivacyNotice className="text-center text-white/70 md:col-span-2" />
         </form>
         {process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY && (
           <Script src="https://challenges.cloudflare.com/turnstile/v0/api.js" strategy="afterInteractive" async defer />
