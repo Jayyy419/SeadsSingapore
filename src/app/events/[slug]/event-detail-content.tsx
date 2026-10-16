@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { SiteShell } from "@/components/site-shell";
 import { InterestForm } from "@/components/interest-form";
 import { useLocale } from "@/lib/locale-context";
-import { buildEventIcsDataUrl } from "@/lib/ics";
+import { buildEventIcsDataUrl, isPastEventDate } from "@/lib/ics";
 import { eventCapacityLabel, isEventFull } from "@/lib/event-capacity";
 import { buildWhatsAppLink } from "@/lib/whatsapp";
 import { useEventRsvpCounts } from "@/lib/use-event-rsvp-counts";
@@ -32,10 +32,16 @@ export function EventDetailContent({ slug }: { slug: string }) {
   const full = isEventFull(event, rsvpCounts[event.slug]);
   const cancelled = event.status === "cancelled";
   const postponed = event.status === "postponed";
+  const past = isPastEventDate(event.date);
 
   return (
     <SiteShell title={event.title[locale]} subtitle={`${event.type[locale]} · ${event.date} · ${event.location[locale]}`}>
       <div className="space-y-10">
+        {past && !cancelled && (
+          <div className="rounded-xl border border-[color:var(--foreground-soft)] bg-[color:var(--surface-2)] px-4 py-3 text-sm font-semibold text-[color:var(--muted)]">
+            {t.eventPastBody}
+          </div>
+        )}
         {(cancelled || postponed) && (
           <div
             className={`rounded-xl border px-4 py-3 text-sm font-semibold ${
@@ -66,14 +72,16 @@ export function EventDetailContent({ slug }: { slug: string }) {
                 {t.addToCalendar}
               </a>
             )}
-            <a
-              href={buildWhatsAppLink(`${full ? t.joinWaitlist : t.rsvpLabel}: ${event.title[locale]} (${event.date})`)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-block rounded-full border border-[color:var(--foreground-soft)] px-4 py-2 text-sm font-semibold text-[color:var(--foreground)] hover:border-[color:var(--brand)] hover:text-[color:var(--brand)]"
-            >
-              {t.rsvpViaWhatsApp}
-            </a>
+            {!cancelled && !past && (
+              <a
+                href={buildWhatsAppLink(`${full ? t.joinWaitlist : t.rsvpLabel}: ${event.title[locale]} (${event.date})`)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block rounded-full border border-[color:var(--foreground-soft)] px-4 py-2 text-sm font-semibold text-[color:var(--foreground)] hover:border-[color:var(--brand)] hover:text-[color:var(--brand)]"
+              >
+                {t.rsvpViaWhatsApp}
+              </a>
+            )}
             <a
               href={`/events/${event.slug}/qr`}
               download={`${event.slug}-qr.png`}
@@ -85,9 +93,10 @@ export function EventDetailContent({ slug }: { slug: string }) {
         </article>
 
         {/* No RSVP form for a cancelled event — accepting signups for something that isn't
-            happening would just create cleanup work and confused attendees. Postponed events
-            keep the form (the event still exists, a new date is coming). */}
-        {!cancelled && (
+            happening would just create cleanup work and confused attendees — nor for one that's
+            already happened (the API refuses both). Postponed events keep the form: the event
+            still exists, a new date is coming. */}
+        {!cancelled && !past && (
           <InterestForm
             eyebrow={full ? t.waitlistLabel : t.rsvpLabel}
             heading={`${t.joinUsAtPrefix}${event.title[locale]}`}

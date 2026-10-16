@@ -6,7 +6,7 @@ import { useLocale } from "@/lib/locale-context";
 import { eventCapacityLabel, isEventFull } from "@/lib/event-capacity";
 import { useEventRsvpCounts } from "@/lib/use-event-rsvp-counts";
 import { useEvents } from "@/lib/use-events";
-import { parseEventDate } from "@/lib/ics";
+import { isPastEventDate, parseEventDate } from "@/lib/ics";
 import type { EventItem } from "@/content/siteContent";
 import type { Translation } from "@/content/i18n";
 
@@ -15,13 +15,10 @@ import type { Translation } from "@/content/i18n";
 // visitor could reasonably conclude the org was inactive. An unparseable date is treated as
 // upcoming rather than silently hidden, so a typo'd date is at least still visible.
 function splitEvents(events: EventItem[]) {
-  const today = new Date();
-  today.setUTCHours(0, 0, 0, 0);
   const upcoming: EventItem[] = [];
   const past: EventItem[] = [];
   for (const event of events) {
-    const date = parseEventDate(event.date);
-    (date && date < today ? past : upcoming).push(event);
+    (isPastEventDate(event.date) ? past : upcoming).push(event);
   }
   const time = (e: EventItem) => parseEventDate(e.date)?.getTime() ?? 0;
   upcoming.sort((a, b) => time(a) - time(b));

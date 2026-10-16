@@ -95,7 +95,6 @@ describe("when not to promote", () => {
 
   for (const [why, overrides] of [
     ["cancelled", { status: "cancelled" }],
-    ["postponed", { status: "postponed" }],
     ["already past", { date: eventDate(-2) }],
   ]) {
     test(`nobody is promoted into an event that's ${why}`, async () => {
@@ -110,6 +109,16 @@ describe("when not to promote", () => {
       assert.equal(countOf("e"), 1, "the slot is still released");
     });
   }
+
+  test("a postponed event still promotes — it's still taking RSVPs, so the waitlist can't be jumped", async () => {
+    seedEvent("later", { status: "postponed" });
+    seedRsvp("a", "later", "confirmed", "2026-01-01");
+    seedRsvp("w", "later", "waitlisted", "2026-01-03", "waiting@example.com");
+
+    assert.equal((await remove("a")).body.promoted, "w");
+    const mail = state.emails.find((e) => e.to[0] === "waiting@example.com");
+    assert.match(mail.body, /Postponed — new date to be announced/);
+  });
 
   test("if capacity was lowered below the count, a deletion doesn't hand out a slot that isn't there", async () => {
     seedEvent("shrunk", { capacity: 2, rsvpCount: 4 });

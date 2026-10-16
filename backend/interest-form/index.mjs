@@ -316,7 +316,9 @@ function isPastEventDate(dateStr) {
 }
 
 function eventDetailsForEmail(eventItem) {
-  return `\n\nEvent: ${eventItem.title?.en ?? eventItem.slug}\nDate: ${eventItem.date ?? "TBC"}\nLocation: ${eventItem.location?.en ?? "TBC"}\nDetails & calendar link: ${SITE_URL}/events/${eventItem.slug}`;
+  // A postponed event's stored date is the old one — don't send people to it.
+  const date = eventItem.status === "postponed" ? "Postponed — new date to be announced" : eventItem.date ?? "TBC";
+  return `\n\nEvent: ${eventItem.title?.en ?? eventItem.slug}\nDate: ${date}\nLocation: ${eventItem.location?.en ?? "TBC"}\nDetails & calendar link: ${SITE_URL}/events/${eventItem.slug}`;
 }
 
 async function sendAlreadyRegisteredEmail(email, name, eventItem) {
@@ -383,7 +385,7 @@ async function handleSubmitInterest(event, headers) {
   const submittedAt = new Date().toISOString();
   const id = randomUUID();
 
-  // Server-side RSVP rules. The event page already hides the form in these cases, but the API
+  // Server-side RSVP rules. The event page hides the form for cancelled and past events, but the API
   // accepted them regardless — and accepted repeats: the same address could RSVP to the same
   // event again and again, each time claiming another capacity slot, so a handful of requests
   // could fill an event and push real attendees onto the waitlist.
@@ -393,8 +395,10 @@ async function handleSubmitInterest(event, headers) {
     if (!eventItem) {
       return json(400, headers, { error: "That event doesn't exist." });
     }
-    if (eventItem.status === "cancelled" || eventItem.status === "postponed") {
-      return json(400, headers, { error: "This event isn't taking RSVPs right now." });
+    // Postponed events still take RSVPs, as the event page invites: the event is still happening,
+    // just on a date to be announced.
+    if (eventItem.status === "cancelled") {
+      return json(400, headers, { error: "This event has been cancelled." });
     }
     if (isPastEventDate(eventItem.date)) {
       return json(400, headers, { error: "This event has already taken place." });
@@ -893,7 +897,6 @@ async function releaseRsvpSlot(slug) {
   const open =
     eventItem &&
     eventItem.status !== "cancelled" &&
-    eventItem.status !== "postponed" &&
     !isPastEventDate(eventItem.date) &&
     typeof eventItem.capacity === "number" &&
     // rsvpCount still includes the RSVP just removed; promote only if that leaves room. An admin

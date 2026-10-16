@@ -4,6 +4,32 @@ All notable changes to this project should be documented in this file.
 
 This format is inspired by Keep a Changelog and uses a date-based release style.
 
+## [2026-10-16] (44)
+
+### Fixed — "past" events judged in Singapore time; postponed events take RSVPs again
+
+- **The events page used UTC to decide what's past.** `splitEvents` compared each event to UTC
+  midnight, and UTC is still the previous day until 8am in Singapore. For the first eight hours
+  of every day, yesterday's events stayed under "upcoming" with their RSVP form open, while the
+  API (which already uses Singapore time) refused those RSVPs. The site and API now share one
+  rule, `isPastEventDate` in `src/lib/ics.ts`, mirroring the backend's function of the same
+  name: an event is past once its whole day has ended in Singapore, and an unparseable date
+  never counts as past.
+- **A past event's page offered a form that could only fail.** It now says the event has
+  already taken place and hides the RSVP form and "RSVP via WhatsApp" (also hidden for
+  cancelled events, which still showed it).
+- **Fixed a regression from (38): postponed events refused RSVPs.** (38) made the API reject
+  RSVPs for postponed events, but the event page deliberately keeps the form open for them
+  ("a new date will be announced"), so every one of those visitors got an error. The API
+  accepts them again. Freed slots go to the waitlist as for any open event, so a new RSVP can't
+  jump the queue. Confirmation and promotion emails say "Postponed — new date to be announced"
+  instead of quoting the stale original date.
+- Tests: `e2e/event-dates.spec.ts` pins the clock to 2am Singapore time. It covers yesterday's
+  event listed as past, a past event's page with no RSVP options, today's event still open,
+  and a postponed event keeping its form; the first two fail against the old code. Backend
+  (44/44): postponed RSVPs are accepted without the old date in the email, and waitlist
+  promotion works into a postponed event. Both fail against the old code.
+
 ## [2026-10-16] (43)
 
 ### Fixed — anyone could lock the admin out of logging in; removed `/verify-session`

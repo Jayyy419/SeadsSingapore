@@ -118,13 +118,24 @@ describe("RSVPs can't be used to exhaust an event's capacity", () => {
     assert.deepEqual(state.emails.at(-1).to, ["CAROL@example.com"]);
   });
 
-  test("cancelled and postponed events refuse RSVPs", async () => {
+  test("cancelled events refuse RSVPs", async () => {
     seedEvent("off", { status: "cancelled" });
-    seedEvent("later", { status: "postponed" });
 
     assert.equal((await rsvp("off", "d@example.com")).status, 400);
-    assert.equal((await rsvp("later", "d@example.com")).status, 400);
     assert.equal(getItem(TABLES.EVENTS_TABLE, "off").rsvpCount, undefined);
+  });
+
+  // The event page keeps its RSVP form open for a postponed event ("a new date will be
+  // announced"); the API refusing them meant every one of those visitors got an error.
+  test("postponed events still take RSVPs, and the confirmation doesn't quote the old date", async () => {
+    seedEvent("later", { status: "postponed", date: "18 Jul 2099" });
+
+    assert.equal((await rsvp("later", "d@example.com")).status, 200);
+    assert.equal(getItem(TABLES.EVENTS_TABLE, "later").rsvpCount, 1);
+    const confirmation = state.emails.find((e) => e.to[0] === "d@example.com");
+    assert.ok(confirmation, "the RSVP is confirmed by email");
+    assert.doesNotMatch(confirmation.body, /18 Jul 2099/);
+    assert.match(confirmation.body, /Postponed — new date to be announced/);
   });
 
   test("past events refuse RSVPs, but an event happening today still accepts them", async () => {
