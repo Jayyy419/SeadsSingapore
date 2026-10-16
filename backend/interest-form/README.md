@@ -76,9 +76,21 @@ failure can't pin a bad value.
 - `/seads/turnstile-secret-key` — Cloudflare Turnstile secret. **Fails open**: if it can't be
   read, `verifyTurnstile` lets the submission through rather than taking down the public form.
 - `/seads/admin-session-secret` — HMAC key signing admin session tokens (`x-admin-token`
-  header). **Fails closed**: if it can't be read, no token validates. Rotating this parameter
-  immediately invalidates every outstanding admin session, which is the intended lever for
-  "log everyone out now."
+  header). **Fails closed**: if it can't be read, no token validates. It also keys the
+  `/my-activity` email links, via a derived sub-key so the two can never be confused.
+
+#### Signing admins out
+
+Each token's signature also covers a **session epoch** stored on the password record in
+`ADMIN_CONFIG_TABLE`. Writing a new epoch invalidates every outstanding token at once, and two
+things do that: **changing the password**, and **Settings → "Sign out all other sessions"**
+(`POST /internal/sessions/revoke`). Both hand the caller a fresh token, so whoever pressed the
+button stays signed in. The epoch is read on every verification rather than cached, so this
+takes effect immediately across all warm containers.
+
+Rotating the SSM secret above is **not** a reliable "log everyone out": `getSsmParameter`
+caches it for the life of each warm container, so old tokens keep working until containers
+recycle. Use the button instead.
 
 Both were migrated off plaintext/Secrets Manager on 2026-08-30 (see `docs/CHANGELOG.md`).
 There is deliberately **no** `ADMIN_PASSWORD` — the only source of truth for the admin
@@ -168,6 +180,25 @@ aws s3api put-public-access-block --bucket seads-media --public-access-block-con
   BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=false,RestrictPublicBuckets=false
 aws s3api put-bucket-cors --bucket seads-media --cors-configuration file://media-bucket-cors.json
 ```
+
+## Testing
+
+```bash
+cd backend/interest-form
+npm ci
+npm test
+```
+
+`test/harness.mjs` runs the real `handler` against in-memory fakes of DynamoDB, SES, SSM and
+S3 — no AWS credentials, no network, nothing touches the live tables. The DynamoDB fake
+evaluates the actual `ConditionExpression`/`UpdateExpression` strings the handler sends, and
+**enforces the role's grants from `iam-policy.json`**: a call to an action the role doesn't
+have throws `AccessDeniedException`, exactly as it would in production. That last part exists
+because story-decision emails were silently never sent — the handler did a `GetItem` the
+role doesn't have on that table, and a `.catch` swallowed the `AccessDenied`. CI runs this suite on every PR.
+
+If you grant the Lambda a new permission, update `iam-policy.json` in the same change, or the
+tests will (correctly) fail.
 
 ## Deploying a change
 

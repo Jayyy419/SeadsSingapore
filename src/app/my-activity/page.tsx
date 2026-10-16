@@ -3,7 +3,7 @@ import { MyActivityContent } from "./my-activity-content";
 
 export const metadata: Metadata = {
   title: "My Activity",
-  description: "Look up your RSVPs and applications with Seads by email.",
+  description: "Get a secure link by email to see your RSVPs and applications with Seads.",
   alternates: { canonical: "/my-activity" },
 };
 

@@ -20,6 +20,20 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # The Lambda had no automated tests at all before this. These run the real handler
+      # against in-memory fakes of DynamoDB/SES/SSM/S3 (backend/interest-form/test/harness.mjs)
+      # — no AWS credentials or network — and the DynamoDB fake enforces the role's actual
+      # grants from iam-policy.json, so code calling an action the role lacks fails here instead
+      # of failing silently in production.
+      - name: Install Lambda dependencies
+        run: npm ci --prefix backend/interest-form
+
+      - name: Lambda syntax check
+        run: node --check backend/interest-form/index.mjs
+
+      - name: Lambda tests
+        run: npm test --prefix backend/interest-form
+
       - name: Lint
         run: npm run lint
 

@@ -184,6 +184,27 @@ function isValidEmail(email) {
   return typeof email === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
+// Submitter-facing emails go to whatever address was typed into the form and quote whatever
+// name or title was typed alongside it — so without this, anyone could send arbitrary text
+// (a phishing link, a fake "claim your prize") to any inbox from our verified sender address,
+// borrowing its reputation. Strips anything link- or domain-shaped, line breaks and markup,
+// and caps the length. A real name or title survives intact; a payload doesn't.
+function sanitizeForEmail(text, maxLen, fallback) {
+  const cleaned = String(text ?? "")
+    .replace(/[\r\n\t]+/g, " ")
+    .replace(/\b(?:https?|ftp):\/*\S*/gi, "")
+    .replace(/\S*@\S+/g, "")
+    .replace(/\S*[a-z0-9-]\.(?:[a-z]{2,})\b\S*/gi, "")
+    .replace(/[<>[\]{}]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, maxLen)
+    .trim();
+  return cleaned || fallback;
+}
+
+const greetingName = (name) => sanitizeForEmail(name, 60, "there");
+
 function json(statusCode, headers, body) {
   return { statusCode, headers, body: JSON.stringify(body) };
 }
@@ -278,6 +299,48 @@ async function verifyTurnstile(token, remoteIp) {
   }
 }
 
+const MONTH_INDEX = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
+
+// Mirrors parseEventDate in src/lib/ics.ts ("DD Mon YYYY", e.g. "18 Jul 2026"). An unparseable
+// date counts as not-past, matching how the events page lists it as upcoming, so a typo'd date
+// never silently closes RSVPs. Compared as calendar days in Singapore time, so an event stays
+// open for RSVPs for the whole of its own day.
+function isPastEventDate(dateStr) {
+  const match = String(dateStr ?? "").trim().match(/^(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})$/);
+  if (!match) return false;
+  const month = MONTH_INDEX[match[2].toLowerCase()];
+  if (month === undefined) return false;
+  const eventDay = `${match[3]}-${String(month + 1).padStart(2, "0")}-${match[1].padStart(2, "0")}`;
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Singapore" });
+  return eventDay < today;
+}
+
+function eventDetailsForEmail(eventItem) {
+  return `\n\nEvent: ${eventItem.title?.en ?? eventItem.slug}\nDate: ${eventItem.date ?? "TBC"}\nLocation: ${eventItem.location?.en ?? "TBC"}\nDetails & calendar link: ${SITE_URL}/events/${eventItem.slug}`;
+}
+
+async function sendAlreadyRegisteredEmail(email, name, eventItem) {
+  if (!NOTIFY_EMAIL) return;
+  try {
+    await ses.send(
+      new SendEmailCommand({
+        Source: NOTIFY_EMAIL,
+        Destination: { ToAddresses: [email] },
+        Message: {
+          Subject: { Data: "You're already registered — Seads Singapore" },
+          Body: {
+            Text: {
+              Data: `Hi ${greetingName(name)},\n\nWe already have your RSVP for this event, so there's no need to sign up again.${eventDetailsForEmail(eventItem)}\n\n— The Seads Singapore team`,
+            },
+          },
+        },
+      })
+    );
+  } catch (err) {
+    console.error("Already-registered email failed:", err);
+  }
+}
+
 async function handleSubmitInterest(event, headers) {
   let payload;
   try {
@@ -289,8 +352,11 @@ async function handleSubmitInterest(event, headers) {
   let name = typeof payload.name === "string" ? payload.name.trim().slice(0, 200) : "";
   const email = typeof payload.email === "string" ? payload.email.trim().slice(0, 200) : "";
   const interest = typeof payload.interest === "string" ? payload.interest.trim().slice(0, 1000) : "";
-  const interestType = INTEREST_TYPES.has(payload.interestType) ? payload.interestType : "";
   const eventSlug = typeof payload.eventSlug === "string" ? payload.eventSlug.trim().slice(0, 200) : "";
+  // Anything carrying an eventSlug claims a capacity slot, so it's an RSVP whatever type was
+  // sent — otherwise it would hold a slot while staying invisible in the event's check-in
+  // roster, which lists only interestType "event".
+  const interestType = eventSlug ? "event" : INTEREST_TYPES.has(payload.interestType) ? payload.interestType : "";
 
   // The footer newsletter signup only asks for an email — requiring a name there would just
   // add friction to the lowest-commitment action on the site.
@@ -316,6 +382,36 @@ async function handleSubmitInterest(event, headers) {
 
   const submittedAt = new Date().toISOString();
   const id = randomUUID();
+
+  // Server-side RSVP rules. The event page already hides the form in these cases, but the API
+  // accepted them regardless — and accepted repeats: the same address could RSVP to the same
+  // event again and again, each time claiming another capacity slot, so a handful of requests
+  // could fill an event and push real attendees onto the waitlist.
+  let eventItem = null;
+  if (eventSlug) {
+    eventItem = (await ddb.send(new GetCommand({ TableName: EVENTS_TABLE, Key: { slug: eventSlug } }))).Item ?? null;
+    if (!eventItem) {
+      return json(400, headers, { error: "That event doesn't exist." });
+    }
+    if (eventItem.status === "cancelled" || eventItem.status === "postponed") {
+      return json(400, headers, { error: "This event isn't taking RSVPs right now." });
+    }
+    if (isPastEventDate(eventItem.date)) {
+      return json(400, headers, { error: "This event has already taken place." });
+    }
+
+    const normalizedEmail = email.toLowerCase();
+    const alreadyRegistered = (await scanAll(TABLE_NAME)).some(
+      (item) => item.eventSlug === eventSlug && item.email?.toLowerCase() === normalizedEmail
+    );
+    if (alreadyRegistered) {
+      // Answered exactly like a fresh RSVP — replying "already registered" would let anyone
+      // confirm whether a given person is attending a given event. The reminder goes to the
+      // inbox instead, which only the address's owner can read.
+      await sendAlreadyRegisteredEmail(email, name, eventItem);
+      return json(200, headers, { ok: true });
+    }
+  }
 
   // Atomically claims one of the event's capacity slots — the increment and the capacity
   // check happen as a single conditional DynamoDB write, so two simultaneous RSVPs can't both
@@ -394,28 +490,21 @@ async function handleSubmitInterest(event, headers) {
       let subject;
       let body;
       if (eventSlug) {
-        let eventDetails = "";
-        try {
-          const eventItem = (await ddb.send(new GetCommand({ TableName: EVENTS_TABLE, Key: { slug: eventSlug } }))).Item;
-          if (eventItem) {
-            eventDetails = `\n\nEvent: ${eventItem.title?.en ?? eventSlug}\nDate: ${eventItem.date ?? "TBC"}\nLocation: ${eventItem.location?.en ?? "TBC"}\nDetails & calendar link: ${SITE_URL}/events/${eventSlug}`;
-          }
-        } catch (err) {
-          console.error("Could not fetch event for confirmation email:", err);
-        }
+        // eventItem was already fetched (and validated) above, so no second read is needed.
+        const eventDetails = eventItem ? eventDetailsForEmail(eventItem) : "";
         if (rsvpStatus === "waitlisted") {
           subject = "You're on the waitlist — Seads Singapore";
-          body = `Hi ${name},\n\nThis event is currently full, so we've added you to the waitlist. We'll reach out at this address if a spot opens up.${eventDetails}\n\n— The Seads Singapore team`;
+          body = `Hi ${greetingName(name)},\n\nThis event is currently full, so we've added you to the waitlist. We'll reach out at this address if a spot opens up.${eventDetails}\n\n— The Seads Singapore team`;
         } else {
           subject = "Your RSVP is confirmed — Seads Singapore";
-          body = `Hi ${name},\n\nThanks for RSVPing! We've saved your spot.${eventDetails}\n\nSee you there!\n— The Seads Singapore team`;
+          body = `Hi ${greetingName(name)},\n\nThanks for RSVPing! We've saved your spot.${eventDetails}\n\nSee you there!\n— The Seads Singapore team`;
         }
       } else if (interestType === "newsletter") {
         subject = "You're subscribed — Seads Singapore";
         body = `Hi,\n\nThanks for subscribing to Seads Singapore updates. We'll keep you posted on upcoming events and programs.\n\nIn the meantime: ${SITE_URL}/events\n\n— The Seads Singapore team`;
       } else {
         subject = "Thanks for reaching out — Seads Singapore";
-        body = `Hi ${name},\n\nThanks for getting in touch — we've received your submission and someone from the team will follow up at this address, usually within a few days.\n\nWhile you wait, you can browse our programs (${SITE_URL}/programs) and upcoming events (${SITE_URL}/events).\n\n— The Seads Singapore team`;
+        body = `Hi ${greetingName(name)},\n\nThanks for getting in touch — we've received your submission and someone from the team will follow up at this address, usually within a few days.\n\nWhile you wait, you can browse our programs (${SITE_URL}/programs) and upcoming events (${SITE_URL}/events).\n\n— The Seads Singapore team`;
       }
       await ses.send(
         new SendEmailCommand({
@@ -500,34 +589,48 @@ async function handleSubmitStory(event, headers) {
   return json(200, headers, { ok: true });
 }
 
-async function signToken(payload) {
+// Session tokens are stateless HMACs, so on their own they can't be revoked: a token stayed
+// valid for its full 8 hours even after the admin password was changed — including a token
+// minted with a password that had just been exposed. Mixing a "session epoch" into the
+// signature fixes that without a session table: storePassword() and handleRevokeSessions()
+// write a fresh random epoch, which instantly invalidates every token signed under the old one.
+// Read on every verification rather than cached, so a revocation takes effect immediately
+// across all warm containers — it's one small GetItem, and admin traffic is tiny.
+async function getSessionEpoch() {
+  const stored = await getStoredPasswordConfig();
+  // A config written before epochs existed has none; the first password change or
+  // revocation replaces this fixed fallback with a real random epoch.
+  return stored?.sessionEpoch ?? "initial";
+}
+
+async function signToken(expiresAt, epoch) {
   const secret = await getAdminSessionSecret();
-  return createHmac("sha256", secret).update(payload).digest("hex");
+  return createHmac("sha256", secret).update(`${expiresAt}|${epoch}`).digest("hex");
 }
 
 async function createSessionToken() {
   const expiresAt = String(Date.now() + SESSION_TTL_SECONDS * 1000);
-  return `${expiresAt}.${await signToken(expiresAt)}`;
+  return `${expiresAt}.${await signToken(expiresAt, await getSessionEpoch())}`;
 }
 
 async function isValidSessionToken(token) {
-  if (!token) return false;
+  if (typeof token !== "string" || !token) return false;
   const [payload, signature] = token.split(".");
   if (!payload || !signature) return false;
+  // Cheap checks first, so an expired or malformed token never costs an SSM or DynamoDB read.
+  if (!/^\d+$/.test(payload) || Date.now() >= Number(payload)) return false;
 
   let expected;
   try {
-    expected = await signToken(payload);
+    expected = await signToken(payload, await getSessionEpoch());
   } catch (err) {
-    // Fail closed — an unreadable session secret must never authenticate anyone.
+    // Fail closed — an unreadable session secret or epoch must never authenticate anyone.
     console.error("Could not verify session token:", err);
     return false;
   }
   const a = Buffer.from(signature);
   const b = Buffer.from(expected);
-  if (a.length !== b.length || !timingSafeEqual(a, b)) return false;
-
-  return Number.isFinite(Number(payload)) && Date.now() < Number(payload);
+  return a.length === b.length && timingSafeEqual(a, b);
 }
 
 async function requireValidAdminToken(event) {
@@ -544,13 +647,21 @@ async function getStoredPasswordConfig() {
   return result.Item ?? null;
 }
 
+// Also rotates the session epoch, so changing the password signs out every existing session —
+// the whole point of changing a password you suspect is compromised.
 async function storePassword(password) {
   const salt = randomBytes(16).toString("hex");
   const hash = hashPassword(password, salt);
   await ddb.send(
     new PutCommand({
       TableName: ADMIN_CONFIG_TABLE,
-      Item: { configId: "password", salt, hash, updatedAt: new Date().toISOString() },
+      Item: {
+        configId: "password",
+        salt,
+        hash,
+        sessionEpoch: randomBytes(16).toString("hex"),
+        updatedAt: new Date().toISOString(),
+      },
     })
   );
 }
@@ -622,7 +733,25 @@ async function handleChangePassword(event, headers) {
   }
 
   await storePassword(newPassword);
-  return json(200, headers, { ok: true });
+  // storePassword just invalidated every session, including the caller's — hand back a fresh
+  // token so the admin who made the change stays signed in on this device.
+  return json(200, headers, { ok: true, token: await createSessionToken() });
+}
+
+// "Sign out everywhere else": rotates the epoch without touching the password. Uses a full Put
+// rather than an UpdateItem because the role's grant on this table is PutItem/GetItem only.
+async function handleRevokeSessions(headers) {
+  const stored = await getStoredPasswordConfig();
+  if (!stored) {
+    return json(409, headers, { error: "No admin password is configured yet." });
+  }
+  await ddb.send(
+    new PutCommand({
+      TableName: ADMIN_CONFIG_TABLE,
+      Item: { ...stored, sessionEpoch: randomBytes(16).toString("hex") },
+    })
+  );
+  return json(200, headers, { ok: true, token: await createSessionToken() });
 }
 
 async function handleVerifySession(event, headers) {
@@ -753,33 +882,60 @@ async function handleDeleteSubmission(headers, id) {
   return json(200, headers, { ok: true });
 }
 
-// Public, email-keyed lookup so a volunteer juggling multiple events/applications can see
-// their own history without an account — every submission (RSVP, join, story interest) is
-// already keyed by the email they typed in, so this just filters the same table down to one
-// person instead of building a new identity system. Rate-limited by IP since, unlike the
-// admin submissions view, this is reachable by anyone who can guess or already knows an email.
-async function handleMyActivity(event, headers) {
-  let payload;
+// Self-service activity lookup, verified by email. This used to return a person's full history
+// — every RSVP, which events and when, application types — to whoever typed their address in,
+// with nothing proving they owned it. That disclosed personal data to anyone who knew or
+// guessed an email (a PDPA problem, and a real one for anyone who'd rather not have their
+// event attendance discoverable). It's now a two-step magic link: step 1 emails a signed,
+// short-lived link to the address; step 2 exchanges that link's token for the activity. Only
+// someone who can read the inbox ever sees the data.
+const ACTIVITY_LINK_TTL_SECONDS = 30 * 60;
+
+// Derived from the session secret rather than reusing it directly, so an activity-link
+// signature can never be presented as (or confused with) an admin session signature.
+async function getActivityLinkKey() {
+  const secret = await getAdminSessionSecret();
+  return createHmac("sha256", secret).update("seads/my-activity-link/v1").digest();
+}
+
+async function createActivityToken(email) {
+  const payload = Buffer.from(JSON.stringify({ email, exp: Date.now() + ACTIVITY_LINK_TTL_SECONDS * 1000 })).toString("base64url");
+  const signature = createHmac("sha256", await getActivityLinkKey()).update(payload).digest("base64url");
+  return `${payload}.${signature}`;
+}
+
+// Returns the verified email address, or null. The signature is checked before the payload is
+// parsed, so nothing attacker-supplied is ever decoded unless we signed it.
+async function verifyActivityToken(token) {
+  if (typeof token !== "string" || token.length > 1000) return null;
+  const [payload, signature] = token.split(".");
+  if (!payload || !signature) return null;
+
+  let expected;
   try {
-    payload = JSON.parse(event.body || "{}");
+    expected = createHmac("sha256", await getActivityLinkKey()).update(payload).digest("base64url");
+  } catch (err) {
+    console.error("Could not verify activity link:", err);
+    return null;
+  }
+  const a = Buffer.from(signature);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
+
+  try {
+    const { email, exp } = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
+    if (!isValidEmail(email) || typeof exp !== "number" || Date.now() >= exp) return null;
+    return email;
   } catch {
-    return json(400, headers, { error: "Invalid JSON body" });
+    return null;
   }
+}
 
-  const email = typeof payload.email === "string" ? payload.email.trim().toLowerCase().slice(0, 200) : "";
-  if (!isValidEmail(email)) {
-    return json(400, headers, { error: "A valid email is required" });
-  }
-
-  const remoteIp = event.requestContext?.http?.sourceIp;
-  if (remoteIp && !(await checkRateLimit(`ip#myactivity#${remoteIp}`, 20))) {
-    return json(429, headers, { error: "Too many lookups — please try again in a few minutes." });
-  }
-
+async function listActivity(email) {
   const [submissions, events] = await Promise.all([scanAll(TABLE_NAME), scanAll(EVENTS_TABLE)]);
   const eventBySlug = new Map(events.map((e) => [e.slug, e]));
 
-  const activity = submissions
+  return submissions
     .filter((item) => !String(item.id).startsWith("ratelimit#") && item.email?.toLowerCase() === email)
     .map((item) => {
       const evt = item.eventSlug ? eventBySlug.get(item.eventSlug) : null;
@@ -793,8 +949,74 @@ async function handleMyActivity(event, headers) {
       };
     })
     .sort((a, b) => (b.submittedAt || "").localeCompare(a.submittedAt || ""));
+}
 
-  return json(200, headers, { activity });
+async function handleMyActivity(event, headers) {
+  let payload;
+  try {
+    payload = JSON.parse(event.body || "{}");
+  } catch {
+    return json(400, headers, { error: "Invalid JSON body" });
+  }
+  const remoteIp = event.requestContext?.http?.sourceIp;
+
+  // Step 2: the visitor followed the emailed link, which proves they control the inbox.
+  if (typeof payload.token === "string") {
+    if (remoteIp && !(await checkRateLimit(`ip#myactivity-view#${remoteIp}`, 30))) {
+      return json(429, headers, { error: "Too many requests — please try again in a few minutes." });
+    }
+    const email = await verifyActivityToken(payload.token);
+    if (!email) {
+      return json(401, headers, { error: "This link is invalid or has expired.", code: "invalid_token" });
+    }
+    return json(200, headers, { email, activity: await listActivity(email) });
+  }
+
+  // Step 1: ask for a link.
+  const email = typeof payload.email === "string" ? payload.email.trim().toLowerCase().slice(0, 200) : "";
+  if (!isValidEmail(email)) {
+    return json(400, headers, { error: "A valid email is required" });
+  }
+
+  // Rate-limited before the table scan, and per address as well as per IP: the per-address
+  // limit is what stops this being used to flood one person's inbox, and it also caps how many
+  // timing samples anyone can take against a single address.
+  const [ipOk, emailOk] = await Promise.all([
+    remoteIp ? checkRateLimit(`ip#myactivity#${remoteIp}`, 10) : true,
+    checkRateLimit(`email#myactivity#${email}`, 3),
+  ]);
+  if (!ipOk || !emailOk) {
+    return json(429, headers, { error: "Too many lookups — please try again in a few minutes." });
+  }
+
+  // Only addresses that actually have activity get an email, so this can't be used to send
+  // mail to arbitrary inboxes.
+  const activity = await listActivity(email);
+  if (activity.length && NOTIFY_EMAIL) {
+    try {
+      const link = `${SITE_URL}/my-activity#token=${await createActivityToken(email)}`;
+      await ses.send(
+        new SendEmailCommand({
+          Source: NOTIFY_EMAIL,
+          Destination: { ToAddresses: [email] },
+          Message: {
+            Subject: { Data: "Your Seads activity link" },
+            Body: {
+              Text: {
+                Data: `Hi,\n\nSomeone (hopefully you) asked to see the Seads Singapore activity for this email address. This link works for the next 30 minutes:\n\n${link}\n\nIf you didn't ask for this, you can safely ignore this email — nothing is shown without the link.\n\n— The Seads Singapore team`,
+              },
+            },
+          },
+        })
+      );
+    } catch (err) {
+      console.error("Activity link email failed:", err);
+    }
+  }
+
+  // Identical response whether or not the address has any activity — anything else would turn
+  // this endpoint into an oracle for "is this person a Seads volunteer, or attending this event?".
+  return json(200, headers, { ok: true });
 }
 
 // Admin-only, per-event RSVP roster for the day-of check-in page — a live headcount view
@@ -861,20 +1083,36 @@ async function handleUpdateStorySubmission(event, headers, id) {
     return json(400, headers, { error: "status must be 'approved' or 'rejected'" });
   }
 
-  // Fetched before the update purely for the notification email below — the author's
-  // email/name/title aren't in this request's payload, only in the stored submission.
-  const existing = await ddb.send(new GetCommand({ TableName: STORY_SUBMISSIONS_TABLE, Key: { id } })).catch(() => null);
-  const submission = existing?.Item;
-
-  await ddb.send(
-    new UpdateCommand({
-      TableName: STORY_SUBMISSIONS_TABLE,
-      Key: { id },
-      UpdateExpression: "SET #status = :status, reviewedAt = :reviewedAt",
-      ExpressionAttributeNames: { "#status": "status" },
-      ExpressionAttributeValues: { ":status": status, ":reviewedAt": new Date().toISOString() },
-    })
-  );
+  // ALL_OLD returns the record as it was before this write, which is what the notification
+  // email below needs (the author's email/name/title aren't in this request's payload).
+  //
+  // This used to be a separate GetItem first — but the role has no GetItem on this table, so
+  // that read failed with AccessDenied on every single call, was swallowed by a .catch, and left
+  // `submission` undefined: approval/rejection emails were therefore never sent at all. Taking
+  // the old values from the write itself needs no extra permission and can't race the update.
+  //
+  // The condition matters too: UpdateItem upserts, so without it a decision on an unknown or
+  // just-deleted id would quietly create a ghost record holding nothing but a status.
+  let submission;
+  try {
+    const result = await ddb.send(
+      new UpdateCommand({
+        TableName: STORY_SUBMISSIONS_TABLE,
+        Key: { id },
+        UpdateExpression: "SET #status = :status, reviewedAt = :reviewedAt",
+        ConditionExpression: "attribute_exists(id)",
+        ExpressionAttributeNames: { "#status": "status" },
+        ExpressionAttributeValues: { ":status": status, ":reviewedAt": new Date().toISOString() },
+        ReturnValues: "ALL_OLD",
+      })
+    );
+    submission = result.Attributes;
+  } catch (err) {
+    if (err.name === "ConditionalCheckFailedException") {
+      return json(404, headers, { error: "Submission not found" });
+    }
+    throw err;
+  }
 
   // Tell the author what happened — before this, neither approved nor rejected submitters
   // ever heard back at all. Skipped if the status isn't actually changing (re-clicking the
@@ -882,15 +1120,16 @@ async function handleUpdateStorySubmission(event, headers, id) {
   // action itself.
   if (NOTIFY_EMAIL && submission?.authorEmail && submission.status !== status) {
     try {
-      const storyTitle = submission.title || "your story";
+      const storyTitle = sanitizeForEmail(submission.title, 120, "your story");
+      const authorName = greetingName(submission.authorName);
       const subject =
         status === "approved"
           ? "Your story is now live — Seads Singapore"
           : "About your story submission — Seads Singapore";
       const body =
         status === "approved"
-          ? `Hi ${submission.authorName || "there"},\n\nGood news — your story "${storyTitle}" has been approved and is now published on our blog:\n${SITE_URL}/blog\n\nThank you for sharing it with the community!\n— The Seads Singapore team`
-          : `Hi ${submission.authorName || "there"},\n\nThank you for submitting "${storyTitle}". After review, we won't be publishing it this time — but we'd love to hear from you again, and you're always welcome to submit another story:\n${SITE_URL}/blog/submit\n\n— The Seads Singapore team`;
+          ? `Hi ${authorName},\n\nGood news — your story "${storyTitle}" has been approved and is now published on our blog:\n${SITE_URL}/blog\n\nThank you for sharing it with the community!\n— The Seads Singapore team`
+          : `Hi ${authorName},\n\nThank you for submitting "${storyTitle}". After review, we won't be publishing it this time — but we'd love to hear from you again, and you're always welcome to submit another story:\n${SITE_URL}/blog/submit\n\n— The Seads Singapore team`;
       await ses.send(
         new SendEmailCommand({
           Source: NOTIFY_EMAIL,
@@ -1653,9 +1892,11 @@ export const handler = async (event) => {
     return handleAdminLogin(event, headers);
   }
 
-  // Public: called by proxy.ts (Next's middleware, Edge runtime) on every /admin/* page load
-  // to check the session cookie's validity — safe to be unauthenticated since it only answers
-  // "is this specific token currently valid", it can't be used to forge or discover one.
+  // Public: answers "is this specific token currently valid" — safe unauthenticated since it
+  // can't be used to forge or discover one. No longer called by the frontend: proxy.ts used to
+  // call it on every /admin/* request until that fetch failing closed locked admins out of the
+  // whole panel (see hasUnexpiredSessionCookie in src/lib/admin-session.ts). Real verification
+  // now happens via requireValidAdminToken on each /internal/* call below.
   if (method === "POST" && path === "/verify-session") {
     return handleVerifySession(event, headers);
   }
@@ -1786,6 +2027,11 @@ export const handler = async (event) => {
     if (method === "PATCH" && path === "/internal/admin-password") {
       const res = await handleChangePassword(event, headers);
       if (res.statusCode < 300) await logAudit(event, "update", "admin-password", null);
+      return res;
+    }
+    if (method === "POST" && path === "/internal/sessions/revoke") {
+      const res = await handleRevokeSessions(headers);
+      if (res.statusCode < 300) await logAudit(event, "revoke", "admin-sessions", null);
       return res;
     }
     if (method === "GET" && path === "/internal/audit-log") {

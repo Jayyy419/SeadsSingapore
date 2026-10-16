@@ -4,6 +4,58 @@ All notable changes to this project should be documented in this file.
 
 This format is inspired by Keep a Changelog and uses a date-based release style.
 
+## [2026-10-16] (38)
+
+### Security — an audit of the Lambda and frontend; every fix ships with a test
+
+The Lambda had no automated tests at all, so this adds a suite (`backend/interest-form/test/`)
+that runs the real handler against in-memory AWS fakes, and runs it in CI. Each security test
+below was checked against the *original* code first: 22 of the 28 fail there and pass here
+(the other 6 are regression guards for behaviour that must not change).
+
+- **`/my-activity` disclosed anyone's history to anyone.** It returned every submission, RSVP,
+  event and date for whatever email address was typed in, with nothing proving ownership — a
+  personal-data disclosure under PDPA, and a real one for anyone who'd rather their event
+  attendance not be discoverable. It's now a **magic link**: requesting sends a signed link
+  valid for 30 minutes to the address, and only that link returns the data. The API answers
+  identically whether or not an address has activity (no "is this person a volunteer?"
+  oracle), emails only addresses that do have activity, and is rate-limited per address so it
+  can't flood an inbox. The token travels in the URL **fragment**, so it never reaches server
+  logs or a `Referer` header, and the page strips it from the address bar on arrival.
+- **RSVPs could exhaust an event's capacity.** The same address could RSVP to the same event
+  repeatedly, each time claiming another slot, so a few requests could fill an event and push
+  real attendees onto the waitlist. Repeats now claim nothing — and get the *same* reply as a
+  fresh RSVP, because "already registered" would reveal who is attending; a reminder goes to
+  the inbox instead. The API also now refuses RSVPs to cancelled, postponed, past and
+  nonexistent events (the UI hid those forms, the server didn't check; a nonexistent event was
+  silently recorded as "waitlisted"). Anything carrying an `eventSlug` is now always stored as
+  an RSVP, where previously it could hold a slot while hidden from the check-in roster.
+- **Confirmation emails were a phishing relay.** They go to whatever address was typed and
+  greet with whatever name was typed, so anyone could send arbitrary text — links included —
+  to any inbox from the verified sender address. Names and story titles are now stripped of
+  anything link- or domain-shaped, line breaks and markup, and length-capped.
+- **Admin sessions couldn't be revoked.** Tokens were stateless, so one stayed valid for its
+  full 8 hours even after the password changed — including a token minted with a password that
+  had just been exposed. Signatures now cover a session epoch: **changing the password signs
+  out every other session**, and a new **Settings → "Sign out all other sessions"** does the
+  same without changing the password. The person who presses either stays signed in.
+  Deploying this signs out existing sessions once.
+- **Story decision emails were never sent.** Moderation fetched the submission with a
+  `GetItem` the Lambda's role has never been granted on that table (checked across every
+  version of `iam-policy.json`), and a `.catch(() => null)` swallowed the `AccessDenied` — so
+  approved and rejected authors never heard back. It now reads the old values from the
+  `UpdateItem` itself (`ReturnValues: ALL_OLD`): no new permission, no read-then-write race.
+  That write also gained `attribute_exists(id)`, so a decision on an unknown id 404s instead of
+  creating a ghost record. The test fake now **enforces `iam-policy.json`**, so code calling an
+  ungranted action fails CI rather than failing silently in production.
+- Smaller hardening: the CSV export's formula-injection guard now covers a leading tab or
+  carriage return (OWASP lists both); the CSP gains an explicit `object-src 'none'`; and a
+  `Cross-Origin-Opener-Policy: same-origin` header closes off reverse-tabnabbing.
+
+Docs fix: the backend README said rotating the SSM session secret "immediately invalidates
+every outstanding admin session". It doesn't — `getSsmParameter` caches it per warm container.
+The new epoch is read uncached, which is what makes the button immediate.
+
 ## [2026-09-02] (37)
 
 ### Fixed — `/admin/analytics` 500ed on every load, because it read the wrong response key

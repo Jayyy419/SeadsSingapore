@@ -17,6 +17,9 @@ export const csp = [
   "font-src 'self' data:",
   `connect-src 'self' ${apiOrigin} ${mediaOrigin} https://challenges.cloudflare.com https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://*.ingest.de.sentry.io`,
   "frame-src https://challenges.cloudflare.com",
+  // default-src 'self' already covered plugins, but 'none' is the recommended explicit value:
+  // the site embeds no <object>/<embed>, so there's nothing to allow.
+  "object-src 'none'",
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",
@@ -28,5 +31,9 @@ export const securityHeaders: { key: string; value: string }[] = [
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
   { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
+  // Severs window.opener for cross-origin pages this site opens or is opened by, closing off
+  // reverse-tabnabbing and cross-window probing. Safe here: no flow relies on a popup talking
+  // back to this window (Turnstile runs in an iframe, which COOP doesn't affect).
+  { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
   { key: "Content-Security-Policy", value: csp },
 ];

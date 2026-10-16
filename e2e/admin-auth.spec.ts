@@ -23,7 +23,8 @@ test.describe("admin auth", () => {
   });
 });
 
-// Deliberately not tested here: the successful-login path. Full coverage would require either
-// a real password against the live Lambda or forging a validly-signed session token, neither
-// of which belongs in an unattended suite — proxy.ts's cookie validation (the actual security
-// boundary) is exercised by the "no session" test above instead.
+// Deliberately not tested here: the successful-login path, which would need a real password
+// against the live Lambda or a validly signed session token — neither belongs in an unattended
+// suite. Note proxy.ts is only a presence-and-expiry gate (see hasUnexpiredSessionCookie); the
+// real security boundary is the Lambda verifying the token's HMAC and session epoch on every
+// /internal/* call, which backend/interest-form/test/security.test.mjs covers directly.
