@@ -5,6 +5,9 @@
 export function AdminLogoutButton() {
   async function onLogout() {
     await fetch("/admin/api/logout", { method: "POST" });
+    // Full navigation, not router.push: it drops the client router cache, which still holds
+    // the admin pages rendered while signed in.
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- see above
     window.location.href = "/admin/login";
   }
 

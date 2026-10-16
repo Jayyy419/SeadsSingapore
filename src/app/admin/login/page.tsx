@@ -34,6 +34,7 @@ export default function AdminLoginPage() {
 
       // Full navigation (not client-side routing) so proxy.ts re-evaluates with the fresh
       // cookie the browser just received.
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- see above
       window.location.href = "/admin";
     } catch {
       setErrorMessage(t.adminLoginIncorrectPassword);

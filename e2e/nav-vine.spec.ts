@@ -70,6 +70,12 @@ test.describe("header vine", () => {
     await expect(page.locator(".seads-vine-stroke").first()).toBeAttached();
     await expect(page.locator("svg.seads-vine-settled")).toHaveCount(0);
 
+    // Cut short, it hasn't been seen — a reload partway through plays it again.
+    await page.reload();
+    await expect(page.locator(".seads-vine-stroke").first()).toBeAttached();
+    await expect(page.locator("svg.seads-vine-settled")).toHaveCount(0);
+
+    await page.waitForTimeout(2000); // let the draw-in finish
     await page.reload();
     await expect(page.locator(".seads-vine-stroke").first()).toBeAttached();
     await expect(page.locator("svg.seads-vine-settled")).toHaveCount(1);
