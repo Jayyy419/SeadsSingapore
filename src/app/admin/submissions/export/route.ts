@@ -6,10 +6,12 @@ import { filterSubmissions, type Submission } from "../filter";
 // /admin/* so proxy.ts's session check gates it like every other admin surface.
 export const dynamic = "force-dynamic";
 
-// Excel interprets a leading = + - or @ as a formula, so a submission crafted like
-// "=HYPERLINK(...)" would execute on open. Prefixing with ' renders it inert as plain text.
+// Spreadsheets interpret a leading = + - or @ as a formula, so a submission crafted like
+// "=HYPERLINK(...)" would execute on open. A leading tab or carriage return is on OWASP's list
+// too — some apps strip it and then evaluate what follows. Prefixing with ' renders any of
+// these inert as plain text.
 function csvCell(value: string): string {
-  const deFormulad = /^[=+\-@]/.test(value) ? `'${value}` : value;
+  const deFormulad = /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
   return `"${deFormulad.replace(/"/g, '""')}"`;
 }
 

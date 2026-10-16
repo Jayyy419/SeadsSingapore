@@ -207,6 +207,11 @@ export type Translation = {
   myActivityButton: string;
   myActivityEmpty: string;
   myActivityError: string;
+  myActivitySent: string;
+  myActivityLinkExpired: string;
+  myActivityShowingFor: string;
+  myActivityLoading: string;
+  myActivityTooMany: string;
 };
 
 export const translations: Record<Locale, Translation> = {
@@ -372,11 +377,16 @@ export const translations: Record<Locale, Translation> = {
     copyLinkLabel: "Copy link",
     updatedLabel: "Updated",
     myActivityTitle: "My activity",
-    myActivitySubtitle: "Enter the email you used when RSVPing or applying to see your history.",
+    myActivitySubtitle: "Enter the email you used when RSVPing or applying, and we'll email you a link to see your history.",
     myActivityEmailPh: "you@example.com",
-    myActivityButton: "Look up",
+    myActivityButton: "Email me a link",
     myActivityEmpty: "No activity found for that email yet.",
     myActivityError: "Couldn't look that up right now — please try again.",
+    myActivitySent: "If that address has any activity with us, we've emailed it a link. It works for 30 minutes — check your spam folder if you don't see it.",
+    myActivityLinkExpired: "That link has expired or isn't valid. Enter your email to get a new one.",
+    myActivityShowingFor: "Showing activity for",
+    myActivityLoading: "Loading your activity…",
+    myActivityTooMany: "Too many requests — please try again in a few minutes.",
   },
   zh: {
     navHome: "首页", navAbout: "关于我们", navPrograms: "项目", navEvents: "活动", navStories: "故事", navMedia: "媒体", navDonate: "捐赠",
@@ -540,11 +550,16 @@ export const translations: Record<Locale, Translation> = {
     copyLinkLabel: "复制链接",
     updatedLabel: "更新于",
     myActivityTitle: "我的活动记录",
-    myActivitySubtitle: "输入您报名或申请时使用的电子邮箱，查看您的记录。",
+    myActivitySubtitle: "输入您报名或申请时使用的电子邮箱，我们会向该邮箱发送一个查看记录的链接。",
     myActivityEmailPh: "you@example.com",
-    myActivityButton: "查询",
+    myActivityButton: "发送链接",
     myActivityEmpty: "未找到该邮箱的相关记录。",
     myActivityError: "暂时无法查询，请稍后再试。",
+    myActivitySent: "如果该邮箱在我们这里有记录，我们已向其发送了一个链接，30分钟内有效。若未收到，请检查垃圾邮件文件夹。",
+    myActivityLinkExpired: "该链接已过期或无效。请输入您的邮箱以获取新链接。",
+    myActivityShowingFor: "以下是该邮箱的记录：",
+    myActivityLoading: "正在加载您的记录…",
+    myActivityTooMany: "请求过于频繁，请几分钟后再试。",
   },
   ms: {
     navHome: "Laman Utama", navAbout: "Tentang Kami", navPrograms: "Program", navEvents: "Acara", navStories: "Kisah", navMedia: "Media", navDonate: "Derma",
@@ -708,11 +723,16 @@ export const translations: Record<Locale, Translation> = {
     copyLinkLabel: "Salin pautan",
     updatedLabel: "Dikemas kini",
     myActivityTitle: "Aktiviti saya",
-    myActivitySubtitle: "Masukkan e-mel yang anda gunakan semasa RSVP atau memohon untuk melihat sejarah anda.",
+    myActivitySubtitle: "Masukkan e-mel yang anda gunakan semasa RSVP atau memohon, dan kami akan menghantar pautan untuk melihat sejarah anda.",
     myActivityEmailPh: "you@example.com",
-    myActivityButton: "Semak",
+    myActivityButton: "Hantar pautan",
     myActivityEmpty: "Tiada aktiviti dijumpai untuk e-mel itu setakat ini.",
     myActivityError: "Tidak dapat menyemak sekarang — sila cuba lagi.",
+    myActivitySent: "Jika alamat itu mempunyai sebarang aktiviti dengan kami, kami telah menghantar pautan kepadanya. Pautan ini sah selama 30 minit — semak folder spam jika anda tidak menemuinya.",
+    myActivityLinkExpired: "Pautan itu telah tamat tempoh atau tidak sah. Masukkan e-mel anda untuk mendapatkan pautan baharu.",
+    myActivityShowingFor: "Menunjukkan aktiviti untuk",
+    myActivityLoading: "Memuatkan aktiviti anda…",
+    myActivityTooMany: "Terlalu banyak permintaan — sila cuba lagi dalam beberapa minit.",
   },
   hi: {
     navHome: "होम", navAbout: "हमारे बारे में", navPrograms: "कार्यक्रम", navEvents: "इवेंट्स", navStories: "कहानियाँ", navMedia: "मीडिया", navDonate: "दान करें",
@@ -876,10 +896,15 @@ export const translations: Record<Locale, Translation> = {
     copyLinkLabel: "लिंक कॉपी करें",
     updatedLabel: "अपडेट किया गया",
     myActivityTitle: "मेरी गतिविधि",
-    myActivitySubtitle: "अपनी गतिविधि देखने के लिए वह ईमेल दर्ज करें जो आपने RSVP या आवेदन करते समय इस्तेमाल किया था।",
+    myActivitySubtitle: "वह ईमेल दर्ज करें जो आपने RSVP या आवेदन करते समय इस्तेमाल किया था — हम उस पर आपकी गतिविधि देखने का लिंक भेजेंगे।",
     myActivityEmailPh: "you@example.com",
-    myActivityButton: "खोजें",
+    myActivityButton: "लिंक भेजें",
     myActivityEmpty: "उस ईमेल के लिए अभी तक कोई गतिविधि नहीं मिली।",
     myActivityError: "अभी खोज नहीं हो पाई — कृपया फिर से प्रयास करें।",
+    myActivitySent: "अगर उस पते की हमारे साथ कोई गतिविधि है, तो हमने उस पर एक लिंक भेज दिया है। यह 30 मिनट तक काम करेगा — अगर न दिखे तो स्पैम फ़ोल्डर देखें।",
+    myActivityLinkExpired: "यह लिंक समाप्त हो गया है या मान्य नहीं है। नया लिंक पाने के लिए अपना ईमेल दर्ज करें।",
+    myActivityShowingFor: "इसके लिए गतिविधि दिखाई जा रही है",
+    myActivityLoading: "आपकी गतिविधि लोड हो रही है…",
+    myActivityTooMany: "बहुत अधिक अनुरोध — कृपया कुछ मिनट बाद फिर से प्रयास करें।",
   },
 };
