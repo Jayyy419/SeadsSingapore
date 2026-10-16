@@ -30,7 +30,7 @@
 
 ## Backend (AWS)
 
-- API Gateway (HTTP API) + Lambda (Node.js 20.x) + 10 DynamoDB tables + S3 + SES — see
+- API Gateway (HTTP API) + Lambda (Node.js 24.x) + 10 DynamoDB tables + S3 + SES — see
   `docs/ARCHITECTURE.md` (Backend Architecture) and `backend/interest-form/`
 - **Auth**: single shared admin password (no per-user accounts), hashed (scrypt) and stored
   in DynamoDB, session cookie signed with an HMAC secret — see `backend/interest-form/README.md`

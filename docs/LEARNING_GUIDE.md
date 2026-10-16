@@ -486,7 +486,7 @@ npm install --omit=dev          # get the AWS SDK packages, skip devDependencies
 zip -qr function.zip index.mjs node_modules package.json
 aws lambda create-function \
   --function-name seads-interest-form-handler \
-  --runtime nodejs20.x \
+  --runtime nodejs24.x \
   --role arn:aws:iam::140023398409:role/seads-interest-form-lambda-role \
   --handler index.handler \
   --zip-file fileb://function.zip

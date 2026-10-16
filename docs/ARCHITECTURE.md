@@ -165,7 +165,7 @@ CloudFront):
 Browser --POST/GET--> API Gateway (HTTP API, seads-interest-form-api)
                             |
                             v
-                       Lambda (seads-interest-form-handler, Node.js 20.x)
+                       Lambda (seads-interest-form-handler, Node.js 24.x)
                        a flat if-chain router in index.mjs, ~1200 lines
                             |
       +---------------------------+----------------------------+
