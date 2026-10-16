@@ -877,9 +877,102 @@ async function handleGetSubmissions(headers) {
   return json(200, headers, { submissions: items });
 }
 
+// Removing a submission. If it was a *confirmed* RSVP, its capacity slot has to go somewhere —
+// before this, it went nowhere: rsvpCount was never decremented, so every cancellation or
+// spam RSVP an admin deleted left an event permanently fuller than it really was, and the
+// people on its waitlist never got in.
 async function handleDeleteSubmission(headers, id) {
+  const existing = (await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { id } }))).Item;
   await ddb.send(new DeleteCommand({ TableName: TABLE_NAME, Key: { id } }));
-  return json(200, headers, { ok: true });
+
+  if (!existing?.eventSlug || existing.rsvpStatus !== "confirmed") {
+    return json(200, headers, { ok: true, promoted: null });
+  }
+  const promoted = await releaseRsvpSlot(existing.eventSlug);
+  return json(200, headers, { ok: true, promoted });
+}
+
+// A freed slot goes straight to the earliest waitlisted person rather than back to the public
+// pool — so a fresh RSVP arriving at the same moment can't jump the queue. Each promotion is a
+// conditional write on `rsvpStatus = waitlisted`, so two deletions racing each other can never
+// promote the same person twice; if a candidate has changed underneath us, the next one is
+// tried. When nobody can be promoted, the slot is released by decrementing the count.
+//
+// Returns the promoted submission's id, or null.
+async function releaseRsvpSlot(slug) {
+  const eventItem = (await ddb.send(new GetCommand({ TableName: EVENTS_TABLE, Key: { slug } }))).Item;
+  const open =
+    eventItem &&
+    eventItem.status !== "cancelled" &&
+    eventItem.status !== "postponed" &&
+    !isPastEventDate(eventItem.date) &&
+    typeof eventItem.capacity === "number" &&
+    // rsvpCount still includes the RSVP just removed; promote only if that leaves room. An admin
+    // can lower capacity below the current count, and then there's no room to give away.
+    (eventItem.rsvpCount ?? 0) <= eventItem.capacity;
+
+  if (open) {
+    const waitlist = (await scanAll(TABLE_NAME))
+      .filter((item) => item.eventSlug === slug && item.rsvpStatus === "waitlisted")
+      .sort((a, b) => (a.submittedAt || "").localeCompare(b.submittedAt || ""));
+
+    for (const candidate of waitlist) {
+      try {
+        await ddb.send(
+          new UpdateCommand({
+            TableName: TABLE_NAME,
+            Key: { id: candidate.id },
+            UpdateExpression: "SET rsvpStatus = :confirmed, promotedAt = :now",
+            ConditionExpression: "rsvpStatus = :waitlisted",
+            ExpressionAttributeValues: { ":confirmed": "confirmed", ":waitlisted": "waitlisted", ":now": new Date().toISOString() },
+          })
+        );
+      } catch (err) {
+        if (err.name === "ConditionalCheckFailedException") continue;
+        throw err;
+      }
+      await sendPromotionEmail(candidate, eventItem);
+      return candidate.id; // the slot transferred, so rsvpCount stays as it is
+    }
+  }
+
+  try {
+    await ddb.send(
+      new UpdateCommand({
+        TableName: EVENTS_TABLE,
+        Key: { slug },
+        UpdateExpression: "SET rsvpCount = rsvpCount - :one",
+        ConditionExpression: "rsvpCount > :zero",
+        ExpressionAttributeValues: { ":one": 1, ":zero": 0 },
+      })
+    );
+  } catch (err) {
+    // Already zero (or the event is gone): nothing to release.
+    if (err.name !== "ConditionalCheckFailedException") throw err;
+  }
+  return null;
+}
+
+async function sendPromotionEmail(submission, eventItem) {
+  if (!NOTIFY_EMAIL || !submission.email) return;
+  try {
+    await ses.send(
+      new SendEmailCommand({
+        Source: NOTIFY_EMAIL,
+        Destination: { ToAddresses: [submission.email] },
+        Message: {
+          Subject: { Data: "A spot opened up — you're in! — Seads Singapore" },
+          Body: {
+            Text: {
+              Data: `Hi ${greetingName(submission.name)},\n\nGood news: a spot opened up, so you've been moved off the waitlist — your RSVP is now confirmed.${eventDetailsForEmail(eventItem)}\n\nIf you can no longer make it, just reply to let us know so we can pass the spot on.\n\nSee you there!\n— The Seads Singapore team`,
+            },
+          },
+        },
+      })
+    );
+  } catch (err) {
+    console.error("Waitlist promotion email failed:", err);
+  }
 }
 
 // Self-service activity lookup, verified by email. This used to return a person's full history
@@ -1937,7 +2030,11 @@ export const handler = async (event) => {
     if (method === "DELETE" && submissionMatch) {
       const id = decodeURIComponent(submissionMatch[1]);
       const res = await handleDeleteSubmission(headers, id);
-      if (res.statusCode < 300) await logAudit(event, "delete", "submission", id);
+      if (res.statusCode < 300) {
+        await logAudit(event, "delete", "submission", id);
+        const promoted = JSON.parse(res.body).promoted;
+        if (promoted) await logAudit(event, "promote", "rsvp", `${promoted} (off the waitlist)`);
+      }
       return res;
     }
     if (method === "GET" && path === "/internal/event-rsvp-counts") {

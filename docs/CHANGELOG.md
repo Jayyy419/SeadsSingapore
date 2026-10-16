@@ -4,6 +4,30 @@ All notable changes to this project should be documented in this file.
 
 This format is inspired by Keep a Changelog and uses a date-based release style.
 
+## [2026-10-16] (40)
+
+### Added — waitlist auto-promotion; fixed: deleted RSVPs never gave their slot back
+
+- **Fixed: a deleted confirmed RSVP kept its capacity slot forever.** `handleDeleteSubmission`
+  removed the row but never decremented the event's `rsvpCount`, so every cancellation — or
+  spam RSVP an admin cleaned up — left the event permanently fuller than it really was. Once an
+  event filled, it stayed "full", and new RSVPs were waitlisted even with seats free.
+- **New: the waitlist moves.** Deleting a confirmed RSVP now hands its slot straight to the
+  **earliest** waitlisted person (by when they asked, not storage order), who is **emailed**
+  that they're in. The slot goes from one person to the next without passing back through the
+  public pool, so a fresh RSVP arriving at the same moment can't jump the queue. Each promotion
+  is a conditional write on `rsvpStatus = waitlisted`, so two deletions racing each other can't
+  promote the same person; if a candidate changed underneath, the next is tried.
+- Nobody is promoted into a cancelled, postponed or past event, or into one whose capacity was
+  lowered below its current count — in those cases the slot is simply released. The count is
+  guarded against going negative.
+- Promotions are recorded in the audit log. The admin's delete confirmation for a confirmed RSVP
+  now says that the first person on the waitlist will get the spot and be emailed.
+
+Needs no new IAM permissions. 13 new backend tests; the core ones were checked against the
+previous code and fail there on the real bug (after deleting a confirmed RSVP, the count stays
+at 2 where it should be 1).
+
 ## [2026-10-16] (39)
 
 ### Changed — the header vine comes alive; reduced-motion respected site-wide
