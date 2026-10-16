@@ -220,6 +220,14 @@ export type Translation = {
   myActivityShowingFor: string;
   myActivityLoading: string;
   myActivityTooMany: string;
+  myActivityDelete: string;
+  myActivityUnsubscribe: string;
+  myActivityCancelRsvp: string;
+  myActivityDeleteAll: string;
+  myActivityDeleteOneConfirm: string;
+  myActivityDeleteAllConfirm: string;
+  myActivityDeleted: string;
+  myActivityDeleteNote: string;
   rsvpCancelTitle: string;
   rsvpCancelSubtitle: string;
   rsvpCancelLoading: string;
@@ -372,7 +380,7 @@ export const translations: Record<Locale, Translation> = {
     howLongKept: "How long we keep it",
     howLongKeptBody: "We keep your information for as long as reasonably needed to respond to and follow up on your enquiry, or until you ask us to delete it — see below.",
     yourRights: "Your rights",
-    yourRightsBody: "You can see what you've submitted at any time on the My activity page, which emails you a private link. To correct or delete your data, or to stop receiving updates, email us at hello@seads.sg.",
+    yourRightsBody: "On the My activity page (which emails you a private link) you can see everything you've submitted, cancel RSVPs, unsubscribe from the newsletter, and delete any or all of your data yourself. For anything else, such as correcting your details, email us at hello@seads.sg.",
     notFoundTitle: "Page not found",
     notFoundSubtitle: "This one didn't take root — the page you're looking for doesn't exist or has moved.",
     tryNavBody: "Try the navigation above, or jump back to one of these:",
@@ -416,6 +424,14 @@ export const translations: Record<Locale, Translation> = {
     myActivityShowingFor: "Showing activity for",
     myActivityLoading: "Loading your activity…",
     myActivityTooMany: "Too many requests — please try again in a few minutes.",
+    myActivityDelete: "Delete",
+    myActivityUnsubscribe: "Unsubscribe",
+    myActivityCancelRsvp: "Cancel RSVP",
+    myActivityDeleteAll: "Delete all my data",
+    myActivityDeleteOneConfirm: "Delete this? It can't be undone.",
+    myActivityDeleteAllConfirm: "Delete everything listed here? It can't be undone.",
+    myActivityDeleted: "Deleted.",
+    myActivityDeleteNote: "Deleting an RSVP cancels it and gives your spot to the next person waiting.",
     rsvpCancelTitle: "Cancel your RSVP",
     rsvpCancelSubtitle: "Can't make it? Let us know so someone else can have your spot.",
     rsvpCancelLoading: "Checking your link…",
@@ -566,7 +582,7 @@ export const translations: Record<Locale, Translation> = {
     howLongKept: "我们保留信息的时长",
     howLongKeptBody: "我们会在合理需要的时间内保留您的信息，以回复和跟进您的咨询，直至您要求我们删除为止——详见下文。",
     yourRights: "您的权利",
-    yourRightsBody: "您可以随时在“我的活动记录”页面查看您提交过的内容，该页面会通过电子邮件向您发送专属链接。如需更正或删除您的数据，或不再接收更新，请发送电子邮件至 hello@seads.sg。",
+    yourRightsBody: "在“我的活动记录”页面（系统会通过电子邮件向您发送专属链接），您可以查看您提交过的所有内容、取消报名、退订通讯，以及自行删除部分或全部数据。如有其他需要，例如更正您的信息，请发送电子邮件至 hello@seads.sg。",
     notFoundTitle: "页面未找到",
     notFoundSubtitle: "这颗种子还未生根——您要找的页面不存在或已被移动。",
     tryNavBody: "请尝试使用上方的导航菜单，或返回以下页面：",
@@ -610,6 +626,14 @@ export const translations: Record<Locale, Translation> = {
     myActivityShowingFor: "以下是该邮箱的记录：",
     myActivityLoading: "正在加载您的记录…",
     myActivityTooMany: "请求过于频繁，请几分钟后再试。",
+    myActivityDelete: "删除",
+    myActivityUnsubscribe: "取消订阅",
+    myActivityCancelRsvp: "取消报名",
+    myActivityDeleteAll: "删除我的所有数据",
+    myActivityDeleteOneConfirm: "确定删除此项？此操作无法撤销。",
+    myActivityDeleteAllConfirm: "确定删除此处列出的所有内容？此操作无法撤销。",
+    myActivityDeleted: "已删除。",
+    myActivityDeleteNote: "删除活动报名即取消报名，您的名额将转给候补名单上的下一位。",
     rsvpCancelTitle: "取消您的报名",
     rsvpCancelSubtitle: "无法参加？请告诉我们，好让其他人获得您的名额。",
     rsvpCancelLoading: "正在核验您的链接…",
@@ -760,7 +784,7 @@ export const translations: Record<Locale, Translation> = {
     howLongKept: "Berapa lama kami menyimpannya",
     howLongKeptBody: "Kami menyimpan maklumat anda selama yang munasabah diperlukan untuk menjawab dan menghubungi anda semula tentang pertanyaan anda, atau sehingga anda meminta kami memadamkannya — lihat di bawah.",
     yourRights: "Hak anda",
-    yourRightsBody: "Anda boleh melihat apa yang telah anda hantar pada bila-bila masa di halaman Aktiviti saya, yang akan menghantar pautan peribadi ke e-mel anda. Untuk membetulkan atau memadamkan data anda, atau berhenti menerima kemas kini, e-mel kami di hello@seads.sg.",
+    yourRightsBody: "Di halaman Aktiviti saya (yang akan menghantar pautan peribadi ke e-mel anda) anda boleh melihat semua yang telah anda hantar, membatalkan RSVP, berhenti melanggan surat berita, dan memadamkan sebahagian atau semua data anda sendiri. Untuk perkara lain, seperti membetulkan butiran anda, e-mel kami di hello@seads.sg.",
     notFoundTitle: "Halaman tidak dijumpai",
     notFoundSubtitle: "Yang ini tidak berakar — halaman yang anda cari tidak wujud atau telah dipindahkan.",
     tryNavBody: "Cuba navigasi di atas, atau kembali ke salah satu daripada ini:",
@@ -804,6 +828,14 @@ export const translations: Record<Locale, Translation> = {
     myActivityShowingFor: "Menunjukkan aktiviti untuk",
     myActivityLoading: "Memuatkan aktiviti anda…",
     myActivityTooMany: "Terlalu banyak permintaan — sila cuba lagi dalam beberapa minit.",
+    myActivityDelete: "Padam",
+    myActivityUnsubscribe: "Berhenti melanggan",
+    myActivityCancelRsvp: "Batalkan RSVP",
+    myActivityDeleteAll: "Padam semua data saya",
+    myActivityDeleteOneConfirm: "Padam ini? Tindakan ini tidak boleh dibuat asal.",
+    myActivityDeleteAllConfirm: "Padam semua yang disenaraikan di sini? Tindakan ini tidak boleh dibuat asal.",
+    myActivityDeleted: "Dipadam.",
+    myActivityDeleteNote: "Memadam RSVP akan membatalkannya dan memberikan tempat anda kepada orang seterusnya dalam senarai menunggu.",
     rsvpCancelTitle: "Batalkan RSVP anda",
     rsvpCancelSubtitle: "Tidak dapat hadir? Beritahu kami supaya orang lain boleh mendapat tempat anda.",
     rsvpCancelLoading: "Menyemak pautan anda…",
@@ -954,7 +986,7 @@ export const translations: Record<Locale, Translation> = {
     howLongKept: "हम इसे कितने समय तक रखते हैं",
     howLongKeptBody: "हम आपकी जानकारी को आपकी पूछताछ का जवाब देने और उसका फॉलो-अप करने के लिए उचित रूप से आवश्यक समय तक रखते हैं, या जब तक आप हमसे इसे हटाने के लिए नहीं कहते — नीचे देखें।",
     yourRights: "आपके अधिकार",
-    yourRightsBody: "आप किसी भी समय मेरी गतिविधि पृष्ठ पर देख सकते हैं कि आपने क्या सबमिट किया है — यह आपको एक निजी लिंक ईमेल करता है। अपना डेटा सही करने या हटाने, या अपडेट प्राप्त करना बंद करने के लिए, हमें hello@seads.sg पर ईमेल करें।",
+    yourRightsBody: "मेरी गतिविधि पृष्ठ पर (जो आपको एक निजी लिंक ईमेल करता है) आप अपनी सबमिट की गई हर चीज़ देख सकते हैं, RSVP रद्द कर सकते हैं, न्यूज़लेटर की सदस्यता समाप्त कर सकते हैं, और अपना कुछ या सारा डेटा स्वयं हटा सकते हैं। किसी और चीज़ के लिए, जैसे अपना विवरण सही करना, हमें hello@seads.sg पर ईमेल करें।",
     notFoundTitle: "पृष्ठ नहीं मिला",
     notFoundSubtitle: "यह जड़ नहीं पकड़ सका — जिस पृष्ठ को आप खोज रहे हैं वह मौजूद नहीं है या स्थानांतरित हो गया है।",
     tryNavBody: "ऊपर दिए गए नेविगेशन का प्रयास करें, या इनमें से किसी एक पर वापस जाएं:",
@@ -998,6 +1030,14 @@ export const translations: Record<Locale, Translation> = {
     myActivityShowingFor: "इसके लिए गतिविधि दिखाई जा रही है",
     myActivityLoading: "आपकी गतिविधि लोड हो रही है…",
     myActivityTooMany: "बहुत अधिक अनुरोध — कृपया कुछ मिनट बाद फिर से प्रयास करें।",
+    myActivityDelete: "हटाएँ",
+    myActivityUnsubscribe: "सदस्यता समाप्त करें",
+    myActivityCancelRsvp: "RSVP रद्द करें",
+    myActivityDeleteAll: "मेरा सारा डेटा हटाएँ",
+    myActivityDeleteOneConfirm: "इसे हटाएँ? इसे पूर्ववत नहीं किया जा सकता।",
+    myActivityDeleteAllConfirm: "यहाँ सूचीबद्ध सब कुछ हटाएँ? इसे पूर्ववत नहीं किया जा सकता।",
+    myActivityDeleted: "हटा दिया गया।",
+    myActivityDeleteNote: "RSVP हटाने से वह रद्द हो जाता है और आपकी जगह प्रतीक्षा सूची में अगले व्यक्ति को मिल जाती है।",
     rsvpCancelTitle: "अपना RSVP रद्द करें",
     rsvpCancelSubtitle: "नहीं आ पा रहे? हमें बताएँ ताकि आपकी जगह किसी और को मिल सके।",
     rsvpCancelLoading: "आपका लिंक जाँचा जा रहा है…",

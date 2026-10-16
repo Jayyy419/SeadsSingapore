@@ -4,6 +4,31 @@ All notable changes to this project should be documented in this file.
 
 This format is inspired by Keep a Changelog and uses a date-based release style.
 
+## [2026-10-16] (48)
+
+### Added — unsubscribe and delete your own data from My activity
+
+- The emailed My activity link now lets people act on what it shows:
+  - **Cancel RSVP** on an event entry. The spot goes to the waitlist, as with the email cancel
+    link (47).
+  - **Unsubscribe** on the newsletter entry. A subscription is just a submission row, so
+    deleting it is unsubscribing.
+  - **Delete** on anything else.
+  - **Delete all my data** for everything at once.
+  Each asks for confirmation first. PDPA gives people the right to withdraw consent and have
+  their data deleted; until now that meant emailing and waiting for someone to do it by hand.
+  There was also no way to unsubscribe at all.
+- `POST /my-activity/delete {token, id | all}` is authorised by the same signed, 30-minute
+  activity link. It only ever touches rows whose email matches the verified address; someone
+  else's id is a 404. The removal logic is now shared with the RSVP cancel link
+  (`removeOwnSubmission`): a conditional delete, spot release, team notification for RSVPs,
+  and an audit entry.
+- Activity entries now carry their `id`. The newsletter "You're subscribed" email says where to
+  unsubscribe. The privacy policy's "Your rights" section (four languages) now describes doing
+  all of this yourself.
+- Tests: backend `test/my-activity-delete.test.mjs` (9; 7 fail against the old code, 2 are
+  guards), e2e `e2e/my-activity-delete.spec.ts` (4). Backend 74/74, e2e 55/55.
+
 ## [2026-10-16] (47)
 
 ### Added — attendees can cancel their own RSVP from the email

@@ -5,6 +5,7 @@ import { SiteShell } from "@/components/site-shell";
 import { useLocale } from "@/lib/locale-context";
 
 type ActivityItem = {
+  id: string;
   submittedAt: string;
   interestType: string | null;
   eventSlug: string | null;
@@ -34,6 +35,8 @@ export function MyActivityContent() {
   const [status, setStatus] = useState<Status>("idle");
   const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [verifiedEmail, setVerifiedEmail] = useState("");
+  const [busy, setBusy] = useState<string | null>(null); // the id being deleted, or "all"
+  const [deletedNotice, setDeletedNotice] = useState(false);
 
   // The token is read from the URL once and kept in a ref, because the effect destroys its own
   // input: it strips the token from the address bar. React may re-run an effect (cleanup then
@@ -77,6 +80,37 @@ export function MyActivityContent() {
       cancelled = true;
     };
   }, []);
+
+  // Same emailed link as viewing — it proves the inbox is yours, so it also lets you delete
+  // what's yours. Deleting the newsletter entry is how you unsubscribe; deleting an RSVP
+  // cancels it and frees the spot for the waitlist.
+  async function deleteEntries(target: { id: string } | { all: true }, confirmText: string) {
+    if (!window.confirm(confirmText)) return;
+    setBusy("id" in target ? target.id : "all");
+    setDeletedNotice(false);
+    try {
+      const res = await fetch(`${ACTIVITY_ENDPOINT}/delete`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: tokenRef.current, ...target }),
+      });
+      if (res.status === 401) return setStatus("expired");
+      if (res.status === 429) return setStatus("tooMany");
+      // 404: already gone (another tab) — refresh to what's really left either way.
+      const data = await res.json().catch(() => null);
+      if (!res.ok && res.status !== 404) throw new Error(`Delete failed: ${res.status}`);
+      if (data?.activity) setActivity(data.activity);
+      else setActivity((items) => items.filter((item) => "all" in target || item.id !== target.id));
+      setDeletedNotice(true);
+    } catch {
+      setStatus("error");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const actionLabel = (item: ActivityItem) =>
+    item.interestType === "newsletter" ? t.myActivityUnsubscribe : item.eventSlug ? t.myActivityCancelRsvp : t.myActivityDelete;
 
   async function requestLink(e: React.FormEvent) {
     e.preventDefault();
@@ -179,9 +213,33 @@ export function MyActivityContent() {
                         {item.eventDate && <span className="ml-2 text-sm font-normal text-[color:var(--muted)]">· {item.eventDate}</span>}
                       </p>
                     )}
-                    <p className="mt-1 text-xs text-[color:var(--muted)]">{new Date(item.submittedAt).toLocaleDateString()}</p>
+                    <div className="mt-1 flex items-center justify-between gap-3">
+                      <p className="text-xs text-[color:var(--muted)]">{new Date(item.submittedAt).toLocaleDateString()}</p>
+                      <button
+                        type="button"
+                        onClick={() => deleteEntries({ id: item.id }, t.myActivityDeleteOneConfirm)}
+                        disabled={busy !== null}
+                        className="text-xs font-semibold text-[color:var(--muted)] hover:text-[#e2965f] disabled:opacity-50"
+                      >
+                        {busy === item.id ? "…" : actionLabel(item)}
+                      </button>
+                    </div>
                   </div>
                 ))
+              )}
+              {deletedNotice && <p className="text-sm font-semibold text-[color:var(--accent)]">{t.myActivityDeleted}</p>}
+              {activity.length > 0 && (
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                  <p className="text-xs text-[color:var(--muted)]">{t.myActivityDeleteNote}</p>
+                  <button
+                    type="button"
+                    onClick={() => deleteEntries({ all: true }, t.myActivityDeleteAllConfirm)}
+                    disabled={busy !== null}
+                    className="rounded-full border border-[#e2965f] px-4 py-2 text-xs font-semibold text-[#e2965f] hover:bg-[#e2965f]/10 disabled:opacity-50"
+                  >
+                    {busy === "all" ? "…" : t.myActivityDeleteAll}
+                  </button>
+                </div>
               )}
             </div>
           )}
