@@ -3,6 +3,7 @@
 import Script from "next/script";
 import { useState } from "react";
 import { useLocale } from "@/lib/locale-context";
+import { FormPrivacyNotice } from "@/components/form-privacy-notice";
 
 // Email-only signup that stores into the same submissions pipeline as the interest form
 // (interestType "newsletter"), so subscribers show up in /admin/submissions and its CSV
@@ -75,6 +76,7 @@ export function NewsletterSignup() {
               {t.statusError}
             </p>
           )}
+          <FormPrivacyNotice className="text-[color:var(--footer-muted)]" />
         </form>
       )}
       {process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY && (

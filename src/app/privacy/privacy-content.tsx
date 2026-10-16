@@ -39,6 +39,12 @@ export function PrivacyContent() {
               <strong className="text-[color:var(--foreground)]">{t.collectFormItemLabel}</strong> {t.collectFormItemBody}
             </li>
             <li>
+              <strong className="text-[color:var(--foreground)]">{t.collectStoryItemLabel}</strong> {t.collectStoryItemBody}
+            </li>
+            <li>
+              <strong className="text-[color:var(--foreground)]">{t.collectEmailItemLabel}</strong> {t.collectEmailItemBody}
+            </li>
+            <li>
               <strong className="text-[color:var(--foreground)]">{t.collectBotItemLabel}</strong>{" "}
               {linkify(t.collectBotItemBody, "Cloudflare", "https://www.cloudflare.com/privacypolicy/")}
             </li>
