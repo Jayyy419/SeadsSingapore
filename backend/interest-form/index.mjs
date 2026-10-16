@@ -329,13 +329,22 @@ const MONTH_INDEX = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, au
 // never silently closes RSVPs. Compared as calendar days in Singapore time, so an event stays
 // open for RSVPs for the whole of its own day.
 function isPastEventDate(dateStr) {
+  const eventDay = eventDayKey(dateStr);
+  return eventDay !== null && eventDay < singaporeDayKey(0);
+}
+
+// "18 Jul 2026" → "2026-07-18", or null if it isn't in that format. Keys compare as strings.
+function eventDayKey(dateStr) {
   const match = String(dateStr ?? "").trim().match(/^(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})$/);
-  if (!match) return false;
+  if (!match) return null;
   const month = MONTH_INDEX[match[2].toLowerCase()];
-  if (month === undefined) return false;
-  const eventDay = `${match[3]}-${String(month + 1).padStart(2, "0")}-${match[1].padStart(2, "0")}`;
-  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Singapore" });
-  return eventDay < today;
+  if (month === undefined) return null;
+  return `${match[3]}-${String(month + 1).padStart(2, "0")}-${match[1].padStart(2, "0")}`;
+}
+
+// The calendar day in Singapore `offsetDays` from today, as a key like eventDayKey's.
+function singaporeDayKey(offsetDays) {
+  return new Date(Date.now() + offsetDays * 24 * 60 * 60 * 1000).toLocaleDateString("en-CA", { timeZone: "Asia/Singapore" });
 }
 
 function eventDetailsForEmail(eventItem) {
@@ -951,6 +960,57 @@ async function sendPromotionEmail(submission, eventItem) {
   } catch (err) {
     console.error("Waitlist promotion email failed:", err);
   }
+}
+
+// Day-before reminders, run daily at 10:00 Singapore time by EventBridge Scheduler (schedule
+// seads-rsvp-reminders; see the README's "Scheduled jobs"). Every confirmed RSVP for an event
+// happening tomorrow gets one reminder with the event details and its cancel link — so people
+// who can't come say so while there's still time to pass the spot on. Each RSVP is marked
+// with a conditional write *before* its email is sent, so a retried or overlapping run never
+// sends anyone a second reminder (at worst, a failed send means one reminder is lost).
+async function runRsvpReminders() {
+  const tomorrow = singaporeDayKey(1);
+  const events = (await scanAll(EVENTS_TABLE)).filter(
+    (e) => eventDayKey(e.date) === tomorrow && e.status !== "cancelled" && e.status !== "postponed"
+  );
+  if (!events.length || !SENDER_EMAIL) return { ok: true, sent: 0, events: events.length };
+
+  const eventBySlug = new Map(events.map((e) => [e.slug, e]));
+  const due = (await scanAll(TABLE_NAME)).filter(
+    (item) => eventBySlug.has(item.eventSlug) && item.rsvpStatus === "confirmed" && !item.reminderSentAt && item.email
+  );
+
+  let sent = 0;
+  for (const rsvp of due) {
+    try {
+      await ddb.send(
+        new UpdateCommand({
+          TableName: TABLE_NAME,
+          Key: { id: rsvp.id },
+          UpdateExpression: "SET reminderSentAt = :now",
+          ConditionExpression: "attribute_exists(id) AND attribute_not_exists(reminderSentAt) AND rsvpStatus = :confirmed",
+          ExpressionAttributeValues: { ":now": new Date().toISOString(), ":confirmed": "confirmed" },
+        })
+      );
+    } catch (err) {
+      if (err.name === "ConditionalCheckFailedException") continue; // already reminded, cancelled, or demoted
+      throw err;
+    }
+    const eventItem = eventBySlug.get(rsvp.eventSlug);
+    try {
+      await sendEmail({
+        to: rsvp.email,
+        replyTo: NOTIFY_EMAIL,
+        subject: `See you tomorrow: ${eventItem.title?.en ?? eventItem.slug} — Seads Singapore`,
+        body: `Hi ${greetingName(rsvp.name)},\n\nA quick reminder that you're coming to this tomorrow:${eventDetailsForEmail(eventItem)}${await rsvpCancelLine(rsvp.id, "confirmed")}\n\nSee you there!\n— The Seads Singapore team`,
+      });
+      sent++;
+    } catch (err) {
+      console.error("RSVP reminder email failed:", err);
+    }
+  }
+  console.log(JSON.stringify({ task: "rsvp-reminders", day: tomorrow, events: events.length, due: due.length, sent }));
+  return { ok: true, sent, events: events.length };
 }
 
 // Self-service RSVP cancellation. Every RSVP email carries a signed link to /rsvp/cancel; until
@@ -2020,6 +2080,15 @@ async function handleDeleteStory(headers, slug) {
 }
 
 export const handler = async (event) => {
+  // Scheduled jobs: EventBridge Scheduler invokes the function directly with a JSON input like
+  // {"task": "rsvp-reminders"}. An API Gateway request can't produce a top-level `task` (its
+  // fields arrive under body/headers/requestContext), so these are unreachable from the API.
+  if (typeof event?.task === "string" && !event.requestContext) {
+    if (event.task === "rsvp-reminders") return runRsvpReminders();
+    console.error("Unknown scheduled task:", event.task);
+    return { ok: false, error: "unknown task" };
+  }
+
   const origin = event.headers?.origin || event.headers?.Origin || "";
   const headers = { "Content-Type": "application/json", ...corsHeaders(origin) };
 
