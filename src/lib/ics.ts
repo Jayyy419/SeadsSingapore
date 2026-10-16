@@ -18,6 +18,23 @@ export function parseEventDate(dateStr: string): Date | null {
   return new Date(Date.UTC(Number(year), month, Number(day)));
 }
 
+// Today's calendar date in Singapore, as UTC midnight so it compares directly with
+// parseEventDate's result. The site's events happen in Singapore; a plain UTC "today" is still
+// yesterday until 8am there, which kept yesterday's events listed as upcoming (and their RSVP
+// form open) for the first eight hours of every day.
+function singaporeToday(now = new Date()): Date {
+  const [year, month, day] = now.toLocaleDateString("en-CA", { timeZone: "Asia/Singapore" }).split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day));
+}
+
+// Same rule as isPastEventDate in backend/interest-form/index.mjs, which refuses RSVPs on that
+// basis: an event is past once its whole day has ended in Singapore, so it stays open on the
+// day itself. An unparseable date counts as not past, so a typo'd date stays visible.
+export function isPastEventDate(dateStr: string, now = new Date()): boolean {
+  const date = parseEventDate(dateStr);
+  return date !== null && date < singaporeToday(now);
+}
+
 function toIcsDate(date: Date): string {
   return date.toISOString().slice(0, 10).replace(/-/g, "");
 }

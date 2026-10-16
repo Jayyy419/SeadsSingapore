@@ -198,6 +198,7 @@ export type Translation = {
   eventPostponedLabel: string;
   eventCancelledBody: string;
   eventPostponedBody: string;
+  eventPastBody: string;
   shareLabel: string;
   copyLinkLabel: string;
   updatedLabel: string;
@@ -373,6 +374,7 @@ export const translations: Record<Locale, Translation> = {
     eventPostponedLabel: "Postponed",
     eventCancelledBody: "This event has been cancelled.",
     eventPostponedBody: "This event has been postponed — a new date will be announced.",
+    eventPastBody: "This event has already taken place — see what's coming up on the events page.",
     shareLabel: "Share",
     copyLinkLabel: "Copy link",
     updatedLabel: "Updated",
@@ -546,6 +548,7 @@ export const translations: Record<Locale, Translation> = {
     eventPostponedLabel: "已延期",
     eventCancelledBody: "该活动已取消。",
     eventPostponedBody: "该活动已延期——新日期将另行公布。",
+    eventPastBody: "该活动已经结束——请到活动页面查看即将举行的活动。",
     shareLabel: "分享",
     copyLinkLabel: "复制链接",
     updatedLabel: "更新于",
@@ -719,6 +722,7 @@ export const translations: Record<Locale, Translation> = {
     eventPostponedLabel: "Ditangguhkan",
     eventCancelledBody: "Acara ini telah dibatalkan.",
     eventPostponedBody: "Acara ini telah ditangguhkan — tarikh baharu akan diumumkan.",
+    eventPastBody: "Acara ini telah pun berlangsung — lihat acara akan datang di halaman acara.",
     shareLabel: "Kongsi",
     copyLinkLabel: "Salin pautan",
     updatedLabel: "Dikemas kini",
@@ -892,6 +896,7 @@ export const translations: Record<Locale, Translation> = {
     eventPostponedLabel: "स्थगित",
     eventCancelledBody: "यह कार्यक्रम रद्द कर दिया गया है।",
     eventPostponedBody: "यह कार्यक्रम स्थगित कर दिया गया है — नई तारीख की घोषणा की जाएगी।",
+    eventPastBody: "यह कार्यक्रम हो चुका है — आने वाले कार्यक्रम कार्यक्रम पृष्ठ पर देखें।",
     shareLabel: "साझा करें",
     copyLinkLabel: "लिंक कॉपी करें",
     updatedLabel: "अपडेट किया गया",
