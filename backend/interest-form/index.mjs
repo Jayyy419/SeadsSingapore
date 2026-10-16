@@ -754,17 +754,6 @@ async function handleRevokeSessions(headers) {
   return json(200, headers, { ok: true, token: await createSessionToken() });
 }
 
-async function handleVerifySession(event, headers) {
-  let payload;
-  try {
-    payload = JSON.parse(event.body || "{}");
-  } catch {
-    return json(400, headers, { error: "Invalid JSON body" });
-  }
-
-  return json(200, headers, { valid: await isValidSessionToken(payload?.token) });
-}
-
 async function handleGetImpactMetrics(headers) {
   const items = (await scanAll(IMPACT_METRICS_TABLE)).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   return json(200, headers, { metrics: items });
@@ -1985,18 +1974,8 @@ export const handler = async (event) => {
     return handleAdminLogin(event, headers);
   }
 
-  // Public: answers "is this specific token currently valid" — safe unauthenticated since it
-  // can't be used to forge or discover one. No longer called by the frontend: proxy.ts used to
-  // call it on every /admin/* request until that fetch failing closed locked admins out of the
-  // whole panel (see hasUnexpiredSessionCookie in src/lib/admin-session.ts). Real verification
-  // now happens via requireValidAdminToken on each /internal/* call below.
-  if (method === "POST" && path === "/verify-session") {
-    return handleVerifySession(event, headers);
-  }
-
   // Everything else under /internal/* requires a currently-valid admin session token (the
-  // same one issued by /admin-login and checked by /verify-session) rather than a separate
-  // static key — ties data-access authorization directly to being logged in as admin.
+  // same one issued by /admin-login) rather than a separate static key — ties data-access authorization directly to being logged in as admin.
   if (path.startsWith("/internal/")) {
     if (!(await requireValidAdminToken(event))) {
       return json(401, headers, { error: "Unauthorized" });

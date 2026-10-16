@@ -7,7 +7,7 @@ import { API_BASE_URL, SESSION_COOKIE } from "@/lib/admin-session";
 // compute has no IAM role of its own (see docs/LEARNING_GUIDE.md), so this proxies through
 // the Lambda instead, which already has the right table permissions. Never called from the
 // browser directly. Forwards the caller's own admin session cookie as the auth token — the
-// Lambda verifies it itself (POST /verify-session logic reused inline), so there's no
+// Lambda verifies it itself (requireValidAdminToken in backend/interest-form), so there's no
 // separate static server-to-server key to keep in sync.
 export async function internalApiFetch(path: string, init?: RequestInit): Promise<Response> {
   const cookieStore = await cookies();

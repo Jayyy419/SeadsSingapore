@@ -4,6 +4,35 @@ All notable changes to this project should be documented in this file.
 
 This format is inspired by Keep a Changelog and uses a date-based release style.
 
+## [2026-10-16] (43)
+
+### Fixed — anyone could lock the admin out of logging in; removed `/verify-session`
+
+- **The login rate limit counted every visitor as one person.** The login page posted the
+  password to this app's `/admin/api/login`, which forwarded it to the Lambda, so the Lambda saw
+  every attempt arrive from Amplify's server IP. The "10 attempts per IP per 10 minutes" limit
+  was really one bucket shared by the whole internet: ten wrong guesses from anyone locked
+  everyone out, the admin included.
+  Forwarding the visitor's IP in a header wouldn't fix it. The Lambda is publicly reachable, so
+  anyone calling it directly could rotate that header and get unlimited guesses. Instead the
+  login page now sends the password **straight from the browser to the Lambda** (CORS already
+  allowed the site's origin), so the source IP the Lambda limits by is the visitor's own and
+  can't be spoofed. `/admin/api/login` now only takes the issued token and sets the httpOnly
+  cookie, since script can't. The password never touches this app's server any more. The route
+  rejects anything that isn't an unexpired token-shaped string, and requires a JSON body so a
+  cross-site form can't post to it without a preflight.
+  Network/CORS failures now say "could not submit, try again" instead of "incorrect password".
+- **`POST /verify-session` removed from the Lambda.** Nothing has called it since the
+  middleware stopped doing so in (36); every admin data call is verified by
+  `requireValidAdminToken` instead. API Gateway routes everything through `$default`, so there
+  was no route to delete there. Stale comments pointing at it updated.
+- Tests: backend checks that one IP exhausting its attempts doesn't stop another IP logging in,
+  and that `/verify-session` now 404s (43/43). The e2e suite now covers the success path. It
+  checks that the password goes only to the Lambda, `/admin/api/login` receives only the token,
+  and the cookie is httpOnly and SameSite=Strict. It also covers the 429 message and the cookie
+  route rejecting malformed, expired and form-encoded input. Both new e2e tests fail against
+  the old code.
+
 ## [2026-10-16] (42)
 
 ### Changed — Node.js 24 everywhere: Lambda, Amplify, CI

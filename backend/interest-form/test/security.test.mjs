@@ -238,6 +238,21 @@ describe("admin sessions can be revoked", () => {
     assert.equal(res.status, 401);
   });
 
+  test("one visitor running out of login attempts doesn't lock anyone else out", async () => {
+    await seedAdminAndLogin("right password");
+    const attempt = (ip, password = "wrong") => call("POST", "/admin-login", { ip, body: { password } });
+
+    for (let i = 0; i < 10; i++) assert.equal((await attempt("198.51.100.7")).status, 401);
+    assert.equal((await attempt("198.51.100.7")).status, 429, "the guesser is stopped");
+    assert.equal((await attempt("198.51.100.7", "right password")).status, 429, "even with the right password");
+    assert.equal((await attempt("198.51.100.8", "right password")).status, 200, "a different visitor still gets in");
+  });
+
+  test("the unused /verify-session endpoint is gone", async () => {
+    const token = await seedAdminAndLogin();
+    assert.equal((await call("POST", "/verify-session", { body: { token } })).status, 404);
+  });
+
   test("tampered, malformed and expired tokens are rejected", async () => {
     const token = await seedAdminAndLogin();
     const [expiresAt, sig] = token.split(".");

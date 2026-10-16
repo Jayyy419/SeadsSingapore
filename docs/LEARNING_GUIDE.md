@@ -2238,8 +2238,8 @@ persistent memory of correct behavior" and "this project has some." The specific
 lean toward things this session's manual passes had already proven valuable to check
 mechanically: page rendering across every route, the skip link, the lightbox focus trap, the
 admin auth redirect. A deliberate constraint on the suite: every test either avoids the live
-Lambda entirely or mocks its response (`page.route()` intercepting the browser's own fetch to
-`/admin/api/login`), specifically so the suite is safe to run unattended on every push without
+Lambda entirely or mocks its response (`page.route()` intercepting the browser's own fetch —
+since 2026-10 the login page calls the Lambda's `/admin-login` directly), specifically so the suite is safe to run unattended on every push without
 writing real submissions, tripping the real rate limiter, or depending on network reachability
 to production infrastructure it doesn't own.
 

@@ -1,30 +1,27 @@
 import { NextResponse } from "next/server";
-import { API_BASE_URL, SESSION_COOKIE, SESSION_TTL_SECONDS } from "@/lib/admin-session";
+import { SESSION_COOKIE, SESSION_TTL_SECONDS, hasUnexpiredSessionCookie } from "@/lib/admin-session";
 
-// Thin, secret-free proxy to the interest-form Lambda's POST /admin-login — see
-// docs/LEARNING_GUIDE.md for why the password check itself doesn't happen here. Called via
-// fetch() from the login page's client-side form handler, not a native <form> POST — a native
-// submission is governed by the CSP's form-action directive, which was blocking the login
-// form in production for reasons not fully pinned down without direct production access.
-// A fetch() POST is governed by connect-src instead, which is already known-correct.
+// Second half of signing in. The login page sends the password straight to the Lambda's
+// POST /admin-login from the browser (so the Lambda's rate limit sees each visitor's own IP —
+// see src/app/admin/login/page.tsx), and posts the token it gets back here, because only the
+// server can set an httpOnly cookie. The password never reaches this app.
+//
+// The token isn't verified here — no signing key lives in this app (see admin-session.ts) —
+// and it doesn't need to be: the Lambda verifies it on every /internal/* call, so a made-up
+// token gets its holder nothing but 401s. This only rejects things that aren't token-shaped.
+//
+// Requiring a JSON body means a cross-site page can't post here without a CORS preflight,
+// which this route doesn't answer.
 export async function POST(request: Request) {
+  if (!request.headers.get("content-type")?.startsWith("application/json")) {
+    return NextResponse.json({ ok: false }, { status: 415 });
+  }
   const body = await request.json().catch(() => null);
-  const password = body?.password;
-
-  const lambdaRes = await fetch(`${API_BASE_URL}/admin-login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ password }),
-  });
-
-  if (!lambdaRes.ok) {
-    // Forward the Lambda's actual status/message instead of collapsing everything to 401 —
-    // a rate-limited (429) attempt reads very differently from a genuinely wrong password.
-    const errBody = await lambdaRes.json().catch(() => null);
-    return NextResponse.json({ ok: false, error: errBody?.error ?? "Incorrect password" }, { status: lambdaRes.status });
+  const token = typeof body?.token === "string" ? body.token : undefined;
+  if (!token || !hasUnexpiredSessionCookie(token)) {
+    return NextResponse.json({ ok: false }, { status: 400 });
   }
 
-  const { token } = await lambdaRes.json();
   const response = NextResponse.json({ ok: true });
   response.cookies.set(SESSION_COOKIE, token, {
     path: "/",
