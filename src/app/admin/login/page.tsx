@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useState } from "react";
 import { useLocale } from "@/lib/locale-context";
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://jztkgrm3lh.execute-api.ap-southeast-1.amazonaws.com";
+
 export default function AdminLoginPage() {
   const { t } = useLocale();
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
@@ -16,7 +18,12 @@ export default function AdminLoginPage() {
 
     setStatus("loading");
     try {
-      const res = await fetch("/admin/api/login", {
+      // Straight from the browser to the Lambda, not via this app's server: the Lambda rate-limits
+      // login attempts by source IP, and proxied through Amplify every visitor arrived from the
+      // same server IP — one shared bucket of 10 attempts, so anyone could lock the admin out by
+      // mistyping ten times. Called directly, the source IP is the visitor's own, and it can't be
+      // spoofed the way a forwarded-IP header could.
+      const res = await fetch(`${API_BASE_URL}/admin-login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password }),
@@ -32,12 +39,28 @@ export default function AdminLoginPage() {
         return;
       }
 
+      // The session cookie is httpOnly, so script can't set it — this app's server does, from the
+      // token the Lambda just issued.
+      const { token } = await res.json();
+      const session = await fetch("/admin/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token }),
+      });
+      if (!session.ok) {
+        setErrorMessage(t.statusError);
+        setStatus("error");
+        return;
+      }
+
       // Full navigation (not client-side routing) so proxy.ts re-evaluates with the fresh
       // cookie the browser just received.
       // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- see above
       window.location.href = "/admin";
     } catch {
-      setErrorMessage(t.adminLoginIncorrectPassword);
+      // A network or CORS failure, not a wrong password — say so rather than send the admin
+      // off retyping a password that was right.
+      setErrorMessage(t.statusError);
       setStatus("error");
     }
   }
