@@ -22,7 +22,7 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: "20"
+          node-version: "24"
 
       # A syntax error here (e.g. a duplicate top-level `const` — this has happened before in
       # this repo) would previously have gone straight to the live Lambda on the next step with
@@ -42,6 +42,19 @@ jobs:
         with:
           role-to-assume: arn:aws:iam::140023398409:role/seads-gha-lambda-deploy
           aws-region: ap-southeast-1
+
+      # CI tests this code on Node 24. The runtime is function configuration, which this role
+      # can read but not change, so a mismatch is fixed by hand in the console — refuse to ship
+      # onto a different runtime rather than discover the difference in production.
+      - name: Check Lambda runtime
+        run: |
+          runtime=$(aws lambda get-function-configuration \
+            --function-name seads-interest-form-handler \
+            --query Runtime --output text)
+          if [ "$runtime" != "nodejs24.x" ]; then
+            echo "::error::Lambda runtime is $runtime, expected nodejs24.x (the version CI tests on)"
+            exit 1
+          fi
 
       - name: Update Lambda code
         run: |

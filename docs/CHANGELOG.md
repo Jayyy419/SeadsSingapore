@@ -4,6 +4,29 @@ All notable changes to this project should be documented in this file.
 
 This format is inspired by Keep a Changelog and uses a date-based release style.
 
+## [2026-10-16] (42)
+
+### Changed — Node.js 24 everywhere: Lambda, Amplify, CI
+
+- Node 20 reached end of life in April 2026, so it no longer gets security fixes. Vercel's
+  preview builds now refuse it outright (`BUILD_UTILS_NODE_VERSION_DISCONTINUED`, which is why
+  every preview since #54 showed "Error"). The AWS SDK warned on every Lambda cold start that
+  releases after January 2027 will require Node 22 or later.
+- **Lambda:** runtime switched from `nodejs20.x` to `nodejs24.x` by hand (the deploy role can
+  read function configuration but not change it). The handler was already `async`, so Node 24's
+  removal of callback-style handlers doesn't affect it. Smoke-tested live: every public
+  endpoint answers 200, forged admin and activity tokens get 401, and cold starts log
+  `nodejs:24.mainline` with no errors.
+  The deploy workflow now refuses to ship if the function's runtime isn't `nodejs24.x`, so code
+  tested on 24 can't land on a different runtime unnoticed.
+- **Amplify:** it had been ignoring `engines` and `.nvmrc` and building with its image's
+  default, Node 22, and Amplify runs SSR on the same major version it builds with. The new
+  `amplify.yml` (mirroring the auto-detected build: `npm ci` then `npm run build`, with `.next`
+  as the artifact) pins Node 24 with `nvm`.
+- **CI**, the deploy workflow, `package.json` `engines` (now `24.x`, the form Vercel asks for)
+  and `.nvmrc` are all on 24. Verified on Node 24.22 locally: typecheck, lint, build, 33/33 e2e
+  and 41/41 backend tests.
+
 ## [2026-10-16] (41)
 
 ### Security — Next.js 16.2.10 → 16.4.2; fixed: the vine intro was skipped on a first visit
