@@ -40,7 +40,7 @@ describe("mail comes from the no-reply sender, and replies reach a person", () =
     assert.deepEqual(notification.replyTo, ["bo@example.com"]);
   });
 
-  test("a waitlist promotion's \"just reply to let us know\" reaches the inbox", async () => {
+  test("a waitlist promotion offers a cancel link, and a reply still reaches the inbox", async () => {
     const token = await seedAdminAndLogin();
     seed(TABLES.EVENTS_TABLE, { slug: "full", title: { en: "Cleanup" }, date: eventDate(5), location: { en: "Park" }, capacity: 1, rsvpCount: 1 });
     seed(TABLES.TABLE_NAME, { id: "a", name: "A", email: "a@example.com", interestType: "event", eventSlug: "full", rsvpStatus: "confirmed", submittedAt: "2026-01-01" });
@@ -49,7 +49,7 @@ describe("mail comes from the no-reply sender, and replies reach a person", () =
     await call("DELETE", "/internal/submissions/a", { token });
 
     const [promotion] = mailTo("w@example.com");
-    assert.match(promotion.body, /just reply/);
+    assert.match(promotion.body, /\/rsvp\/cancel#token=/);
     assert.equal(promotion.from, FROM);
     assert.deepEqual(promotion.replyTo, [INBOX]);
   });

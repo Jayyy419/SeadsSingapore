@@ -344,14 +344,14 @@ function eventDetailsForEmail(eventItem) {
   return `\n\nEvent: ${eventItem.title?.en ?? eventItem.slug}\nDate: ${date}\nLocation: ${eventItem.location?.en ?? "TBC"}\nDetails & calendar link: ${SITE_URL}/events/${eventItem.slug}`;
 }
 
-async function sendAlreadyRegisteredEmail(email, name, eventItem) {
+async function sendAlreadyRegisteredEmail(email, name, eventItem, existing) {
   if (!SENDER_EMAIL) return;
   try {
     await sendEmail({
       to: email,
       replyTo: NOTIFY_EMAIL,
       subject: "You're already registered — Seads Singapore",
-      body: `Hi ${greetingName(name)},\n\nWe already have your RSVP for this event, so there's no need to sign up again.${eventDetailsForEmail(eventItem)}\n\n— The Seads Singapore team`,
+      body: `Hi ${greetingName(name)},\n\nWe already have your RSVP for this event, so there's no need to sign up again.${eventDetailsForEmail(eventItem)}${await rsvpCancelLine(existing.id, existing.rsvpStatus)}\n\n— The Seads Singapore team`,
     });
   } catch (err) {
     console.error("Already-registered email failed:", err);
@@ -420,14 +420,14 @@ async function handleSubmitInterest(event, headers) {
     }
 
     const normalizedEmail = email.toLowerCase();
-    const alreadyRegistered = (await scanAll(TABLE_NAME)).some(
+    const alreadyRegistered = (await scanAll(TABLE_NAME)).find(
       (item) => item.eventSlug === eventSlug && item.email?.toLowerCase() === normalizedEmail
     );
     if (alreadyRegistered) {
       // Answered exactly like a fresh RSVP — replying "already registered" would let anyone
       // confirm whether a given person is attending a given event. The reminder goes to the
       // inbox instead, which only the address's owner can read.
-      await sendAlreadyRegisteredEmail(email, name, eventItem);
+      await sendAlreadyRegisteredEmail(email, name, eventItem, alreadyRegistered);
       return json(200, headers, { ok: true });
     }
   }
@@ -503,12 +503,13 @@ async function handleSubmitInterest(event, headers) {
       if (eventSlug) {
         // eventItem was already fetched (and validated) above, so no second read is needed.
         const eventDetails = eventItem ? eventDetailsForEmail(eventItem) : "";
+        const cancelLine = await rsvpCancelLine(id, rsvpStatus);
         if (rsvpStatus === "waitlisted") {
           subject = "You're on the waitlist — Seads Singapore";
-          body = `Hi ${greetingName(name)},\n\nThis event is currently full, so we've added you to the waitlist. We'll reach out at this address if a spot opens up.${eventDetails}\n\n— The Seads Singapore team`;
+          body = `Hi ${greetingName(name)},\n\nThis event is currently full, so we've added you to the waitlist. We'll reach out at this address if a spot opens up.${eventDetails}${cancelLine}\n\n— The Seads Singapore team`;
         } else {
           subject = "Your RSVP is confirmed — Seads Singapore";
-          body = `Hi ${greetingName(name)},\n\nThanks for RSVPing! We've saved your spot.${eventDetails}\n\nSee you there!\n— The Seads Singapore team`;
+          body = `Hi ${greetingName(name)},\n\nThanks for RSVPing! We've saved your spot.${eventDetails}${cancelLine}\n\nSee you there!\n— The Seads Singapore team`;
         }
       } else if (interestType === "newsletter") {
         subject = "You're subscribed — Seads Singapore";
@@ -945,11 +946,102 @@ async function sendPromotionEmail(submission, eventItem) {
       to: submission.email,
       replyTo: NOTIFY_EMAIL,
       subject: "A spot opened up — you're in! — Seads Singapore",
-      body: `Hi ${greetingName(submission.name)},\n\nGood news: a spot opened up, so you've been moved off the waitlist — your RSVP is now confirmed.${eventDetailsForEmail(eventItem)}\n\nIf you can no longer make it, just reply to let us know so we can pass the spot on.\n\nSee you there!\n— The Seads Singapore team`,
+      body: `Hi ${greetingName(submission.name)},\n\nGood news: a spot opened up, so you've been moved off the waitlist — your RSVP is now confirmed.${eventDetailsForEmail(eventItem)}${await rsvpCancelLine(submission.id, "confirmed")}\n\nSee you there!\n— The Seads Singapore team`,
     });
   } catch (err) {
     console.error("Waitlist promotion email failed:", err);
   }
+}
+
+// Self-service RSVP cancellation. Every RSVP email carries a signed link to /rsvp/cancel; until
+// this, an attendee who couldn't make it had to reply and hope someone deleted the row by hand,
+// so most simply didn't show up — and their spot sat empty while people waited for it.
+// Cancelling takes two steps on purpose: opening the link only shows what would be cancelled,
+// and a button press confirms. Mail security scanners open links in emails automatically; a
+// link that cancelled on open would cancel people's RSVPs without them ever clicking.
+const RSVP_CANCEL_PURPOSE = "seads/rsvp-cancel-link/v1";
+const RSVP_CANCEL_LINK_TTL_SECONDS = 180 * 24 * 60 * 60;
+
+// The line added to an RSVP email. Best-effort: if the link can't be signed (the session secret
+// failed to load), the email still goes out, just without it.
+async function rsvpCancelLine(id, rsvpStatus) {
+  try {
+    const token = await signLink(RSVP_CANCEL_PURPOSE, { id }, RSVP_CANCEL_LINK_TTL_SECONDS);
+    const link = `${SITE_URL}/rsvp/cancel#token=${token}`;
+    return rsvpStatus === "waitlisted"
+      ? `\n\nNo longer interested? Leave the waitlist here:\n${link}`
+      : `\n\nCan't make it after all? Cancel here so someone on the waitlist can have your spot:\n${link}`;
+  } catch (err) {
+    console.error("Could not create RSVP cancel link:", err);
+    return "";
+  }
+}
+
+async function handleCancelRsvp(event, headers) {
+  let payload;
+  try {
+    payload = JSON.parse(event.body || "{}");
+  } catch {
+    return json(400, headers, { error: "Invalid JSON body" });
+  }
+  const remoteIp = event.requestContext?.http?.sourceIp;
+  if (remoteIp && !(await checkRateLimit(`ip#rsvpcancel#${remoteIp}`, 30))) {
+    return json(429, headers, { error: "Too many requests — please try again in a few minutes." });
+  }
+
+  const link = await verifyLink(RSVP_CANCEL_PURPOSE, payload.token);
+  if (typeof link?.id !== "string") {
+    return json(401, headers, { error: "This link is invalid or has expired.", code: "invalid_token" });
+  }
+  const rsvp = (await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { id: link.id } }))).Item;
+  if (!rsvp?.eventSlug) {
+    return json(404, headers, { error: "This RSVP has already been cancelled.", code: "not_found" });
+  }
+  const eventItem = (await ddb.send(new GetCommand({ TableName: EVENTS_TABLE, Key: { slug: rsvp.eventSlug } }))).Item;
+  const past = eventItem ? isPastEventDate(eventItem.date) : false;
+
+  if (payload.confirm !== true) {
+    return json(200, headers, {
+      rsvp: {
+        name: rsvp.name,
+        rsvpStatus: rsvp.rsvpStatus ?? null,
+        eventSlug: rsvp.eventSlug,
+        eventTitle: eventItem?.title ?? null,
+        eventDate: eventItem?.date ?? null,
+        past,
+      },
+    });
+  }
+  if (past) {
+    return json(400, headers, { error: "This event has already taken place.", code: "past" });
+  }
+
+  // Conditional, so a double-click (or the link opened in two tabs) releases the slot once.
+  try {
+    await ddb.send(new DeleteCommand({ TableName: TABLE_NAME, Key: { id: rsvp.id }, ConditionExpression: "attribute_exists(id)" }));
+  } catch (err) {
+    if (err.name === "ConditionalCheckFailedException") {
+      return json(404, headers, { error: "This RSVP has already been cancelled.", code: "not_found" });
+    }
+    throw err;
+  }
+  const promoted = rsvp.rsvpStatus === "confirmed" ? await releaseRsvpSlot(rsvp.eventSlug) : null;
+  await logAudit(event, "cancel", "rsvp", `${rsvp.eventSlug} (by the attendee${promoted ? `; promoted ${promoted}` : ""})`);
+
+  if (NOTIFY_EMAIL) {
+    try {
+      const title = eventItem?.title?.en ?? rsvp.eventSlug;
+      await sendEmail({
+        to: NOTIFY_EMAIL,
+        replyTo: rsvp.email,
+        subject: `RSVP cancelled: ${rsvp.name} — ${title}`,
+        body: `${rsvp.name} (${rsvp.email}) cancelled their ${rsvp.rsvpStatus === "waitlisted" ? "place on the waitlist" : "RSVP"} for ${title} (${eventItem?.date ?? "date TBC"}).${promoted ? "\n\nThe first person on the waitlist has been given the spot and emailed." : ""}`,
+      });
+    } catch (err) {
+      console.error("RSVP cancellation notification failed:", err);
+    }
+  }
+  return json(200, headers, { ok: true });
 }
 
 // Self-service activity lookup, verified by email. This used to return a person's full history
@@ -960,32 +1052,36 @@ async function sendPromotionEmail(submission, eventItem) {
 // short-lived link to the address; step 2 exchanges that link's token for the activity. Only
 // someone who can read the inbox ever sees the data.
 const ACTIVITY_LINK_TTL_SECONDS = 30 * 60;
+const ACTIVITY_LINK_PURPOSE = "seads/my-activity-link/v1";
 
-// Derived from the session secret rather than reusing it directly, so an activity-link
-// signature can never be presented as (or confused with) an admin session signature.
-async function getActivityLinkKey() {
+// Signed links in emails: `${base64url(JSON payload)}.${base64url(HMAC)}`, the payload carrying
+// its own expiry. Each kind of link has its own purpose string, and the signing key is derived
+// from the session secret per purpose — so a link of one kind can never be replayed as another
+// (an activity link as a cancel link, say), nor confused with an admin session signature.
+async function getLinkKey(purpose) {
   const secret = await getAdminSessionSecret();
-  return createHmac("sha256", secret).update("seads/my-activity-link/v1").digest();
+  return createHmac("sha256", secret).update(purpose).digest();
 }
 
-async function createActivityToken(email) {
-  const payload = Buffer.from(JSON.stringify({ email, exp: Date.now() + ACTIVITY_LINK_TTL_SECONDS * 1000 })).toString("base64url");
-  const signature = createHmac("sha256", await getActivityLinkKey()).update(payload).digest("base64url");
+async function signLink(purpose, data, ttlSeconds) {
+  const payload = Buffer.from(JSON.stringify({ ...data, exp: Date.now() + ttlSeconds * 1000 })).toString("base64url");
+  const signature = createHmac("sha256", await getLinkKey(purpose)).update(payload).digest("base64url");
   return `${payload}.${signature}`;
 }
 
-// Returns the verified email address, or null. The signature is checked before the payload is
-// parsed, so nothing attacker-supplied is ever decoded unless we signed it.
-async function verifyActivityToken(token) {
+// Returns the signed payload, or null if the token is malformed, tampered with, of another
+// purpose, or expired. The signature is checked before the payload is parsed, so nothing
+// attacker-supplied is ever decoded unless we signed it.
+async function verifyLink(purpose, token) {
   if (typeof token !== "string" || token.length > 1000) return null;
   const [payload, signature] = token.split(".");
   if (!payload || !signature) return null;
 
   let expected;
   try {
-    expected = createHmac("sha256", await getActivityLinkKey()).update(payload).digest("base64url");
+    expected = createHmac("sha256", await getLinkKey(purpose)).update(payload).digest("base64url");
   } catch (err) {
-    console.error("Could not verify activity link:", err);
+    console.error("Could not verify signed link:", err);
     return null;
   }
   const a = Buffer.from(signature);
@@ -993,12 +1089,22 @@ async function verifyActivityToken(token) {
   if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
 
   try {
-    const { email, exp } = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
-    if (!isValidEmail(email) || typeof exp !== "number" || Date.now() >= exp) return null;
-    return email;
+    const data = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
+    if (typeof data?.exp !== "number" || Date.now() >= data.exp) return null;
+    return data;
   } catch {
     return null;
   }
+}
+
+async function createActivityToken(email) {
+  return signLink(ACTIVITY_LINK_PURPOSE, { email }, ACTIVITY_LINK_TTL_SECONDS);
+}
+
+// Returns the verified email address, or null.
+async function verifyActivityToken(token) {
+  const data = await verifyLink(ACTIVITY_LINK_PURPOSE, token);
+  return data && isValidEmail(data.email) ? data.email : null;
 }
 
 async function listActivity(email) {
@@ -1891,6 +1997,10 @@ export const handler = async (event) => {
   // Public, email-keyed activity lookup — see handleMyActivity above.
   if (method === "POST" && path === "/my-activity") {
     return handleMyActivity(event, headers);
+  }
+
+  if (method === "POST" && path === "/rsvp/cancel") {
+    return handleCancelRsvp(event, headers);
   }
 
   // Public read of approved community stories — no internal-key required, this is meant to
