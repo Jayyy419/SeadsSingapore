@@ -513,7 +513,7 @@ async function handleSubmitInterest(event, headers) {
         }
       } else if (interestType === "newsletter") {
         subject = "You're subscribed — Seads Singapore";
-        body = `Hi,\n\nThanks for subscribing to Seads Singapore updates. We'll keep you posted on upcoming events and programs.\n\nIn the meantime: ${SITE_URL}/events\n\n— The Seads Singapore team`;
+        body = `Hi,\n\nThanks for subscribing to Seads Singapore updates. We'll keep you posted on upcoming events and programs.\n\nIn the meantime: ${SITE_URL}/events\n\nYou can unsubscribe at any time from ${SITE_URL}/my-activity\n\n— The Seads Singapore team`;
       } else {
         subject = "Thanks for reaching out — Seads Singapore";
         body = `Hi ${greetingName(name)},\n\nThanks for getting in touch — we've received your submission and someone from the team will follow up at this address, usually within a few days.\n\nWhile you wait, you can browse our programs (${SITE_URL}/programs) and upcoming events (${SITE_URL}/events).\n\n— The Seads Singapore team`;
@@ -1016,32 +1016,47 @@ async function handleCancelRsvp(event, headers) {
     return json(400, headers, { error: "This event has already taken place.", code: "past" });
   }
 
-  // Conditional, so a double-click (or the link opened in two tabs) releases the slot once.
+  if (!(await removeOwnSubmission(event, rsvp, "by the attendee"))) {
+    return json(404, headers, { error: "This RSVP has already been cancelled.", code: "not_found" });
+  }
+  return json(200, headers, { ok: true });
+}
+
+// Removes one of a visitor's own submissions: an RSVP cancelled from its email link, or anything
+// deleted from My activity (which is also how a newsletter subscriber unsubscribes — the
+// subscription is just a submission row). Returns false if it was already gone. The delete is
+// conditional, so a double-click (or two open tabs) can't release an RSVP's spot twice. A
+// confirmed RSVP's spot is released through releaseRsvpSlot, so the waitlist gets it; the team
+// is told about RSVPs, since those change who's coming.
+async function removeOwnSubmission(event, item, how) {
   try {
-    await ddb.send(new DeleteCommand({ TableName: TABLE_NAME, Key: { id: rsvp.id }, ConditionExpression: "attribute_exists(id)" }));
+    await ddb.send(new DeleteCommand({ TableName: TABLE_NAME, Key: { id: item.id }, ConditionExpression: "attribute_exists(id)" }));
   } catch (err) {
-    if (err.name === "ConditionalCheckFailedException") {
-      return json(404, headers, { error: "This RSVP has already been cancelled.", code: "not_found" });
-    }
+    if (err.name === "ConditionalCheckFailedException") return false;
     throw err;
   }
-  const promoted = rsvp.rsvpStatus === "confirmed" ? await releaseRsvpSlot(rsvp.eventSlug) : null;
-  await logAudit(event, "cancel", "rsvp", `${rsvp.eventSlug} (by the attendee${promoted ? `; promoted ${promoted}` : ""})`);
+  if (!item.eventSlug) {
+    await logAudit(event, "delete", "submission", `${item.interestType || "submission"} (${how})`);
+    return true;
+  }
 
+  const promoted = item.rsvpStatus === "confirmed" ? await releaseRsvpSlot(item.eventSlug) : null;
+  await logAudit(event, "cancel", "rsvp", `${item.eventSlug} (${how}${promoted ? `; promoted ${promoted}` : ""})`);
   if (NOTIFY_EMAIL) {
     try {
-      const title = eventItem?.title?.en ?? rsvp.eventSlug;
+      const eventItem = (await ddb.send(new GetCommand({ TableName: EVENTS_TABLE, Key: { slug: item.eventSlug } }))).Item;
+      const title = eventItem?.title?.en ?? item.eventSlug;
       await sendEmail({
         to: NOTIFY_EMAIL,
-        replyTo: rsvp.email,
-        subject: `RSVP cancelled: ${rsvp.name} — ${title}`,
-        body: `${rsvp.name} (${rsvp.email}) cancelled their ${rsvp.rsvpStatus === "waitlisted" ? "place on the waitlist" : "RSVP"} for ${title} (${eventItem?.date ?? "date TBC"}).${promoted ? "\n\nThe first person on the waitlist has been given the spot and emailed." : ""}`,
+        replyTo: item.email,
+        subject: `RSVP cancelled: ${item.name} — ${title}`,
+        body: `${item.name} (${item.email}) cancelled their ${item.rsvpStatus === "waitlisted" ? "place on the waitlist" : "RSVP"} for ${title} (${eventItem?.date ?? "date TBC"}).${promoted ? "\n\nThe first person on the waitlist has been given the spot and emailed." : ""}`,
       });
     } catch (err) {
       console.error("RSVP cancellation notification failed:", err);
     }
   }
-  return json(200, headers, { ok: true });
+  return true;
 }
 
 // Self-service activity lookup, verified by email. This used to return a person's full history
@@ -1116,6 +1131,7 @@ async function listActivity(email) {
     .map((item) => {
       const evt = item.eventSlug ? eventBySlug.get(item.eventSlug) : null;
       return {
+        id: item.id,
         submittedAt: item.submittedAt,
         interestType: item.interestType || null,
         eventSlug: item.eventSlug || null,
@@ -1125,6 +1141,38 @@ async function listActivity(email) {
       };
     })
     .sort((a, b) => (b.submittedAt || "").localeCompare(a.submittedAt || ""));
+}
+
+// Deleting your own data from the My activity page — one entry (an RSVP, an enquiry, a
+// newsletter subscription: deleting that is unsubscribing) or everything at once. PDPA gives
+// people the right to withdraw consent and have their data deleted; until this, the only way
+// was to email and wait for someone to do it by hand. Authorised by the same emailed link as
+// viewing the activity, so it only ever touches the verified address's own rows.
+async function handleDeleteMyActivity(event, headers) {
+  let payload;
+  try {
+    payload = JSON.parse(event.body || "{}");
+  } catch {
+    return json(400, headers, { error: "Invalid JSON body" });
+  }
+  const remoteIp = event.requestContext?.http?.sourceIp;
+  if (remoteIp && !(await checkRateLimit(`ip#myactivity-delete#${remoteIp}`, 20))) {
+    return json(429, headers, { error: "Too many requests — please try again in a few minutes." });
+  }
+  const email = await verifyActivityToken(payload.token);
+  if (!email) {
+    return json(401, headers, { error: "This link is invalid or has expired.", code: "invalid_token" });
+  }
+
+  const mine = (await scanAll(TABLE_NAME)).filter(
+    (item) => !String(item.id).startsWith("ratelimit#") && item.email?.toLowerCase() === email
+  );
+  const targets = payload.all === true ? mine : mine.filter((item) => item.id === payload.id);
+  if (!targets.length) {
+    return json(404, headers, { error: "Nothing to delete — it may already be gone.", code: "not_found" });
+  }
+  for (const item of targets) await removeOwnSubmission(event, item, "deleted by the person via My activity");
+  return json(200, headers, { ok: true, activity: await listActivity(email) });
 }
 
 async function handleMyActivity(event, headers) {
@@ -1997,6 +2045,10 @@ export const handler = async (event) => {
   // Public, email-keyed activity lookup — see handleMyActivity above.
   if (method === "POST" && path === "/my-activity") {
     return handleMyActivity(event, headers);
+  }
+
+  if (method === "POST" && path === "/my-activity/delete") {
+    return handleDeleteMyActivity(event, headers);
   }
 
   if (method === "POST" && path === "/rsvp/cancel") {
