@@ -4,6 +4,31 @@ All notable changes to this project should be documented in this file.
 
 This format is inspired by Keep a Changelog and uses a date-based release style.
 
+## [2026-10-16] (41)
+
+### Security — Next.js 16.2.10 → 16.4.2; fixed: the vine intro was skipped on a first visit
+
+- **Next.js upgraded to 16.4.2 (and `eslint-config-next` to match).** `npm audit` flagged a
+  critical advisory against 16.2.10 — a Proxy/middleware bypass in App Router apps built with
+  Turbopack, which is exactly how `src/proxy.ts` gates `/admin/*` — plus a DoS, and high-severity
+  advisories in the `postcss` and `sharp` it bundles. `npm audit fix` cleared the remaining
+  transitive ones (`brace-expansion`, `browserslist`, `fast-uri`, `nanoid`, `source-map-js`,
+  `baseline-browser-mapping`). Production dependencies now audit clean. The Lambda still checks
+  every admin token itself, so the bypass would have exposed admin page shells, not data.
+  Five high advisories remain in the lint-only toolchain (`braces`/`micromatch` under
+  `eslint-config-next`); npm's only "fix" is downgrading to v14, and none of it ships.
+  The upgrade path's codemods (16.3) are all for opt-in features; none apply.
+- 16.4's new `no-location-assign-relative-destination` lint flagged the login and logout
+  `window.location.href` navigations. Both are deliberate full reloads (login: `proxy.ts` must
+  see the fresh cookie; logout: drop the router cache of signed-in admin pages), so they're
+  annotated rather than changed.
+- `AGENTS.md`: the Next-managed rules block, as `next dev` 16.4 now rewrites it.
+- **Fixed: the header vine's intro never played in dev, and a reload mid-intro skipped it.**
+  The "played this session" flag was written the moment the header mounted, so React's dev
+  double-mount read it straight back and settled the vine before anyone saw it. It's now written
+  when the draw-in animation actually ends. `e2e/nav-vine.spec.ts` covers both a cut-short
+  intro replaying and a finished one staying settled (fails 3/3 against the old code).
+
 ## [2026-10-16] (40)
 
 ### Added — waitlist auto-promotion; fixed: deleted RSVPs never gave their slot back

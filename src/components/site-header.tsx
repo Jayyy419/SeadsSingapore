@@ -124,10 +124,18 @@ export function SiteHeader() {
     setTheme(resolvedTheme);
     document.documentElement.setAttribute("data-theme", resolvedTheme);
 
+    // Only read here; the flag is written once the draw-in actually finishes (markIntroPlayed).
+    // Writing it on mount meant React's dev double-mount, or a reload a split second in, found
+    // the flag already set and skipped an intro nobody had seen.
     // Storage can throw (private mode, blocked site data) — the intro simply plays then.
     try {
       if (window.sessionStorage.getItem(VINE_INTRO_KEY)) setIntroPlayed(true);
-      else window.sessionStorage.setItem(VINE_INTRO_KEY, "1");
+    } catch {}
+  }, []);
+
+  const markIntroPlayed = useCallback(() => {
+    try {
+      window.sessionStorage.setItem(VINE_INTRO_KEY, "1");
     } catch {}
   }, []);
 
@@ -351,7 +359,16 @@ export function SiteHeader() {
               instead of finishing invisibly on an empty path before the first measurement. */}
           {vine.path && (
             <>
-              <path className="seads-vine-stroke" pathLength={1} d={vine.path} stroke="url(#seads-vine-taper)" strokeWidth="3" fill="none" strokeLinecap="round" />
+              <path
+                className="seads-vine-stroke"
+                pathLength={1}
+                d={vine.path}
+                stroke="url(#seads-vine-taper)"
+                strokeWidth="3"
+                fill="none"
+                strokeLinecap="round"
+                onAnimationEnd={markIntroPlayed}
+              />
               <path
                 className="seads-vine-stroke"
                 pathLength={1}
