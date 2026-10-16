@@ -4,6 +4,43 @@ All notable changes to this project should be documented in this file.
 
 This format is inspired by Keep a Changelog and uses a date-based release style.
 
+## [2026-10-16] (39)
+
+### Changed — the header vine comes alive; reduced-motion respected site-wide
+
+- **The vine draws itself in** from the logo across the header, and **each leaf unfurls just
+  as the drawing tip reaches it**. Leaf delays follow the *inverse* of the draw's ease-out
+  curve: spaced linearly, they trailed ~600px behind the tip, because an ease-out draws most
+  of the vine in its first fraction of a second. Afterwards the leaves **sway gently**, each on
+  its own slow, out-of-phase cycle.
+- **Opening a nav group perks up its leaf** — it lifts and brightens — so the vine and the
+  flower-bloom dropdown read as one plant.
+- **Leaves are real leaves now**: a stalk, a midrib, a pointed and slightly asymmetric blade,
+  growing on both sides of the stem.
+- **Fixed: leaf tips were clipped off the top of the page.** Every leaf grew upward from a vine
+  only ~22px below the top, so the taller tips were cut off by the viewport. Each leaf is now
+  fitted to the header band, leaning shallowly enough to stay full-size — fitting is measured
+  on the curve actually drawn, since Bézier control points overstate a leaf's extent.
+- **Fixed on mobile: four leaves were stacked beside the logo.** With the nav hidden, its
+  buttons measure as zero-width at one spot, and their aligned leaves all piled up there.
+  Mobile now shows only the evenly spaced leaves along the vine.
+- The logo's two leaves spread open on hover and keyboard focus, like a sprouting seed.
+- **The intro plays once per browser session**; a reload shows the vine straight away. (The
+  header lives in the root layout, so client-side navigation never replayed it anyway.)
+- **Performance:** leaf geometry was recomputed after *every* render — each hover, each
+  language tooltip — re-measuring five elements and walking the vine ~100 times with
+  `getPointAtLength`, almost always to find nothing had changed. A `ResizeObserver` (plus
+  `document.fonts.ready`) now recomputes only when something actually moves.
+- **Accessibility:** `prefers-reduced-motion` previously disabled only smooth scrolling; the
+  nav bloom, gallery bounce-ins and everything else still animated. It now applies site-wide,
+  collapsing durations so every element still lands in its finished state (a drawn vine, an
+  unfurled leaf, an open bloom).
+
+New e2e coverage (`e2e/nav-vine.spec.ts`): no leaf clipped, no mobile pile-up, exactly one leaf
+perks per open group, reduced motion lands on the finished state, and the intro plays once per
+session. The clipping and pile-up tests were checked by re-introducing each bug and confirming
+the test fails.
+
 ## [2026-10-16] (38)
 
 ### Security — an audit of the Lambda and frontend; every fix ships with a test

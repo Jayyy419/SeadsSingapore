@@ -8,6 +8,28 @@ import { useLocale } from "@/lib/locale-context";
 import { buildBloom, buildVine, computeSprigs, type BloomChild, type FillerPetal, type Sprig } from "@/lib/vine";
 
 const THEME_KEY = "seads-theme";
+const VINE_INTRO_KEY = "seads-vine-intro";
+// The vine's draw-in: duration and easing must match .seads-vine-stroke in globals.css.
+const VINE_DRAW_S = 1.4;
+const VINE_DRAW_EASE = [0.33, 0.85, 0.36, 1] as const;
+
+// When, in seconds, the eased draw-in reaches `fraction` of the vine's length. Each leaf waits
+// for exactly this moment so it sprouts just as the drawing tip passes it. Spacing the delays
+// linearly instead leaves the leaves trailing far behind the tip, because the ease-out draws
+// most of the vine in its first fraction of a second. Inverts the CSS cubic-bezier by bisection:
+// find the curve parameter whose output progress equals `fraction`, then read off its time.
+function drawTimeAt(fraction: number): number {
+  const [x1, y1, x2, y2] = VINE_DRAW_EASE;
+  const bez = (p1: number, p2: number, s: number) => 3 * (1 - s) ** 2 * s * p1 + 3 * (1 - s) * s ** 2 * p2 + s ** 3;
+  let lo = 0;
+  let hi = 1;
+  for (let i = 0; i < 24; i++) {
+    const mid = (lo + hi) / 2;
+    if (bez(y1, y2, mid) < fraction) lo = mid;
+    else hi = mid;
+  }
+  return bez(x1, x2, (lo + hi) / 2) * VINE_DRAW_S;
+}
 const MOBILE_BREAKPOINT = 860;
 const NAV_ORDER = ["home", "programs", "stories", "about"] as const;
 type GroupKey = (typeof NAV_ORDER)[number];
@@ -16,6 +38,9 @@ type GroupKey = (typeof NAV_ORDER)[number];
 const PETAL_COLORS = ["#c7ddcd", "#a3c7ae", "#7cae8c", "#4f8a68"];
 // every group's bloom uses the same "Get Involved" terracotta palette
 const BLOOM_SCALE = ["#d9a679", "#cf9865", "#e0b48c"];
+// A brighter, fresher green than any resting leaf, so a perked leaf reads as lifting toward the
+// light rather than darkening.
+const PERKED_LEAF_FILL = "#5fae7f";
 
 const LOCALE_META: { code: Locale; label: string; full: string }[] = [
   { code: "en", label: "EN", full: "English" },
@@ -58,6 +83,10 @@ export function SiteHeader() {
   const [closingGroup, setClosingGroup] = useState<GroupKey | null>(null);
   const [hoveredLocale, setHoveredLocale] = useState<Locale | null>(null);
   const [theme, setTheme] = useState<"light" | "dark">("light");
+  // The vine draws itself in and its leaves unfurl once per browser session; after that it
+  // simply appears. The header lives in the root layout, so client-side navigation never
+  // replays it anyway — this only spares a full page reload from repeating the intro.
+  const [introPlayed, setIntroPlayed] = useState(false);
   const [vine, setVine] = useState<{ width: number; height: number; path: string; sprigs: Sprig[] }>({
     width: 0,
     height: 44,
@@ -94,6 +123,12 @@ export function SiteHeader() {
     const resolvedTheme = window.localStorage.getItem(THEME_KEY) === "dark" ? "dark" : "light";
     setTheme(resolvedTheme);
     document.documentElement.setAttribute("data-theme", resolvedTheme);
+
+    // Storage can throw (private mode, blocked site data) — the intro simply plays then.
+    try {
+      if (window.sessionStorage.getItem(VINE_INTRO_KEY)) setIntroPlayed(true);
+      else window.sessionStorage.setItem(VINE_INTRO_KEY, "1");
+    } catch {}
   }, []);
 
   const measureVine = useCallback(() => {
@@ -114,30 +149,39 @@ export function SiteHeader() {
     const container = containerRef.current;
     if (!pathEl || !container) return;
     const cRect = container.getBoundingClientRect();
-    const centers = NAV_ORDER.map((k) => groupRefs.current[k])
-      .filter((el): el is HTMLDivElement => Boolean(el))
-      .map((el) => {
-        const r = el.getBoundingClientRect();
-        return r.left + r.width / 2 - cRect.left;
-      });
+    // On mobile the nav is hidden, so its buttons have no real positions — leaves go to the
+    // fillers only, rather than being stacked at the hidden buttons' zero-width rects.
+    const centers = isMobileRef.current
+      ? []
+      : NAV_ORDER.map((k) => groupRefs.current[k])
+          .filter((el): el is HTMLDivElement => Boolean(el))
+          .map((el) => {
+            const r = el.getBoundingClientRect();
+            return r.left + r.width / 2 - cRect.left;
+          });
     const nextSprigs = computeSprigs(pathEl, centers);
     if (!nextSprigs.length) return;
     setVine((prev) => (JSON.stringify(nextSprigs) !== JSON.stringify(prev.sprigs) ? { ...prev, sprigs: nextSprigs } : prev));
   }, []);
 
-  useEffect(() => {
-    measureVine();
-    const raf = requestAnimationFrame(() => {
+  // Geometry is recomputed only when something actually moves. This used to run after *every*
+  // render — each hover, each language tooltip — re-measuring five elements and walking the vine
+  // ~100 times with getPointAtLength, almost always to conclude nothing had changed.
+  const measureRafRef = useRef<number | undefined>(undefined);
+  const scheduleMeasure = useCallback(() => {
+    if (measureRafRef.current !== undefined) return;
+    measureRafRef.current = requestAnimationFrame(() => {
+      measureRafRef.current = undefined;
       measureVine();
       computeSprigsNow();
     });
-    const timeout = setTimeout(() => {
-      measureVine();
-      computeSprigsNow();
-    }, 300);
+  }, [measureVine, computeSprigsNow]);
+
+  useEffect(() => {
+    measureVine();
     // Coalesced to at most once per animation frame — a raw `resize` listener fires dozens of
-    // times/sec during a drag-resize, and each call re-measures the container and rebuilds the
-    // vine's SVG path, so running it uncoalesced makes every drag-resize frame do real work.
+    // times/sec during a drag-resize. This one only tracks the mobile breakpoint; the
+    // ResizeObserver below handles geometry.
     const onResize = () => {
       if (resizeRafRef.current !== undefined) return;
       resizeRafRef.current = requestAnimationFrame(() => {
@@ -148,26 +192,37 @@ export function SiteHeader() {
           setIsMobile(mobile);
           if (!mobile) setMenuOpen(false);
         }
-        measureVine();
       });
     };
     window.addEventListener("resize", onResize);
+    // Web fonts land after first paint and change every label's width, which moves the buttons.
+    document.fonts?.ready.then(scheduleMeasure).catch(() => {});
     return () => {
-      cancelAnimationFrame(raf);
-      clearTimeout(timeout);
       window.removeEventListener("resize", onResize);
       if (resizeRafRef.current !== undefined) cancelAnimationFrame(resizeRafRef.current);
+      if (measureRafRef.current !== undefined) cancelAnimationFrame(measureRafRef.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [measureVine, scheduleMeasure]);
 
-  // Re-measure and re-align sprigs after every render (locale text width changes, group
-  // state changes, etc. can all shift the container/button geometry).
+  // The header itself (viewport width) and every nav group (whose width changes with the
+  // locale, the active route's bolder label, and the mobile breakpoint hiding the nav).
   useEffect(() => {
-    measureVine();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(scheduleMeasure);
+    if (containerRef.current) observer.observe(containerRef.current);
+    for (const key of NAV_ORDER) {
+      const el = groupRefs.current[key];
+      if (el) observer.observe(el);
+    }
+    return () => observer.disconnect();
+  }, [scheduleMeasure, isMobile]);
+
+  // A new vine path means new geometry for every leaf sitting on it.
+  useEffect(() => {
+    if (!vine.path) return;
     const raf = requestAnimationFrame(computeSprigsNow);
     return () => cancelAnimationFrame(raf);
-  });
+  }, [vine.path, isMobile, computeSprigsNow]);
 
   useEffect(() => () => clearTimeout(closeTimerRef.current), []);
 
@@ -279,7 +334,8 @@ export function SiteHeader() {
           width={vine.width}
           height={vine.height}
           viewBox={`0 0 ${vine.width} ${vine.height}`}
-          className="pointer-events-none absolute left-0 top-0 -z-10 overflow-visible"
+          aria-hidden="true"
+          className={`pointer-events-none absolute left-0 top-0 -z-10 overflow-visible ${introPlayed ? "seads-vine-settled" : ""}`}
         >
           <defs>
             <linearGradient id="seads-vine-taper" x1="0" y1="0" x2="1" y2="0">
@@ -287,19 +343,61 @@ export function SiteHeader() {
               <stop offset="100%" stopColor="var(--brand-deep)" stopOpacity="0.25" />
             </linearGradient>
           </defs>
-          <path ref={vinePathRef} d={vine.path} stroke="url(#seads-vine-taper)" strokeWidth="3" fill="none" strokeLinecap="round" />
-          <path d={vine.path} stroke="var(--brand)" strokeWidth="1.3" fill="none" opacity="0.55" strokeLinecap="round" />
-          {vine.sprigs.map((sprig, i) => (
-            <path key={i} d={sprig.path} style={{ fill: sprig.fill }} />
-          ))}
+          {/* Measured, never painted. The visible strokes below carry pathLength={1} for the
+              draw-in, and a pathLength would muddy the point-at-length maths the leaves are
+              placed with — so placement reads this untouched copy of the same curve. */}
+          <path ref={vinePathRef} d={vine.path} fill="none" stroke="none" />
+          {/* Mounted only once the real curve exists, so the draw-in plays over the actual vine
+              instead of finishing invisibly on an empty path before the first measurement. */}
+          {vine.path && (
+            <>
+              <path className="seads-vine-stroke" pathLength={1} d={vine.path} stroke="url(#seads-vine-taper)" strokeWidth="3" fill="none" strokeLinecap="round" />
+              <path
+                className="seads-vine-stroke"
+                pathLength={1}
+                d={vine.path}
+                stroke="var(--brand)"
+                strokeWidth="1.3"
+                fill="none"
+                opacity="0.55"
+                strokeLinecap="round"
+                style={{ animationDelay: "0.08s" }}
+              />
+            </>
+          )}
+          {vine.sprigs.map((sprig, i) => {
+            const origin = `${sprig.x.toFixed(1)}px ${sprig.y.toFixed(1)}px`;
+            const perked = sprig.buttonIndex !== null && openGroup === NAV_ORDER[sprig.buttonIndex];
+            // Each leaf unfurls just as the drawing vine reaches it…
+            const unfurlDelay = 0.04 + drawTimeAt(vine.width ? Math.min(1, Math.max(0, sprig.x / vine.width)) : 0);
+            // …then sways on its own slow, out-of-phase cycle (a negative delay starts it mid-cycle).
+            const swaySeconds = 5.2 + ((i * 1.37) % 2.6);
+            return (
+              <g
+                key={i}
+                className="seads-leaf-unfurl"
+                style={{ transformOrigin: origin, animationDelay: `${unfurlDelay.toFixed(2)}s`, ["--leaf-side" as string]: sprig.side }}
+              >
+                <g className="seads-leaf-perk" data-perked={perked} style={{ transformOrigin: origin }}>
+                  <g
+                    className="seads-leaf-sway"
+                    style={{ transformOrigin: origin, animationDuration: `${swaySeconds.toFixed(2)}s`, animationDelay: `-${(i * 0.9).toFixed(2)}s` }}
+                  >
+                    <path className="seads-leaf-blade" d={sprig.path} style={{ fill: perked ? PERKED_LEAF_FILL : sprig.fill }} />
+                    <path className="seads-leaf-vein" d={sprig.vein} />
+                  </g>
+                </g>
+              </g>
+            );
+          })}
         </svg>
 
         <div className="relative mx-auto grid w-full max-w-6xl grid-cols-[1fr_auto_1fr] items-center gap-4 px-4 py-3 sm:px-6 lg:px-8">
-        <Link href="/" className="flex shrink-0 items-center gap-2 justify-self-start">
-          <svg width="24" height="24" viewBox="0 0 22 22" className="shrink-0">
+        <Link href="/" className="seads-logo flex shrink-0 items-center gap-2 justify-self-start">
+          <svg width="24" height="24" viewBox="0 0 22 22" className="shrink-0" aria-hidden="true">
             <ellipse cx="11" cy="13" rx="6" ry="7.5" fill="#8a5a34" />
-            <path d="M11 6 C 9 2, 4 2, 3 5 C 6 6.5, 9 6.5, 11 6 Z" fill="#4f9c6f" />
-            <path d="M11 6 C 13 2, 18 2, 19 5 C 16 6.5, 13 6.5, 11 6 Z" fill="#2f6f5e" />
+            <path className="seads-logo-leaf seads-logo-leaf-l" d="M11 6 C 9 2, 4 2, 3 5 C 6 6.5, 9 6.5, 11 6 Z" fill="#4f9c6f" />
+            <path className="seads-logo-leaf seads-logo-leaf-r" d="M11 6 C 13 2, 18 2, 19 5 C 16 6.5, 13 6.5, 11 6 Z" fill="#2f6f5e" />
           </svg>
           <span className="font-display text-2xl font-bold text-[color:var(--foreground)]">Seads</span>
           <span className="font-display text-[13px] italic text-[color:var(--muted)]">/si:dz/</span>

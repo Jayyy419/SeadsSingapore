@@ -5,7 +5,10 @@
 // their rotation angles are close together.
 
 export type Vine = { width: number; height: number; path: string; sprigs: Sprig[] };
-export type Sprig = { path: string; fill: string };
+// x/y is where the leaf's stalk meets the vine — the pivot every leaf animation rotates and
+// scales around. `side` is which way the leaf leans (-1 left, 1 right); `buttonIndex` is set on
+// the leaf aligned to a nav button, so hovering that button can perk it up.
+export type Sprig = { path: string; vein: string; fill: string; x: number; y: number; side: number; buttonIndex: number | null };
 
 // A calm decorative vine with gentle, non-repeating organic variation (smooth low-frequency
 // modulation of amplitude/period, not randomness) plus a soft overall sag like a real draped
@@ -45,9 +48,81 @@ export function buildVine(width: number): { path: string } {
   return { path: d };
 }
 
-export function buildSprigFromPoint(px: number, py: number, dir: number, scale: number): string {
-  const o = (dx: number, dy: number) => `${(px + dir * dx * scale).toFixed(1)},${(py + dy * scale).toFixed(1)}`;
-  return `M${px.toFixed(1)},${py.toFixed(1)} C${o(3, -9)} ${o(11, -16)} ${o(21, -17)} C${o(27, -11)} ${o(23, -3)} ${o(15, 0)} C${o(9, 2)} ${o(4, 1)} ${px.toFixed(1)},${py.toFixed(1)} Z`;
+// The header's vine band: leaves must stay inside it. Leaves used to grow upward only, from a
+// vine just ~22px below the top of the page, so the taller ones had their tips cut off by the
+// top of the viewport. Now each leaf is fitted to this band, and leaves grow on both sides.
+const LEAF_TOP_LIMIT = 1.5;
+const LEAF_BOTTOM_LIMIT = 36; // where the nav labels' line boxes begin
+
+// A lanceolate leaf in its own frame: u runs along the leaf from its stalk (u=0) to its tip
+// (u=len), v across it. A short petiole leads to the blade, which is widest a little below its
+// middle and deliberately asymmetric — real leaves rarely have two identical halves.
+function leafFrame(len: number, halfW: number) {
+  const base = len * 0.16;
+  return {
+    base: [base, 0],
+    tip: [len, 0],
+    side1: [
+      [base + len * 0.12, halfW],
+      [len * 0.62, halfW * 0.95],
+    ],
+    side2: [
+      [len * 0.6, -halfW * 0.78],
+      [base + len * 0.1, -halfW * 0.92],
+    ],
+    rib: [len * 0.55, halfW * 0.07],
+  } as const;
+}
+
+// Builds a leaf whose stalk meets the vine at (px, py), pointing at `angleDeg` (0 = right, -90 =
+// straight up), then shrinks it — around its stalk, so it stays attached — if any part would
+// leave the vine band.
+export function buildLeaf(px: number, py: number, angleDeg: number, len: number) {
+  const rad = (angleDeg * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+
+  const make = (l: number) => {
+    const f = leafFrame(l, l * 0.34);
+    const w = ([u, v]: readonly [number, number]) => [px + u * cos - v * sin, py + u * sin + v * cos] as const;
+    const [base, tip, s1a, s1b, s2a, s2b, rib] = [f.base, f.tip, ...f.side1, ...f.side2, f.rib].map(w);
+    const fmt = ([x, y]: readonly [number, number]) => `${x.toFixed(1)},${y.toFixed(1)}`;
+    // Extents come from sampling the curves actually drawn. A Bézier's control points bulge
+    // well beyond its curve, so fitting to them shrank leaves that never overflowed at all.
+    const ys = [py];
+    const cubicY = (y0: number, y1: number, y2: number, y3: number, t: number) =>
+      (1 - t) ** 3 * y0 + 3 * (1 - t) ** 2 * t * y1 + 3 * (1 - t) * t ** 2 * y2 + t ** 3 * y3;
+    for (let t = 0; t <= 1.0001; t += 1 / 16) {
+      ys.push(cubicY(base[1], s1a[1], s1b[1], tip[1], t), cubicY(tip[1], s2a[1], s2b[1], base[1], t));
+    }
+    return {
+      minY: Math.min(...ys),
+      maxY: Math.max(...ys),
+      path: `M${fmt(base)} C${fmt(s1a)} ${fmt(s1b)} ${fmt(tip)} C${fmt(s2a)} ${fmt(s2b)} ${fmt(base)} Z`,
+      // The stalk and midrib in one stroke: it reads as a stalk off the blade and a vein on it.
+      vein: `M${px.toFixed(1)},${py.toFixed(1)} L${fmt(base)} Q${fmt(rib)} ${fmt(tip)}`,
+    };
+  };
+
+  let leaf = make(len);
+  const overTop = LEAF_TOP_LIMIT - leaf.minY;
+  const overBottom = leaf.maxY - LEAF_BOTTOM_LIMIT;
+  if (overTop > 0 || overBottom > 0) {
+    const fit = overTop > 0 ? (py - LEAF_TOP_LIMIT) / (py - leaf.minY) : (LEAF_BOTTOM_LIMIT - py) / (leaf.maxY - py);
+    leaf = make(len * Math.max(0.45, Math.min(1, fit)));
+  }
+  return { path: leaf.path, vein: leaf.vein };
+}
+
+// Leaves lean up-and-out or droop down-and-out. The lean is fairly shallow on purpose: the band
+// above the vine is only ~15–22px tall, so a steeply raised leaf has to be shrunk to fit, while a
+// shallower one spends its length sideways — where there's plenty of room — and can stay large.
+// A small deterministic jitter keeps neighbours from looking stamped out of one mould without
+// making the layout change between renders.
+function leafAngle(side: number, up: boolean, i: number): number {
+  const jitter = 7 * Math.sin(i * 2.17 + 0.6);
+  const lean = up ? -26 : 18;
+  return (side > 0 ? lean : 180 - lean) + jitter;
 }
 
 function petalPath(anchorX: number, anchorY: number, len: number, halfWidth: number): string {
@@ -113,8 +188,11 @@ export function buildBloom(children: BloomChildInput[], colorScale: string[]): {
   return { kids, fillerPetals };
 }
 
-// Small filler buds walked along the vine's own curve in the otherwise-empty stretches
-// between/around the nav buttons, plus one larger sprig aligned to each button's x-position.
+// One larger leaf aligned to each nav button, plus smaller filler leaves walked along the vine's
+// own curve in the otherwise-empty stretches between and around them. With no button centres
+// (the mobile layout, where the nav is hidden) it returns just the fillers — previously it
+// returned nothing there but drew button leaves at the hidden nav's zero-width positions,
+// stacking them on top of each other beside the logo.
 export function computeSprigs(pathEl: SVGPathElement, buttonCenters: number[]): Sprig[] {
   let total: number;
   try {
@@ -122,7 +200,7 @@ export function computeSprigs(pathEl: SVGPathElement, buttonCenters: number[]): 
   } catch {
     return [];
   }
-  if (!total || !buttonCenters.length) return [];
+  if (!total) return [];
 
   const pointAtX = (x: number) => {
     // binary search along the vine's own path length for the point closest to this x,
@@ -142,23 +220,29 @@ export function computeSprigs(pathEl: SVGPathElement, buttonCenters: number[]): 
 
   const sizes = [1.15, 0.85, 1.35, 0.95];
   const colors = ["#8fb89c", "#7ba58c", "#4f8a68", "#a3c7ae"];
+  // Button leaves always lean upward: that's where the room is, since the nav labels sit just
+  // below the vine.
   const sprigs: Sprig[] = buttonCenters.map((x, i) => {
-    const best = pointAtX(x);
-    const dir0 = i % 2 === 0 ? -1 : 1;
-    return { path: buildSprigFromPoint(x, best.y, dir0, sizes[i % sizes.length]), fill: colors[i % colors.length] };
+    const { y } = pointAtX(x);
+    const side = i % 2 === 0 ? -1 : 1;
+    const leaf = buildLeaf(x, y, leafAngle(side, true, i), 31 * sizes[i % sizes.length]);
+    return { ...leaf, fill: colors[i % colors.length], x, y, side, buttonIndex: i };
   });
 
   const fillerFracs = [0.05, 0.13, 0.2, 0.36, 0.58, 0.72, 0.88, 0.97];
   const fillerSizes = [0.7, 0.75, 0.85, 0.6, 0.8, 0.65, 0.88, 0.62];
   const fillerColors = ["#a3c7ae", "#7ba58c", "#7ba58c", "#8fb89c", "#a3c7ae", "#7ba58c", "#8fb89c", "#a3c7ae"];
   const fillers = fillerFracs
-    .map((frac, i) => {
+    .map((frac, i): Sprig | null => {
       const p = pathEl.getPointAtLength(total * frac);
       // skip if too close to a button-aligned sprig to avoid crowding
-      const tooClose = buttonCenters.some((cx) => Math.abs(cx - p.x) < 24);
-      if (tooClose) return null;
-      const dir = i % 2 === 0 ? 1 : -1;
-      return { path: buildSprigFromPoint(p.x, p.y, dir, fillerSizes[i % fillerSizes.length]), fill: fillerColors[i % fillerColors.length] };
+      if (buttonCenters.some((cx) => Math.abs(cx - p.x) < 24)) return null;
+      const side = i % 2 === 0 ? 1 : -1;
+      // Mostly upward, where the room is — but where the vine rides high a leaf droops instead,
+      // so leaves sit on both sides of the stem as they would on a real vine.
+      const up = p.y >= 17;
+      const leaf = buildLeaf(p.x, p.y, leafAngle(side, up, i + 4), 30 * fillerSizes[i % fillerSizes.length]);
+      return { ...leaf, fill: fillerColors[i % fillerColors.length], x: p.x, y: p.y, side, buttonIndex: null };
     })
     .filter((s): s is Sprig => s !== null);
 
