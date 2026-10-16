@@ -329,6 +329,7 @@ SESClient.prototype.send = async (command) => {
   state.emails.push({
     to: input.Destination.ToAddresses,
     from: input.Source,
+    replyTo: input.ReplyToAddresses,
     subject: input.Message.Subject.Data,
     body: input.Message.Body.Text.Data,
   });
@@ -363,6 +364,7 @@ for (const [envName, tableName] of Object.entries(TABLES)) process.env[envName] 
 process.env.MEDIA_BUCKET = "test-media";
 process.env.AWS_REGION = "ap-southeast-1";
 process.env.NOTIFY_EMAIL = "team@example.org";
+process.env.SENDER_EMAIL = "no-reply@example.org";
 process.env.SITE_URL = "https://seads.test";
 process.env.ALLOWED_ORIGINS = "https://seads.test";
 

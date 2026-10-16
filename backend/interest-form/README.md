@@ -54,9 +54,13 @@ One env var per DynamoDB table (`index.mjs` never hardcodes a table name), plus:
   entries, and singleton config blobs — donate/social/announcement — see the "Site content"
   section near the top of `index.mjs`)
 - `MEDIA_BUCKET` — `seads-media` (see "The media bucket" below)
-- `NOTIFY_EMAIL` — SES-verified address; both receives org notifications and sends
-  submitter-facing confirmation/decision emails (RSVP, join, story approval/rejection) as the
-  `Source`
+- `NOTIFY_EMAIL` — the team inbox. Org notifications (new submissions, story submissions) are
+  delivered here with the visitor as Reply-To, and it's the Reply-To on everything sent to
+  visitors, so replies reach a person.
+- `SENDER_EMAIL` — optional; the From on every email, shown as `Seads Singapore <address>`.
+  Meant to be a no-reply address. Must be SES-verified, either the address itself or, better,
+  its whole domain (Easy DKIM), which also keeps mail out of spam. Falls back to `NOTIFY_EMAIL`
+  if unset. All sending goes through `sendEmail()` in `index.mjs`.
 - `SITE_URL` — optional, used only to build links inside submitter-facing emails; falls back
   to the same Amplify URL the frontend's `NEXT_PUBLIC_SITE_URL` defaults to if unset
 - `ALLOWED_ORIGINS` — comma-separated list of allowed CORS origins (frontend URLs)

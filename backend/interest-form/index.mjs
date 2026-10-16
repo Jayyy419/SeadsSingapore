@@ -81,7 +81,13 @@ const STORIES_TABLE = process.env.STORIES_TABLE;
 const SITE_CONTENT_TABLE = process.env.SITE_CONTENT_TABLE;
 const MEDIA_BUCKET = process.env.MEDIA_BUCKET;
 const MEDIA_BUCKET_REGION = process.env.AWS_REGION || "ap-southeast-1";
+// The team inbox: org notifications (new submissions, stories) are delivered here, and replies
+// to anything the site emails a visitor land here too, via Reply-To.
 const NOTIFY_EMAIL = process.env.NOTIFY_EMAIL;
+// The From address on everything the site sends — meant to be a no-reply address, so nobody
+// replies into an unread mailbox. Falls back to the inbox, which was the From before the two
+// were split. Must be an SES-verified identity (an address, or its whole domain).
+const SENDER_EMAIL = process.env.SENDER_EMAIL || NOTIFY_EMAIL;
 // Used only to build links inside submitter-facing emails — same fallback URL the frontend
 // uses for NEXT_PUBLIC_SITE_URL; update both once a custom domain is live.
 const SITE_URL = process.env.SITE_URL || "https://main.d2mrph1bcp6pjx.amplifyapp.com";
@@ -180,8 +186,25 @@ function corsHeaders(origin) {
   };
 }
 
+// Also rules out characters with meaning in an address header (`,;<>()"[]\`): the address
+// becomes the Reply-To on team notifications, and SES rejects the whole message over a
+// malformed one.
 function isValidEmail(email) {
-  return typeof email === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  return typeof email === "string" && email.length <= 254 && /^[^\s@,;<>()"[\]\\]+@[^\s@,;<>()"[\]\\]+\.[^\s@,;<>()"[\]\\]+$/.test(email);
+}
+
+// Every email the site sends goes through here. Visitor-facing mail sets replyTo to the team
+// inbox, so "just reply to let us know" reaches a person rather than the no-reply sender;
+// team notifications set it to the visitor, so replying answers them directly.
+async function sendEmail({ to, subject, body, replyTo }) {
+  await ses.send(
+    new SendEmailCommand({
+      Source: `Seads Singapore <${SENDER_EMAIL}>`,
+      Destination: { ToAddresses: [to] },
+      ...(replyTo ? { ReplyToAddresses: [replyTo] } : {}),
+      Message: { Subject: { Data: subject }, Body: { Text: { Data: body } } },
+    })
+  );
 }
 
 // Submitter-facing emails go to whatever address was typed into the form and quote whatever
@@ -322,22 +345,14 @@ function eventDetailsForEmail(eventItem) {
 }
 
 async function sendAlreadyRegisteredEmail(email, name, eventItem) {
-  if (!NOTIFY_EMAIL) return;
+  if (!SENDER_EMAIL) return;
   try {
-    await ses.send(
-      new SendEmailCommand({
-        Source: NOTIFY_EMAIL,
-        Destination: { ToAddresses: [email] },
-        Message: {
-          Subject: { Data: "You're already registered — Seads Singapore" },
-          Body: {
-            Text: {
-              Data: `Hi ${greetingName(name)},\n\nWe already have your RSVP for this event, so there's no need to sign up again.${eventDetailsForEmail(eventItem)}\n\n— The Seads Singapore team`,
-            },
-          },
-        },
-      })
-    );
+    await sendEmail({
+      to: email,
+      replyTo: NOTIFY_EMAIL,
+      subject: "You're already registered — Seads Singapore",
+      body: `Hi ${greetingName(name)},\n\nWe already have your RSVP for this event, so there's no need to sign up again.${eventDetailsForEmail(eventItem)}\n\n— The Seads Singapore team`,
+    });
   } catch (err) {
     console.error("Already-registered email failed:", err);
   }
@@ -464,20 +479,12 @@ async function handleSubmitInterest(event, headers) {
   if (NOTIFY_EMAIL) {
     const typeLabel = INTEREST_TYPE_LABELS[interestType];
     try {
-      await ses.send(
-        new SendEmailCommand({
-          Source: NOTIFY_EMAIL,
-          Destination: { ToAddresses: [NOTIFY_EMAIL] },
-          Message: {
-            Subject: { Data: `New Seads interest form submission${typeLabel ? ` (${typeLabel})` : ""} from ${name}` },
-            Body: {
-              Text: {
-                Data: `Name: ${name}\nEmail: ${email}\nInterested in: ${typeLabel || "(not specified)"}\nMessage: ${interest || "(none given)"}\nSubmitted: ${submittedAt}`,
-              },
-            },
-          },
-        })
-      );
+      await sendEmail({
+        to: NOTIFY_EMAIL,
+        replyTo: email,
+        subject: `New Seads interest form submission${typeLabel ? ` (${typeLabel})` : ""} from ${name}`,
+        body: `Name: ${name}\nEmail: ${email}\nInterested in: ${typeLabel || "(not specified)"}\nMessage: ${interest || "(none given)"}\nSubmitted: ${submittedAt}`,
+      });
     } catch (err) {
       // Don't fail the whole request if the notification email can't be sent (e.g. SES
       // sandbox mode, unverified address) — the submission is already safely in DynamoDB.
@@ -489,7 +496,7 @@ async function handleSubmitInterest(event, headers) {
   // RSVP left nothing in the attendee's inbox (no proof it worked, no event details) and a
   // join submission got no acknowledgment. Same "never fail the request over email" policy as
   // the org notification above.
-  if (NOTIFY_EMAIL) {
+  if (SENDER_EMAIL) {
     try {
       let subject;
       let body;
@@ -510,13 +517,7 @@ async function handleSubmitInterest(event, headers) {
         subject = "Thanks for reaching out — Seads Singapore";
         body = `Hi ${greetingName(name)},\n\nThanks for getting in touch — we've received your submission and someone from the team will follow up at this address, usually within a few days.\n\nWhile you wait, you can browse our programs (${SITE_URL}/programs) and upcoming events (${SITE_URL}/events).\n\n— The Seads Singapore team`;
       }
-      await ses.send(
-        new SendEmailCommand({
-          Source: NOTIFY_EMAIL,
-          Destination: { ToAddresses: [email] },
-          Message: { Subject: { Data: subject }, Body: { Text: { Data: body } } },
-        })
-      );
+      await sendEmail({ to: email, replyTo: NOTIFY_EMAIL, subject, body });
     } catch (err) {
       console.error("Submitter confirmation email failed:", err);
     }
@@ -571,20 +572,12 @@ async function handleSubmitStory(event, headers) {
   // to go look.
   if (NOTIFY_EMAIL) {
     try {
-      await ses.send(
-        new SendEmailCommand({
-          Source: NOTIFY_EMAIL,
-          Destination: { ToAddresses: [NOTIFY_EMAIL] },
-          Message: {
-            Subject: { Data: `New Seads story submission from ${authorName}` },
-            Body: {
-              Text: {
-                Data: `Author: ${authorName}\nEmail: ${authorEmail}\nTitle: ${title}\nSubmitted: ${submittedAt}\n\nReview at /admin/stories`,
-              },
-            },
-          },
-        })
-      );
+      await sendEmail({
+        to: NOTIFY_EMAIL,
+        replyTo: authorEmail,
+        subject: `New Seads story submission from ${authorName}`,
+        body: `Author: ${authorName}\nEmail: ${authorEmail}\nTitle: ${title}\nSubmitted: ${submittedAt}\n\nReview at /admin/stories`,
+      });
     } catch (err) {
       console.error("SES send failed:", err);
     }
@@ -946,22 +939,14 @@ async function releaseRsvpSlot(slug) {
 }
 
 async function sendPromotionEmail(submission, eventItem) {
-  if (!NOTIFY_EMAIL || !submission.email) return;
+  if (!SENDER_EMAIL || !submission.email) return;
   try {
-    await ses.send(
-      new SendEmailCommand({
-        Source: NOTIFY_EMAIL,
-        Destination: { ToAddresses: [submission.email] },
-        Message: {
-          Subject: { Data: "A spot opened up — you're in! — Seads Singapore" },
-          Body: {
-            Text: {
-              Data: `Hi ${greetingName(submission.name)},\n\nGood news: a spot opened up, so you've been moved off the waitlist — your RSVP is now confirmed.${eventDetailsForEmail(eventItem)}\n\nIf you can no longer make it, just reply to let us know so we can pass the spot on.\n\nSee you there!\n— The Seads Singapore team`,
-            },
-          },
-        },
-      })
-    );
+    await sendEmail({
+      to: submission.email,
+      replyTo: NOTIFY_EMAIL,
+      subject: "A spot opened up — you're in! — Seads Singapore",
+      body: `Hi ${greetingName(submission.name)},\n\nGood news: a spot opened up, so you've been moved off the waitlist — your RSVP is now confirmed.${eventDetailsForEmail(eventItem)}\n\nIf you can no longer make it, just reply to let us know so we can pass the spot on.\n\nSee you there!\n— The Seads Singapore team`,
+    });
   } catch (err) {
     console.error("Waitlist promotion email failed:", err);
   }
@@ -1077,23 +1062,15 @@ async function handleMyActivity(event, headers) {
   // Only addresses that actually have activity get an email, so this can't be used to send
   // mail to arbitrary inboxes.
   const activity = await listActivity(email);
-  if (activity.length && NOTIFY_EMAIL) {
+  if (activity.length && SENDER_EMAIL) {
     try {
       const link = `${SITE_URL}/my-activity#token=${await createActivityToken(email)}`;
-      await ses.send(
-        new SendEmailCommand({
-          Source: NOTIFY_EMAIL,
-          Destination: { ToAddresses: [email] },
-          Message: {
-            Subject: { Data: "Your Seads activity link" },
-            Body: {
-              Text: {
-                Data: `Hi,\n\nSomeone (hopefully you) asked to see the Seads Singapore activity for this email address. This link works for the next 30 minutes:\n\n${link}\n\nIf you didn't ask for this, you can safely ignore this email — nothing is shown without the link.\n\n— The Seads Singapore team`,
-              },
-            },
-          },
-        })
-      );
+      await sendEmail({
+        to: email,
+        replyTo: NOTIFY_EMAIL,
+        subject: "Your Seads activity link",
+        body: `Hi,\n\nSomeone (hopefully you) asked to see the Seads Singapore activity for this email address. This link works for the next 30 minutes:\n\n${link}\n\nIf you didn't ask for this, you can safely ignore this email — nothing is shown without the link.\n\n— The Seads Singapore team`,
+      });
     } catch (err) {
       console.error("Activity link email failed:", err);
     }
@@ -1203,7 +1180,7 @@ async function handleUpdateStorySubmission(event, headers, id) {
   // ever heard back at all. Skipped if the status isn't actually changing (re-clicking the
   // same decision shouldn't re-send the email). Best-effort, never fails the moderation
   // action itself.
-  if (NOTIFY_EMAIL && submission?.authorEmail && submission.status !== status) {
+  if (SENDER_EMAIL && submission?.authorEmail && submission.status !== status) {
     try {
       const storyTitle = sanitizeForEmail(submission.title, 120, "your story");
       const authorName = greetingName(submission.authorName);
@@ -1215,13 +1192,7 @@ async function handleUpdateStorySubmission(event, headers, id) {
         status === "approved"
           ? `Hi ${authorName},\n\nGood news — your story "${storyTitle}" has been approved and is now published on our blog:\n${SITE_URL}/blog\n\nThank you for sharing it with the community!\n— The Seads Singapore team`
           : `Hi ${authorName},\n\nThank you for submitting "${storyTitle}". After review, we won't be publishing it this time — but we'd love to hear from you again, and you're always welcome to submit another story:\n${SITE_URL}/blog/submit\n\n— The Seads Singapore team`;
-      await ses.send(
-        new SendEmailCommand({
-          Source: NOTIFY_EMAIL,
-          Destination: { ToAddresses: [submission.authorEmail] },
-          Message: { Subject: { Data: subject }, Body: { Text: { Data: body } } },
-        })
-      );
+      await sendEmail({ to: submission.authorEmail, replyTo: NOTIFY_EMAIL, subject, body });
     } catch (err) {
       console.error("Story decision email failed:", err);
     }
