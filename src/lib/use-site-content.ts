@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePrefetched } from "@/lib/public-data-context";
 import { mediaItems as staticMediaItems } from "@/content/media";
 import { testimonials as staticTestimonials } from "@/content/siteContent";
 import type { Locale } from "@/content/i18n";
@@ -66,39 +67,43 @@ function fetchSiteContent(): Promise<RawSiteContent | null> {
   return cachedFetch;
 }
 
-// Same static-fallback-then-live-swap pattern as useEvents()/useTeam()/etc. — render
-// instantly from bundled data, upgrade when the live fetch resolves, degrade gracefully if
-// it never does.
+function normalize(data: RawSiteContent): SiteContent {
+  return {
+    media: data.media?.length ? data.media : staticFallback.media,
+    testimonials: data.testimonials?.length
+      ? data.testimonials.map((t) => ({
+          itemId: t.itemId,
+          quote: toLocalized(t.quote),
+          author: toLocalized([t.author, t.roleLabel].filter(Boolean).join(", ")),
+        }))
+      : staticFallback.testimonials,
+    faq: data.faq ?? [],
+    donate: data.donate ?? null,
+    social: data.social ?? null,
+    announcement: data.announcement ?? null,
+  };
+}
+
+// Same pattern as useEvents()/useTeam()/etc. (see usePublicList): the server's prefetch when
+// there is one, otherwise bundled data upgraded when the browser's fetch resolves — degrading
+// gracefully if it never does.
 export function useSiteContent(): SiteContent & { loaded: boolean } {
-  const [content, setContent] = useState<SiteContent>(staticFallback);
-  const [loaded, setLoaded] = useState(false);
+  const prefetched = usePrefetched<RawSiteContent>("site-content");
+  const [content, setContent] = useState<SiteContent>(() => (prefetched ? normalize(prefetched) : staticFallback));
+  const [loaded, setLoaded] = useState(prefetched !== undefined);
 
   useEffect(() => {
+    if (prefetched !== undefined) return;
     let cancelled = false;
     fetchSiteContent().then((data) => {
       if (cancelled) return;
-      if (data) {
-        setContent({
-          media: data.media?.length ? data.media : staticFallback.media,
-          testimonials: data.testimonials?.length
-            ? data.testimonials.map((t) => ({
-                itemId: t.itemId,
-                quote: toLocalized(t.quote),
-                author: toLocalized([t.author, t.roleLabel].filter(Boolean).join(", ")),
-              }))
-            : staticFallback.testimonials,
-          faq: data.faq ?? [],
-          donate: data.donate ?? null,
-          social: data.social ?? null,
-          announcement: data.announcement ?? null,
-        });
-      }
+      if (data) setContent(normalize(data));
       setLoaded(true);
     });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [prefetched]);
 
   return { ...content, loaded };
 }

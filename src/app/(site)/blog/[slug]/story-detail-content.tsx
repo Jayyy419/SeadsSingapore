@@ -7,11 +7,13 @@ import { SiteShell } from "@/components/site-shell";
 import { ShareButtons } from "@/components/share-buttons";
 import { useLocale } from "@/lib/locale-context";
 import { useStories } from "@/lib/use-stories";
+import type { Story } from "@/content/siteContent";
 
-export function StoryDetailContent({ slug }: { slug: string }) {
+// `live`: this story fresh from the page's server render — see EventDetailContent.
+export function StoryDetailContent({ slug, live }: { slug: string; live?: Story | null }) {
   const { locale, t } = useLocale();
   const { stories, loaded } = useStories();
-  const story = stories.find((s) => s.slug === slug);
+  const story = live ?? stories.find((s) => s.slug === slug);
   // Wait for the live fetch before 404ing — see event-detail-content.tsx for why.
   if (!story && loaded) notFound();
   if (!story) return null;

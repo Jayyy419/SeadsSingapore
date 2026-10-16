@@ -28,14 +28,22 @@ Seads is a Next.js App Router web application with:
    - Homepage uses local state and client-side interactions (`"use client"`).
    - Subpages render static sections and shared shell wrappers.
 4. Data sources:
-   - Most content (team, partners, programs, stories, events, impact metrics) is fetched at
-     request time from the Lambda's public GET endpoints, which read DynamoDB. List pages use
-     a "static-fallback then live-swap" pattern (`src/lib/use-team.ts` and siblings): render
-     immediately from bundled static seed data, then replace it once the live fetch resolves,
-     so the page never shows a loading spinner or goes blank if the API is briefly slow.
-   - `[slug]` detail pages (events/programs/blog) additionally fetch server-side in
-     `generateMetadata` for correct per-page `<title>`/OG tags and JSON-LD, wrapped in
-     try/catch so a network failure falls back to generic metadata instead of a 500.
+   - Most content (team, partners, programs, stories, events, impact metrics, site content) is
+     read from the Lambda's public GET endpoints, which read DynamoDB. Public pages live in the
+     `src/app/(site)/` route group, whose layout fetches all of those endpoints **on the server,
+     cached for 60 seconds** (`src/lib/public-data.ts`), and hands them to the page through
+     `PublicDataProvider`. So the first HTML already has the real content, and a page view
+     makes no API calls from the browser (RSVP counts excepted: they stay a live browser
+     fetch). An admin edit reaches the public site within a minute; Amplify doesn't support
+     on-demand revalidation, so `revalidatePath`/`revalidateTag` can't shorten that.
+   - The hooks (`src/lib/use-team.ts` and siblings, built on `usePublicList`) use that
+     prefetch when it's there. Otherwise (`next dev`, so the e2e suite, or a failed server
+     fetch) they fall back to the older pattern: render bundled static seed data, then swap in
+     the live list once the browser's fetch resolves.
+   - `[slug]` detail pages (events/programs/blog) also fetch their record server-side,
+     uncached, for per-page `<title>`/OG tags and JSON-LD, and pass it to the page as `live`.
+     So an item created or edited moments ago renders correctly before the cached list catches
+     up, and an unknown slug is a real 404.
    - Testimonials and static UI copy remain local TypeScript modules
      (`src/content/*`) with no backend involved.
 
@@ -51,7 +59,8 @@ Seads is a Next.js App Router web application with:
 - `src/lib`
   - Shared non-content utilities: `vine.ts` (nav's vine/bloom geometry), `locale-context.tsx`
     (i18n provider/hook), `use-team.ts`/`use-partners.ts`/`use-programs.ts`/`use-events.ts`/
-    `use-stories.ts`/`use-event-rsvp-counts.ts` (static-fallback-then-live-swap data hooks),
+    `use-stories.ts`/`use-event-rsvp-counts.ts` (data hooks; see Data sources above),
+    `public-data.ts`/`public-data-context.tsx` (the cached server prefetch behind them),
     `internal-api.ts` (server-side helper for calling the Lambda's `/internal/*` routes with
     the admin session header), `json-ld.ts` (XSS-safe JSON-LD serialization), `ics.ts`
     (calendar file generation), `event-capacity.ts`, `whatsapp.ts`

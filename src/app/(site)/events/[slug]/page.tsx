@@ -67,7 +67,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ sl
       {event && (
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLdString(buildEventJsonLd(event)) }} />
       )}
-      <EventDetailContent slug={slug} />
+      <EventDetailContent slug={slug} live={event} />
     </>
   );
 }

@@ -7,12 +7,14 @@ import { SiteShell } from "@/components/site-shell";
 import { InterestForm } from "@/components/interest-form";
 import { useLocale } from "@/lib/locale-context";
 import { usePrograms } from "@/lib/use-programs";
+import type { Program } from "@/content/siteContent";
 import { buildWhatsAppLink } from "@/lib/whatsapp";
 
-export function ProgramDetailContent({ slug }: { slug: string }) {
+// `live`: this program fresh from the page's server render — see EventDetailContent.
+export function ProgramDetailContent({ slug, live }: { slug: string; live?: Program | null }) {
   const { locale, t } = useLocale();
   const { programs, loaded } = usePrograms();
-  const program = programs.find((p) => p.slug === slug);
+  const program = live ?? programs.find((p) => p.slug === slug);
   // Wait for the live fetch before 404ing — see event-detail-content.tsx for why.
   if (!program && loaded) notFound();
   if (!program) return null;

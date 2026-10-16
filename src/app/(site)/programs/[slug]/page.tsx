@@ -32,5 +32,5 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
 export default async function ProgramDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  return <ProgramDetailContent slug={slug} />;
+  return <ProgramDetailContent slug={slug} live={await getProgram(slug)} />;
 }
