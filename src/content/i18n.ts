@@ -184,6 +184,8 @@ export type Translation = {
   adminLoginButton: string;
   adminLoginIncorrectPassword: string;
   adminLoginBackToSite: string;
+  adminLoginCodePrompt: string;
+  adminLoginCodePlaceholder: string;
   skipToContent: string;
   followUs: string;
   newsletterTitle: string;
@@ -388,6 +390,7 @@ export const translations: Record<Locale, Translation> = {
     portraitPhotoLabel: "portrait photo", mediaFilterAll: "All",
     adminLoginPasswordPlaceholder: "Password", adminLoginButton: "Log in",
     adminLoginIncorrectPassword: "Incorrect password.", adminLoginBackToSite: "Back to seads.sg",
+    adminLoginCodePrompt: "Enter the 6-digit code from your authenticator app, or a backup code.", adminLoginCodePlaceholder: "Code",
     skipToContent: "Skip to main content",
     followUs: "Follow us",
     newsletterTitle: "Stay in the loop",
@@ -590,6 +593,7 @@ export const translations: Record<Locale, Translation> = {
     portraitPhotoLabel: "肖像照片", mediaFilterAll: "全部",
     adminLoginPasswordPlaceholder: "密码", adminLoginButton: "登录",
     adminLoginIncorrectPassword: "密码错误。", adminLoginBackToSite: "返回 seads.sg",
+    adminLoginCodePrompt: "请输入身份验证器应用中的 6 位数代码，或一个备用代码。", adminLoginCodePlaceholder: "代码",
     skipToContent: "跳到主要内容",
     followUs: "关注我们",
     newsletterTitle: "订阅最新动态",
@@ -792,6 +796,7 @@ export const translations: Record<Locale, Translation> = {
     portraitPhotoLabel: "foto potret", mediaFilterAll: "Semua",
     adminLoginPasswordPlaceholder: "Kata laluan", adminLoginButton: "Log masuk",
     adminLoginIncorrectPassword: "Kata laluan salah.", adminLoginBackToSite: "Kembali ke seads.sg",
+    adminLoginCodePrompt: "Masukkan kod 6 digit daripada aplikasi pengesah anda, atau kod sandaran.", adminLoginCodePlaceholder: "Kod",
     skipToContent: "Langkau ke kandungan utama",
     followUs: "Ikuti kami",
     newsletterTitle: "Kekal berhubung",
@@ -994,6 +999,7 @@ export const translations: Record<Locale, Translation> = {
     portraitPhotoLabel: "पोर्ट्रेट फोटो", mediaFilterAll: "सभी",
     adminLoginPasswordPlaceholder: "पासवर्ड", adminLoginButton: "लॉग इन करें",
     adminLoginIncorrectPassword: "गलत पासवर्ड।", adminLoginBackToSite: "seads.sg पर वापस जाएं",
+    adminLoginCodePrompt: "अपने ऑथेंटिकेटर ऐप से 6-अंकों का कोड, या कोई बैकअप कोड दर्ज करें।", adminLoginCodePlaceholder: "कोड",
     skipToContent: "मुख्य सामग्री पर जाएं",
     followUs: "हमें फॉलो करें",
     newsletterTitle: "अपडेट पाते रहें",

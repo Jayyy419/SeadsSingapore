@@ -10,11 +10,15 @@ export default function AdminLoginPage() {
   const { t } = useLocale();
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState(t.adminLoginIncorrectPassword);
+  // Set once the Lambda says this account has two-factor sign-in on: the form then also asks
+  // for a code, and the next submit sends the password and the code together.
+  const [needCode, setNeedCode] = useState(false);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const password = formData.get("password");
+    const code = formData.get("code");
 
     setStatus("loading");
     try {
@@ -26,7 +30,7 @@ export default function AdminLoginPage() {
       const res = await fetch(`${API_BASE_URL}/admin-login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify(needCode ? { password, code } : { password }),
       });
 
       if (!res.ok) {
@@ -34,6 +38,11 @@ export default function AdminLoginPage() {
         // it comes from the API, not this page's i18n dictionary — so only the generic
         // fallback below is localized.
         const body = await res.json().catch(() => null);
+        if (body?.code === "totp_required") {
+          setNeedCode(true);
+          setStatus("idle");
+          return;
+        }
         setErrorMessage(body?.error ? `${body.error}${body.error.endsWith(".") ? "" : "."}` : t.adminLoginIncorrectPassword);
         setStatus("error");
         return;
@@ -82,6 +91,22 @@ export default function AdminLoginPage() {
               autoFocus
               className="rounded-xl border border-[color:var(--foreground-soft)] bg-[color:var(--surface)] px-4 py-3 text-sm text-[color:var(--foreground)]"
             />
+            {needCode && (
+              <>
+                <p className="text-xs text-[color:var(--muted)]">{t.adminLoginCodePrompt}</p>
+                <input
+                  name="code"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  placeholder={t.adminLoginCodePlaceholder}
+                  aria-label={t.adminLoginCodePlaceholder}
+                  required
+                  autoFocus
+                  maxLength={9}
+                  className="rounded-xl border border-[color:var(--foreground-soft)] bg-[color:var(--surface)] px-4 py-3 text-sm tracking-widest text-[color:var(--foreground)]"
+                />
+              </>
+            )}
             {status === "error" && <p className="text-xs font-semibold text-[#e2965f]">{errorMessage}</p>}
             <button
               type="submit"

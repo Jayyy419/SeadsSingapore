@@ -4,6 +4,38 @@ All notable changes to this project should be documented in this file.
 
 This format is inspired by Keep a Changelog and uses a date-based release style.
 
+## [2026-10-17] (51)
+
+### Added — optional two-factor sign-in for the admin
+
+- Admin → Settings → **Two-factor sign-in**:
+  - **Turning it on:** scan a QR code (or type the key) into any authenticator app and confirm
+    with a code. It then shows **8 one-time backup codes**, once. Turning it on also signs out
+    every other session, since those were opened without it.
+  - **Turning it off:** needs the password *and* a current code, so a stolen session alone
+    can't strip it.
+- **Login:** a correct password now gets "enter the code" (`totp_required`), and the login
+  page shows a code field and sends the password and code together. The code is only asked
+  for after the password checks out, so it tells someone without the password nothing.
+  Backup codes work in the same field.
+- **Security details:**
+  - The TOTP secret is AES-256-GCM encrypted at rest, with a key derived from the SSM session
+    secret; backup codes are stored only as keyed hashes.
+  - A code can't be replayed within its 30 seconds (`lastUsedStep`).
+  - Spending a code is a conditional write, so two simultaneous logins can't use the same one.
+  - Wrong codes also count against a global ceiling, so a botnet holding the password can't
+    work through the million codes one IP at a time.
+- Kept in its own config record (`configId: "totp"`), so changing the password can't wipe it.
+  No new dependencies: RFC 6238 is about 40 lines on `node:crypto`. Lockout recovery is in the
+  backend README.
+- Tests: backend `test/two-factor.test.mjs` (14), checked against an independent TOTP
+  implementation. It covers:
+  - setup and confirmation, backup codes and other sessions being signed out;
+  - the secret and codes never being stored in the clear;
+  - the code required after the password, wrong codes, replay, and single-use backup codes;
+  - a password change preserving 2FA, turning it off, and auth on every endpoint.
+  E2E: the two-step login. Backend 94/94.
+
 ## [2026-10-16] (50)
 
 ### Added — day-before reminder emails for confirmed RSVPs
