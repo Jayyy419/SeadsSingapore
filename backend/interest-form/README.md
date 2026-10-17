@@ -185,6 +185,22 @@ aws s3api put-public-access-block --bucket seads-media --public-access-block-con
 aws s3api put-bucket-cors --bucket seads-media --cors-configuration file://media-bucket-cors.json
 ```
 
+## Scheduled jobs
+
+EventBridge Scheduler invokes the function directly (no API Gateway) with a JSON input naming
+a task; `handler` dispatches on `event.task` before any HTTP routing. An API request can't
+reach these, because API Gateway payloads never have a top-level `task`.
+
+| Schedule (group `seads`) | When | Input | What it does |
+| --- | --- | --- | --- |
+| `seads-rsvp-reminders` | daily 10:00 `Asia/Singapore` | `{"task":"rsvp-reminders"}` | Emails every confirmed RSVP for an event happening tomorrow (not cancelled or postponed), with its cancel link. Marks `reminderSentAt` before sending, so re-runs never double-send. |
+
+The schedules run as IAM role `seads-scheduler-invoke`, trusted by `scheduler.amazonaws.com`
+for this account only and allowed `lambda:InvokeFunction` on this function and nothing else.
+Each run logs one JSON summary line (`{"task":"rsvp-reminders","sent":…}`) to the function's
+log group. To run one by hand:
+`aws lambda invoke --function-name seads-interest-form-handler --payload '{"task":"rsvp-reminders"}' --cli-binary-format raw-in-base64-out out.json`.
+
 ## Testing
 
 ```bash

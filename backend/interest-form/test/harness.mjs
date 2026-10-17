@@ -384,6 +384,10 @@ export async function call(method, path, { body, token, ip } = {}) {
   return { status: res.statusCode, body: res.body ? JSON.parse(res.body) : null };
 }
 
+// A direct invocation, the way EventBridge Scheduler calls the function: the raw payload, no
+// API Gateway envelope.
+export const invoke = (payload) => handler(payload);
+
 // Seeds an admin password and logs in through the real endpoint, returning a session token.
 export async function seedAdminAndLogin(password = "correct horse battery staple") {
   const { scryptSync, randomBytes } = await import("node:crypto");

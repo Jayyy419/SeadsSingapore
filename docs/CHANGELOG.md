@@ -4,6 +4,31 @@ All notable changes to this project should be documented in this file.
 
 This format is inspired by Keep a Changelog and uses a date-based release style.
 
+## [2026-10-16] (50)
+
+### Added — day-before reminder emails for confirmed RSVPs
+
+- Every day at 10:00 Singapore time, EventBridge Scheduler invokes the Lambda with
+  `{"task":"rsvp-reminders"}`. Everyone with a confirmed RSVP for an event happening tomorrow
+  (not cancelled or postponed) gets a "See you tomorrow" email with the event details and
+  their cancel link (47). People who can't come say so while there's still time to pass the
+  spot to the waitlist.
+- **Never twice.** Each RSVP is marked `reminderSentAt` with a conditional write before its
+  email goes out, so a retried or overlapping run reminds nobody a second time. The worst case
+  is a failed send losing one reminder, never a duplicate. Each run logs a one-line JSON
+  summary.
+- **Not reachable from the API.** `handler` dispatches scheduled tasks on a top-level
+  `event.task`, which no API Gateway request can produce. Unknown tasks are refused.
+- `isPastEventDate` now shares `eventDayKey`/`singaporeDayKey` with the reminder job, so
+  "tomorrow" and "past" use the same Singapore-time calendar.
+- The schedule itself (group `seads`, `seads-rsvp-reminders`, role `seads-scheduler-invoke`)
+  is created in AWS after this deploys; it's documented in the backend README's "Scheduled
+  jobs".
+- Tests: `test/reminders.test.mjs` (6): only tomorrow's confirmed RSVPs are reminded, the email
+  has its details and a working cancel link, a second run sends nothing, cancelled and
+  postponed events are skipped, the API can't trigger it, and unknown tasks are refused.
+  Backend 80/80.
+
 ## [2026-10-16] (49)
 
 ### Changed — public pages render from a cached server fetch; the browser no longer calls the API on every visit
