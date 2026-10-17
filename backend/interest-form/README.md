@@ -215,6 +215,7 @@ reach these, because API Gateway payloads never have a top-level `task`.
 | Schedule (group `seads`) | When | Input | What it does |
 | --- | --- | --- | --- |
 | `seads-rsvp-reminders` | daily 10:00 `Asia/Singapore` | `{"task":"rsvp-reminders"}` | Emails every confirmed RSVP for an event happening tomorrow (not cancelled or postponed), with its cancel link. Marks `reminderSentAt` before sending, so re-runs never double-send. |
+| `seads-weekly-digest` | Mondays 09:00 `Asia/Singapore` | `{"task":"weekly-digest"}` | Emails the team inbox a summary: the week's new submissions by type, the next 14 days' events and how full they are, stories awaiting moderation, and attendee self-cancellations. Read-only. |
 
 The schedules run as IAM role `seads-scheduler-invoke`, trusted by `scheduler.amazonaws.com`
 for this account only and allowed `lambda:InvokeFunction` on this function and nothing else.

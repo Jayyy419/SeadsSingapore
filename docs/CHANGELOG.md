@@ -4,6 +4,23 @@ All notable changes to this project should be documented in this file.
 
 This format is inspired by Keep a Changelog and uses a date-based release style.
 
+## [2026-10-17] (52)
+
+### Added — a weekly digest email to the team inbox
+
+- Every Monday at 09:00 Singapore time (`{"task":"weekly-digest"}`, schedule
+  `seads-weekly-digest`), the team inbox gets one summary:
+  - the past 7 days' new submissions, broken down by type;
+  - each event in the next 14 days with confirmed/capacity and waitlist counts (postponed
+    events flagged, cancelled ones left out);
+  - stories waiting for moderation, with the link;
+  - RSVPs attendees cancelled themselves (from the audit log).
+  The admin panel had all of this, but nobody opens it just to check, so new volunteers waited
+  days for a reply and stories sat unmoderated.
+- Read-only, so a re-run just sends the same summary again. Rate-limit counter rows in the
+  submissions table are excluded.
+- Tests: `test/digest.test.mjs` (5). Backend 99/99.
+
 ## [2026-10-17] (51)
 
 ### Added — optional two-factor sign-in for the admin

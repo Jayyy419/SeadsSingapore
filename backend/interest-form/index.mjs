@@ -1225,6 +1225,88 @@ async function runRsvpReminders() {
   return { ok: true, sent, events: events.length };
 }
 
+// Monday-morning summary to the team inbox (schedule seads-weekly-digest): what came in over
+// the past week, how full the next fortnight's events are, and what's waiting on someone. The
+// admin panel has all of this, but nobody opens it to check — so new volunteers waited days
+// for a reply and stories sat unmoderated. Read-only: it changes nothing, so a re-run just
+// sends the same summary again.
+const DIGEST_DAYS = 7;
+const DIGEST_LOOKAHEAD_DAYS = 14;
+
+async function buildWeeklyDigest() {
+  const since = new Date(Date.now() - DIGEST_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  const [submissions, events, stories, audit] = await Promise.all([
+    scanAll(TABLE_NAME),
+    scanAll(EVENTS_TABLE),
+    scanAll(STORY_SUBMISSIONS_TABLE),
+    AUDIT_LOG_TABLE ? scanAll(AUDIT_LOG_TABLE) : [],
+  ]);
+  const real = submissions.filter((item) => !String(item.id).startsWith("ratelimit#"));
+  const recent = real.filter((item) => (item.submittedAt ?? "") >= since);
+
+  const byType = {};
+  for (const item of recent) {
+    const label = INTEREST_TYPE_LABELS[item.interestType] ?? "Other";
+    byType[label] = (byType[label] ?? 0) + 1;
+  }
+
+  const today = singaporeDayKey(0);
+  const horizon = singaporeDayKey(DIGEST_LOOKAHEAD_DAYS);
+  const upcoming = events
+    .filter((e) => {
+      const day = eventDayKey(e.date);
+      return day && day >= today && day <= horizon && e.status !== "cancelled";
+    })
+    .sort((a, b) => eventDayKey(a.date).localeCompare(eventDayKey(b.date)))
+    .map((e) => {
+      const rsvps = real.filter((item) => item.eventSlug === e.slug);
+      return {
+        title: e.title?.en ?? e.slug,
+        date: e.date,
+        postponed: e.status === "postponed",
+        confirmed: rsvps.filter((item) => item.rsvpStatus === "confirmed").length,
+        waitlisted: rsvps.filter((item) => item.rsvpStatus === "waitlisted").length,
+        capacity: typeof e.capacity === "number" ? e.capacity : null,
+      };
+    });
+
+  return {
+    newSubmissions: recent.length,
+    byType,
+    upcoming,
+    pendingStories: stories.filter((st) => st.status === "pending").length,
+    cancellations: audit.filter((entry) => entry.action === "cancel" && entry.entityType === "rsvp" && (entry.timestamp ?? "") >= since).length,
+  };
+}
+
+function formatWeeklyDigest(d) {
+  const lines = [`Seads — the week in review (last ${DIGEST_DAYS} days)`, ""];
+  lines.push(`New submissions: ${d.newSubmissions}`);
+  for (const [label, count] of Object.entries(d.byType).sort((a, b) => b[1] - a[1])) lines.push(`  • ${label}: ${count}`);
+  if (d.cancellations) lines.push(`RSVPs cancelled by attendees: ${d.cancellations}`);
+  lines.push("", `Coming up in the next ${DIGEST_LOOKAHEAD_DAYS} days:`);
+  if (!d.upcoming.length) lines.push("  (no events scheduled)");
+  for (const e of d.upcoming) {
+    const fill = e.capacity !== null ? `${e.confirmed}/${e.capacity} confirmed` : `${e.confirmed} confirmed`;
+    lines.push(`  • ${e.date} — ${e.title}: ${fill}${e.waitlisted ? `, ${e.waitlisted} waitlisted` : ""}${e.postponed ? " (postponed)" : ""}`);
+  }
+  lines.push("", `Stories waiting for moderation: ${d.pendingStories}${d.pendingStories ? ` — ${SITE_URL}/admin/stories` : ""}`);
+  lines.push("", `Everything in full: ${SITE_URL}/admin`);
+  return lines.join("\n");
+}
+
+async function runWeeklyDigest() {
+  if (!NOTIFY_EMAIL || !SENDER_EMAIL) return { ok: true, sent: 0 };
+  const digest = await buildWeeklyDigest();
+  await sendEmail({
+    to: NOTIFY_EMAIL,
+    subject: `Seads weekly digest: ${digest.newSubmissions} new, ${digest.upcoming.length} event${digest.upcoming.length === 1 ? "" : "s"} coming up`,
+    body: formatWeeklyDigest(digest),
+  });
+  console.log(JSON.stringify({ task: "weekly-digest", ...digest, upcoming: digest.upcoming.length }));
+  return { ok: true, sent: 1 };
+}
+
 // Self-service RSVP cancellation. Every RSVP email carries a signed link to /rsvp/cancel; until
 // this, an attendee who couldn't make it had to reply and hope someone deleted the row by hand,
 // so most simply didn't show up — and their spot sat empty while people waited for it.
@@ -2297,6 +2379,7 @@ export const handler = async (event) => {
   // fields arrive under body/headers/requestContext), so these are unreachable from the API.
   if (typeof event?.task === "string" && !event.requestContext) {
     if (event.task === "rsvp-reminders") return runRsvpReminders();
+    if (event.task === "weekly-digest") return runWeeklyDigest();
     console.error("Unknown scheduled task:", event.task);
     return { ok: false, error: "unknown task" };
   }
