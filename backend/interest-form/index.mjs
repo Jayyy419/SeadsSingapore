@@ -1298,11 +1298,19 @@ function formatWeeklyDigest(d) {
 async function runWeeklyDigest() {
   if (!NOTIFY_EMAIL || !SENDER_EMAIL) return { ok: true, sent: 0 };
   const digest = await buildWeeklyDigest();
-  await sendEmail({
-    to: NOTIFY_EMAIL,
-    subject: `Seads weekly digest: ${digest.newSubmissions} new, ${digest.upcoming.length} event${digest.upcoming.length === 1 ? "" : "s"} coming up`,
-    body: formatWeeklyDigest(digest),
-  });
+  // Best-effort like every other email here: a send failure (an unverified sender, say) is
+  // logged and reported, not thrown — throwing would make the scheduler retry something a
+  // retry can't fix and set off the Lambda error alarm every Monday.
+  try {
+    await sendEmail({
+      to: NOTIFY_EMAIL,
+      subject: `Seads weekly digest: ${digest.newSubmissions} new, ${digest.upcoming.length} event${digest.upcoming.length === 1 ? "" : "s"} coming up`,
+      body: formatWeeklyDigest(digest),
+    });
+  } catch (err) {
+    console.error("Weekly digest email failed:", err);
+    return { ok: false, sent: 0, error: err.name };
+  }
   console.log(JSON.stringify({ task: "weekly-digest", ...digest, upcoming: digest.upcoming.length }));
   return { ok: true, sent: 1 };
 }

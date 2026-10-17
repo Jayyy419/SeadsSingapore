@@ -4,6 +4,24 @@ All notable changes to this project should be documented in this file.
 
 This format is inspired by Keep a Changelog and uses a date-based release style.
 
+## [2026-10-17] (53)
+
+### Scheduled jobs are live; the weekly digest no longer errors when email can't send
+
+- **Created in AWS** (`ap-southeast-1`, tagged `Project=SeadsSingapore`/`Environment=Production`):
+  - IAM role `seads-scheduler-invoke`: trusted by `scheduler.amazonaws.com` for this account
+    only, allowed `lambda:InvokeFunction` on `seads-interest-form-handler` and nothing else.
+  - Schedule group `seads`, containing `seads-rsvp-reminders` (daily 10:00) and
+    `seads-weekly-digest` (Mondays 09:00), both `Asia/Singapore` with 2 retries.
+  Each job was test-run by hand. Reminders: `{ok:true, sent:0}`, with no events tomorrow. The
+  digest built its summary and then failed at SES, because the sender isn't verified yet.
+- **Fixed:** that SES failure was thrown, which would have made the scheduler retry something
+  a retry can't fix and set off the Lambda error alarm every Monday until email is set up. The
+  digest send is now best-effort like every other email: logged, and returned as
+  `{ok:false, error}`. The test harness can now make sends fail (`state.sesFailure`), and the new
+  test fails against the old code. Backend 100/100.
+- The Lambda concurrency increase requested in (46) was approved: 10 → 1000.
+
 ## [2026-10-17] (52)
 
 ### Added — a weekly digest email to the team inbox

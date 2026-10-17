@@ -94,6 +94,7 @@ export function resetState() {
   state.emails = [];
   state.s3Deletes = [];
   state.turnstileSuccess = true;
+  state.sesFailure = null; // set to an Error to make every send fail with it
   state.ssm = new Map([
     ["/seads/admin-session-secret", "test-session-secret-0123456789abcdef"],
     ["/seads/turnstile-secret-key", "test-turnstile-secret"],
@@ -325,6 +326,7 @@ async function fakeDynamo(command) {
 DynamoDBDocumentClient.prototype.send = fakeDynamo;
 
 SESClient.prototype.send = async (command) => {
+  if (state.sesFailure) throw state.sesFailure;
   const input = command.input;
   state.emails.push({
     to: input.Destination.ToAddresses,
