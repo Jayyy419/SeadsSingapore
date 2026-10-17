@@ -65,3 +65,12 @@ test("rate-limit counters stored in the submissions table aren't counted as subm
   await run();
   assert.match(digest().body, /New submissions: 0/);
 });
+
+test("a failed send is reported, not thrown — retrying can't fix it", async () => {
+  state.sesFailure = Object.assign(new Error("Email address is not verified"), { name: "MessageRejected" });
+  try {
+    assert.deepEqual(await run(), { ok: false, sent: 0, error: "MessageRejected" });
+  } finally {
+    state.sesFailure = null;
+  }
+});
