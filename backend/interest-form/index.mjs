@@ -4,7 +4,7 @@ import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
 import { SSMClient, GetParameterCommand } from "@aws-sdk/client-ssm";
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { randomUUID, createHmac, timingSafeEqual, scryptSync, randomBytes } from "node:crypto";
+import { randomUUID, createHmac, timingSafeEqual, scryptSync, randomBytes, createCipheriv, createDecipheriv } from "node:crypto";
 
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 const ses = new SESClient({});
@@ -718,7 +718,219 @@ async function handleAdminLogin(event, headers) {
     return json(401, headers, { ok: false, error: "Incorrect password" });
   }
 
+  // Second factor, once enabled. Only asked for after the password checks out, so it never
+  // tells an attacker without the password anything.
+  const totp = await getTotpConfig();
+  if (totp?.enabled) {
+    const code = typeof payload.code === "string" ? payload.code : "";
+    if (!code) {
+      return json(401, headers, { ok: false, code: "totp_required", error: "Enter the 6-digit code from your authenticator app." });
+    }
+    if (!(await checkSecondFactor(totp, code))) {
+      return json(401, headers, { ok: false, code: "totp_invalid", error: "That code didn't work — try the current one, or a backup code." });
+    }
+  }
+
   return json(200, headers, { ok: true, token: await createSessionToken() });
+}
+
+// Two-factor sign-in (TOTP, RFC 6238 — any authenticator app). Kept in its own admin-config
+// record (configId "totp") so that storePassword, which rewrites the password record whole,
+// can never wipe it. The shared secret is encrypted at rest with a key derived from the session
+// secret in SSM, so reading the DynamoDB table alone doesn't yield it; backup codes are stored
+// only as keyed hashes. Recovery if both the phone and the backup codes are lost: set
+// `enabled` to false on that record in the DynamoDB console (see the README).
+const TOTP_ISSUER = "Seads Admin";
+const TOTP_STEP_SECONDS = 30;
+const BACKUP_CODE_COUNT = 8;
+const BASE32 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+
+function base32Encode(buf) {
+  let bits = 0, value = 0, out = "";
+  for (const byte of buf) {
+    value = (value << 8) | byte;
+    bits += 8;
+    while (bits >= 5) {
+      out += BASE32[(value >>> (bits - 5)) & 31];
+      bits -= 5;
+    }
+  }
+  if (bits > 0) out += BASE32[(value << (5 - bits)) & 31];
+  return out;
+}
+
+function base32Decode(str) {
+  let bits = 0, value = 0;
+  const out = [];
+  for (const ch of str.replace(/=+$/, "").toUpperCase()) {
+    const idx = BASE32.indexOf(ch);
+    if (idx === -1) continue;
+    value = (value << 5) | idx;
+    bits += 5;
+    if (bits >= 8) {
+      out.push((value >>> (bits - 8)) & 255);
+      bits -= 8;
+    }
+  }
+  return Buffer.from(out);
+}
+
+function hotp(secret, counter) {
+  const msg = Buffer.alloc(8);
+  msg.writeBigUInt64BE(BigInt(counter));
+  const mac = createHmac("sha1", secret).update(msg).digest();
+  const offset = mac[mac.length - 1] & 15;
+  const binary = mac.readUInt32BE(offset) & 0x7fffffff;
+  return String(binary % 1_000_000).padStart(6, "0");
+}
+
+async function getTotpKey() {
+  return createHmac("sha256", await getAdminSessionSecret()).update("seads/totp-secret-key/v1").digest();
+}
+
+async function encryptTotpSecret(base32) {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", await getTotpKey(), iv);
+  const enc = Buffer.concat([cipher.update(base32, "utf8"), cipher.final()]);
+  return [iv, cipher.getAuthTag(), enc].map((b) => b.toString("base64url")).join(".");
+}
+
+async function decryptTotpSecret(stored) {
+  const [iv, tag, enc] = stored.split(".").map((part) => Buffer.from(part, "base64url"));
+  const decipher = createDecipheriv("aes-256-gcm", await getTotpKey(), iv);
+  decipher.setAuthTag(tag);
+  return Buffer.concat([decipher.update(enc), decipher.final()]).toString("utf8");
+}
+
+async function hashBackupCode(code) {
+  return createHmac("sha256", await getTotpKey()).update(code.replace(/[^a-z0-9]/gi, "").toLowerCase()).digest("hex");
+}
+
+async function getTotpConfig() {
+  return (await ddb.send(new GetCommand({ TableName: ADMIN_CONFIG_TABLE, Key: { configId: "totp" } }))).Item ?? null;
+}
+
+async function putTotpConfig(item, condition) {
+  await ddb.send(
+    new PutCommand({
+      TableName: ADMIN_CONFIG_TABLE,
+      Item: { ...item, configId: "totp", updatedAt: new Date().toISOString() },
+      ...condition,
+    })
+  );
+}
+
+// The authenticator-app step a code matches (allowing one step of clock drift either way), or
+// null. Steps at or before the last one used are refused, so a code seen over someone's
+// shoulder can't be replayed within its 30 seconds.
+function matchTotpStep(base32Secret, code, lastUsedStep = -1) {
+  if (!/^\d{6}$/.test(code)) return null;
+  const secret = base32Decode(base32Secret);
+  const now = Math.floor(Date.now() / 1000 / TOTP_STEP_SECONDS);
+  for (const step of [now - 1, now, now + 1]) {
+    if (step <= lastUsedStep) continue;
+    const expected = Buffer.from(hotp(secret, step));
+    if (timingSafeEqual(expected, Buffer.from(code))) return step;
+  }
+  return null;
+}
+
+// A current authenticator code or an unused backup code. Either one is spent with a conditional
+// write on the record's updatedAt, so two simultaneous logins can't both use the same code.
+async function checkSecondFactor(totp, rawCode) {
+  const code = rawCode.trim();
+  const step = matchTotpStep(await decryptTotpSecret(totp.secretEnc), code.replace(/\s/g, ""), totp.lastUsedStep);
+  let next = null;
+  if (step !== null) {
+    next = { ...totp, lastUsedStep: step };
+  } else {
+    const hash = await hashBackupCode(code);
+    if ((totp.backupCodeHashes ?? []).includes(hash)) {
+      next = { ...totp, backupCodeHashes: totp.backupCodeHashes.filter((h) => h !== hash) };
+    }
+  }
+  if (!next) {
+    // A global ceiling on wrong codes, across every IP: the per-IP login limit alone would let
+    // a botnet that already has the password work through the million codes.
+    await checkRateLimit("admin#totp-fail", 30);
+    return false;
+  }
+  try {
+    await putTotpConfig(next, { ConditionExpression: "updatedAt = :seen", ExpressionAttributeValues: { ":seen": totp.updatedAt } });
+  } catch (err) {
+    if (err.name === "ConditionalCheckFailedException") return false;
+    throw err;
+  }
+  return true;
+}
+
+async function handleGetTwoFactor(headers) {
+  const totp = await getTotpConfig();
+  return json(200, headers, { enabled: Boolean(totp?.enabled), backupCodesLeft: totp?.enabled ? (totp.backupCodeHashes ?? []).length : 0 });
+}
+
+// Step 1: a new secret, held as "pending" until a code from it proves the app was set up.
+async function handleSetupTwoFactor(headers) {
+  const totp = await getTotpConfig();
+  if (totp?.enabled) return json(409, headers, { error: "Two-factor sign-in is already on." });
+  const secret = base32Encode(randomBytes(20));
+  await putTotpConfig({ ...(totp ?? {}), enabled: false, pendingSecretEnc: await encryptTotpSecret(secret) });
+  const otpauthUri = `otpauth://totp/${encodeURIComponent(TOTP_ISSUER)}?secret=${secret}&issuer=${encodeURIComponent(TOTP_ISSUER)}&digits=6&period=${TOTP_STEP_SECONDS}`;
+  return json(200, headers, { secret, otpauthUri });
+}
+
+// Step 2: confirm with a code, switch it on, hand out backup codes once, and sign out every
+// other session — they were opened without the second factor.
+async function handleEnableTwoFactor(event, headers) {
+  let payload;
+  try {
+    payload = JSON.parse(event.body || "{}");
+  } catch {
+    return json(400, headers, { error: "Invalid JSON body" });
+  }
+  const totp = await getTotpConfig();
+  if (totp?.enabled) return json(409, headers, { error: "Two-factor sign-in is already on." });
+  if (!totp?.pendingSecretEnc) return json(400, headers, { error: "Start the setup first." });
+
+  const pendingSecret = await decryptTotpSecret(totp.pendingSecretEnc);
+  const step = matchTotpStep(pendingSecret, String(payload.code ?? "").replace(/\s/g, ""));
+  if (step === null) return json(400, headers, { code: "totp_invalid", error: "That code didn't match — check the time on your phone and try the current one." });
+
+  const backupCodes = Array.from({ length: BACKUP_CODE_COUNT }, () => {
+    const raw = base32Encode(randomBytes(5)).toLowerCase();
+    return `${raw.slice(0, 4)}-${raw.slice(4, 8)}`;
+  });
+  await putTotpConfig({
+    enabled: true,
+    secretEnc: totp.pendingSecretEnc,
+    lastUsedStep: step,
+    backupCodeHashes: await Promise.all(backupCodes.map(hashBackupCode)),
+  });
+  const stored = await getStoredPasswordConfig();
+  if (stored) {
+    await ddb.send(new PutCommand({ TableName: ADMIN_CONFIG_TABLE, Item: { ...stored, sessionEpoch: randomBytes(16).toString("hex") } }));
+  }
+  return json(200, headers, { ok: true, backupCodes, token: await createSessionToken() });
+}
+
+// Turning it off needs the password and a current code (or a backup code) — a stolen session
+// alone mustn't be able to strip the second factor.
+async function handleDisableTwoFactor(event, headers) {
+  let payload;
+  try {
+    payload = JSON.parse(event.body || "{}");
+  } catch {
+    return json(400, headers, { error: "Invalid JSON body" });
+  }
+  const totp = await getTotpConfig();
+  if (!totp?.enabled) return json(409, headers, { error: "Two-factor sign-in is already off." });
+  const password = typeof payload.password === "string" ? payload.password.trim() : "";
+  if (!(await checkPassword(password))) return json(401, headers, { error: "Password is incorrect." });
+  if (!(await checkSecondFactor(totp, typeof payload.code === "string" ? payload.code : ""))) {
+    return json(401, headers, { code: "totp_invalid", error: "That code didn't work." });
+  }
+  await putTotpConfig({ enabled: false });
+  return json(200, headers, { ok: true });
 }
 
 async function handleChangePassword(event, headers) {
@@ -2308,6 +2520,22 @@ export const handler = async (event) => {
     if (method === "PATCH" && path === "/internal/admin-password") {
       const res = await handleChangePassword(event, headers);
       if (res.statusCode < 300) await logAudit(event, "update", "admin-password", null);
+      return res;
+    }
+    if (method === "GET" && path === "/internal/2fa") {
+      return handleGetTwoFactor(headers);
+    }
+    if (method === "POST" && path === "/internal/2fa/setup") {
+      return handleSetupTwoFactor(headers);
+    }
+    if (method === "POST" && path === "/internal/2fa/enable") {
+      const res = await handleEnableTwoFactor(event, headers);
+      if (res.statusCode < 300) await logAudit(event, "enable", "two-factor", null);
+      return res;
+    }
+    if (method === "POST" && path === "/internal/2fa/disable") {
+      const res = await handleDisableTwoFactor(event, headers);
+      if (res.statusCode < 300) await logAudit(event, "disable", "two-factor", null);
       return res;
     }
     if (method === "POST" && path === "/internal/sessions/revoke") {

@@ -185,6 +185,27 @@ aws s3api put-public-access-block --bucket seads-media --public-access-block-con
 aws s3api put-bucket-cors --bucket seads-media --cors-configuration file://media-bucket-cors.json
 ```
 
+## Two-factor sign-in
+
+Optional TOTP (any authenticator app), turned on from Admin → Settings. It lives in its own
+`seads-admin-config` record, `configId: "totp"`, separate from the password record, so changing
+the password never touches it:
+
+- `secretEnc`: the shared secret, AES-256-GCM encrypted with a key derived from
+  `/seads/admin-session-secret`. Reading the table alone doesn't yield it.
+- `backupCodeHashes`: 8 one-time backup codes, stored only as keyed hashes. Each is removed
+  when used.
+- `lastUsedStep`: the last code's time step. A code can't be replayed, even inside its
+  30 seconds.
+
+Once it's on, `POST /admin-login` answers a correct password with
+`401 {"code":"totp_required"}` until a code is sent too. Wrong codes count against a global
+ceiling (`admin#totp-fail`, 30 per window) as well as the per-IP login limit.
+
+**Locked out** (phone lost, no backup codes left)? In the DynamoDB console, open
+`seads-admin-config`, edit the item with `configId` = `totp`, and set `enabled` to `false`.
+The password alone signs in again, and you can set two-factor up afresh from Settings.
+
 ## Scheduled jobs
 
 EventBridge Scheduler invokes the function directly (no API Gateway) with a JSON input naming

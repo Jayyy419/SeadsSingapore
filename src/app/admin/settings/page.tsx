@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { AdminShell } from "@/components/admin-shell";
 import { changePassword, revokeOtherSessions, type ChangePasswordState, type RevokeSessionsState } from "./actions";
+import { TwoFactorSection } from "./two-factor-section";
 
 const initialState: ChangePasswordState = { status: "idle" };
 const initialRevokeState: RevokeSessionsState = { status: "idle" };
@@ -12,7 +13,7 @@ export default function AdminSettingsPage() {
   const [revokeState, revokeAction, revokePending] = useActionState(revokeOtherSessions, initialRevokeState);
 
   return (
-    <AdminShell title="Settings" subtitle="Change the shared admin password and manage signed-in sessions.">
+    <AdminShell title="Settings" subtitle="Change the shared admin password, manage signed-in sessions, and set up two-factor sign-in.">
       <form action={formAction} className="section-card flex max-w-md flex-col gap-3 p-6 sm:p-8">
         <h2 className="font-display text-lg text-[color:var(--foreground)]">Change password</h2>
         <p className="text-xs text-[color:var(--muted)]">Changing the password also signs out every other device that&apos;s signed in.</p>
@@ -72,6 +73,8 @@ export default function AdminSettingsPage() {
           {revokePending ? "..." : "Sign out all other sessions"}
         </button>
       </form>
+
+      <TwoFactorSection />
     </AdminShell>
   );
 }

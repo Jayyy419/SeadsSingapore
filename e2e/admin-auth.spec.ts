@@ -78,6 +78,37 @@ test.describe("admin auth", () => {
     expect(cookie?.sameSite).toBe("Strict");
   });
 
+  test("with two-factor on, the password step asks for a code, then sends both together", async ({ page, context }) => {
+    const token = fakeToken();
+    const bodies: unknown[] = [];
+    const cors = await mockLambdaLogin(page, async (route, body) => {
+      bodies.push(body);
+      const withCode = (body as { code?: string }).code;
+      await route.fulfill(
+        withCode
+          ? { status: 200, headers: cors, contentType: "application/json", body: JSON.stringify({ ok: true, token }) }
+          : { status: 401, headers: cors, contentType: "application/json", body: JSON.stringify({ code: "totp_required", error: "Enter the code" }) }
+      );
+    });
+    await page.route((url) => url.pathname === "/admin" && url.hostname === "localhost", (route) => route.fulfill({ status: 200, body: "admin" }));
+
+    await page.goto("/admin/login");
+    await page.getByPlaceholder(/password/i).fill("correct horse");
+    await page.getByRole("button", { name: /log in/i }).click();
+
+    const codeField = page.getByRole("textbox", { name: "Code" });
+    await expect(codeField).toBeVisible();
+    await expect(page.getByText(/authenticator app/i)).toBeVisible();
+    await expect(page.getByText(/enter the code/i)).toHaveCount(0); // a prompt, not an error
+
+    await codeField.fill("123456");
+    await page.getByRole("button", { name: /log in/i }).click();
+
+    await expect(page).toHaveURL(/\/admin$/);
+    expect(bodies).toEqual([{ password: "correct horse" }, { password: "correct horse", code: "123456" }]);
+    expect((await context.cookies()).find((c) => c.name === "seads_admin_session")?.value).toBe(token);
+  });
+
   test("the cookie route refuses anything that isn't an unexpired token", async ({ request }) => {
     const post = (data: unknown, headers?: Record<string, string>) => request.post("/admin/api/login", { data, headers });
 

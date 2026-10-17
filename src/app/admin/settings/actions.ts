@@ -57,3 +57,43 @@ export async function revokeOtherSessions(): Promise<RevokeSessionsState> {
   await adoptRefreshedToken(data?.token);
   return { status: "ok", message: "Every other session has been signed out. You're still signed in here." };
 }
+
+// Two-factor sign-in. The Lambda does all of it (see the TOTP section of
+// backend/interest-form/index.mjs); these just relay, and adopt the fresh session token that
+// turning it on hands back — it signs out every other session, as those were opened without it.
+export type TwoFactorStatus = { enabled: boolean; backupCodesLeft: number } | null;
+export type TwoFactorSetup = { secret: string; otpauthUri: string } | { error: string };
+export type EnableTwoFactorState = { status: "idle" | "ok" | "error"; message?: string; backupCodes?: string[] };
+export type DisableTwoFactorState = { status: "idle" | "ok" | "error"; message?: string };
+
+export async function getTwoFactorStatus(): Promise<TwoFactorStatus> {
+  const res = await internalApiFetch("/internal/2fa");
+  return res.ok ? res.json() : null;
+}
+
+export async function startTwoFactorSetup(): Promise<TwoFactorSetup> {
+  const res = await internalApiFetch("/internal/2fa/setup", { method: "POST" });
+  const data = await res.json().catch(() => null);
+  return res.ok ? { secret: data.secret, otpauthUri: data.otpauthUri } : { error: data?.error ?? "Could not start setup." };
+}
+
+export async function enableTwoFactor(_prev: EnableTwoFactorState, formData: FormData): Promise<EnableTwoFactorState> {
+  const res = await internalApiFetch("/internal/2fa/enable", {
+    method: "POST",
+    body: JSON.stringify({ code: String(formData.get("code") ?? "") }),
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) return { status: "error", message: data?.error ?? "Could not turn on two-factor sign-in." };
+  await adoptRefreshedToken(data?.token);
+  return { status: "ok", backupCodes: data?.backupCodes ?? [] };
+}
+
+export async function disableTwoFactor(_prev: DisableTwoFactorState, formData: FormData): Promise<DisableTwoFactorState> {
+  const res = await internalApiFetch("/internal/2fa/disable", {
+    method: "POST",
+    body: JSON.stringify({ password: String(formData.get("password") ?? ""), code: String(formData.get("code") ?? "") }),
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) return { status: "error", message: data?.error ?? "Could not turn off two-factor sign-in." };
+  return { status: "ok", message: "Two-factor sign-in is off. The password alone signs in again." };
+}
