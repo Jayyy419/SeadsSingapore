@@ -108,7 +108,9 @@ Adding a new secret needs the same care as a new table: create the parameter (ta
 `SsmParameterRead`/`SsmDecrypt` statements cover it, and only then deploy code that reads it.
 
 **Reminder for whoever adds the next table**: a new `*_TABLE` env var needs three separate
-changes, not just the code — (1) `aws dynamodb create-table` + enable PITR, (2) add a
+changes, not just the code — (1) `aws dynamodb create-table` with
+`--tags Key=Project,Value=SeadsSingapore Key=Environment,Value=Production` (the Seads budget
+only counts tagged resources) + enable PITR, (2) add a
 statement to `iam-policy.json` and re-apply it via the CloudShell/admin-credentials flow
 below, and (3) `aws lambda update-function-configuration` to actually set the env var on the
 live function. Forgetting step 3 is the one `deploy-interest-form-lambda.yml`'s `node --check`

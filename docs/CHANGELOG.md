@@ -4,6 +4,20 @@ All notable changes to this project should be documented in this file.
 
 This format is inspired by Keep a Changelog and uses a date-based release style.
 
+## [2026-11-13]
+
+### New AWS resources get tagged when they're created
+
+- **Found in AWS:** nine DynamoDB tables (`seads-admin-audit-log`, `seads-admin-config`,
+  `seads-events`, `seads-impact-metrics`, `seads-partners`, `seads-programs`, `seads-stories`,
+  `seads-story-submissions`, `seads-team`) and the `seads-media` bucket had no tags, so the
+  Seads budget couldn't see them. They're now tagged `Project=SeadsSingapore`/`Environment=Production`.
+- **Fixed the cause:** the "adding a new table" checklist in `backend/interest-form/README.md`
+  never said to tag the table. It now passes the tags to `create-table`, and `CLAUDE.md` has a
+  rule to tag every new AWS resource at creation.
+- **Budget:** `seads-monthly-budget` was found measuring the whole AWS account rather than
+  Seads; it's now filtered to `Project=SeadsSingapore`.
+
 ## [2026-10-17] (53)
 
 ### Scheduled jobs are live; the weekly digest no longer errors when email can't send
